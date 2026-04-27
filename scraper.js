@@ -29,6 +29,7 @@ const MARKET_SOURCES = {
   migros: "https://www.migros.com.tr/arama?q=",
   carrefour: "https://www.carrefoursa.com/arama?q=",
   cimri: "https://www.cimri.com/arama?q=",
+  tahtakaleMilkCategory: "https://www.tahtakalespot.com/uzun-omurlu-sutler-1175",
 };
 
 const CIMRI_MARKETS = new Set(["bim", "fille", "metro", "tahtakale"]);
@@ -196,6 +197,16 @@ function parsePriceValue(text) {
     String(match[1]).replace(/\./g, "").replace(",", "."),
   );
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function parseLoosePriceValue(text) {
+  const str = String(text || "");
+  const contextual = /fiyat|price|tl|₺/i.test(str);
+  if (!contextual) return null;
+  const match = str.match(/(?:^|[^\d])(\d{1,4})(?:[^\d]|$)/);
+  if (!match) return null;
+  const value = Number.parseInt(match[1], 10);
+  return Number.isFinite(value) && value >= 5 && value <= 2000 ? value : null;
 }
 
 async function fetchText(url, timeoutMs = SEARCH_TIMEOUT_MS, headers = {}) {
@@ -372,6 +383,41 @@ async function scrapeCarrefour(query) {
   return rankItemsForQuery(query, items, MARKET_RESULT_LIMIT);
 }
 
+function parseTahtakaleCategoryText(text) {
+  const items = [];
+  const lines = String(text || "").split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const linkMatch = lines[i].match(
+      /\[!\[Image \d+:\s*([^\]]+)\]\((https?:\/\/[^)]+)\)\]\((https?:\/\/www\.tahtakalespot\.com\/[^)\s]+)\s+"([^"]+)"\)/i,
+    );
+    if (!linkMatch) continue;
+    let price = null;
+    for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
+      price = parsePriceValue(lines[j]);
+      if (price !== null) break;
+    }
+    if (price === null) continue;
+    items.push({
+      market: MARKET_LABELS.tahtakale,
+      name: normalizeText(linkMatch[4] || linkMatch[1]),
+      price,
+      image: normalizeText(linkMatch[2]),
+    });
+  }
+  return dedupeItems(items);
+}
+
+async function scrapeTahtakale(query) {
+  logScrape("Tahtakale", `Starting scrape for "${query}"`);
+  const text = await withTimeout(
+    "Tahtakale category fetch",
+    fetchViaJinaReader(MARKET_SOURCES.tahtakaleMilkCategory),
+    JINA_TIMEOUT_MS,
+  );
+  if (/attention required|cloudflare|blocked/i.test(text)) return [];
+  return rankItemsForQuery(query, parseTahtakaleCategoryText(text), MARKET_RESULT_LIMIT);
+}
+
 function parseCimriByMarket(text, marketKey, aliases = []) {
   const items = [];
   const lines = String(text || "").split("\n");
@@ -480,6 +526,60 @@ async function scrapeCimriMarket(query, marketKey, aliases = []) {
   return rankItemsForQuery(query, items, MARKET_RESULT_LIMIT);
 }
 
+function decodeHtmlEntities(value) {
+  return String(value || "")
+    .replaceAll("&amp;", "&")
+    .replaceAll("&quot;", '"')
+    .replaceAll("&#39;", "'")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">");
+}
+
+function parseDuckDuckGoFallback(html, query, marketKey) {
+  const items = [];
+  const source = String(html || "");
+  const titleMatches = [...source.matchAll(/class="result__a"[^>]*>([\s\S]*?)<\/a>/gi)];
+  const snippetMatches = [
+    ...source.matchAll(/class="result__snippet"[^>]*>([\s\S]*?)<\/a>/gi),
+  ];
+  const count = Math.min(titleMatches.length, snippetMatches.length);
+  for (let i = 0; i < count; i++) {
+    const rawTitle = decodeHtmlEntities(
+      String(titleMatches[i][1] || "").replace(/<[^>]+>/g, " "),
+    );
+    const rawSnippet = decodeHtmlEntities(
+      String(snippetMatches[i][1] || "").replace(/<[^>]+>/g, " "),
+    );
+    const name = normalizeText(rawTitle);
+    const snippet = normalizeText(rawSnippet);
+    const price =
+      parsePriceValue(snippet) ??
+      parsePriceValue(name) ??
+      parseLoosePriceValue(snippet);
+    if (!name || price === null) continue;
+    items.push({
+      market: MARKET_LABELS[marketKey] || marketKey,
+      name: `${name} ${snippet}`.slice(0, 180),
+      price,
+      image: "",
+    });
+  }
+  return rankItemsForQuery(query, items, Math.min(8, MARKET_RESULT_LIMIT));
+}
+
+async function scrapeDuckDuckGoFallback(query, marketKey) {
+  const search = `${MARKET_LABELS[marketKey] || marketKey} ${query} fiyat`;
+  const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(search)}`;
+  const html = await withTimeout(
+    `${marketKey} duckduckgo fallback`,
+    fetchText(url, JINA_TIMEOUT_MS, {
+      Accept: "text/html,application/xhtml+xml",
+    }),
+    JINA_TIMEOUT_MS,
+  );
+  return parseDuckDuckGoFallback(html, query, marketKey);
+}
+
 const MARKET_HANDLERS = {
   bim: (query) => scrapeCimriMarket(query, "bim", ["bim a.s", "bim market"]),
   fille: (query) => scrapeCimriMarket(query, "fille", ["file market", "fille market"]),
@@ -487,8 +587,7 @@ const MARKET_HANDLERS = {
   migros: scrapeMigros,
   metro: (query) =>
     scrapeCimriMarket(query, "metro", ["metro grossmarket", "metro market"]),
-  tahtakale: (query) =>
-    scrapeCimriMarket(query, "tahtakale", ["tahta kale", "tahtakale spot"]),
+  tahtakale: scrapeTahtakale,
   carrefour: scrapeCarrefour,
 };
 
@@ -509,12 +608,24 @@ async function searchMultiple(product) {
   const entries = [];
   const errors = {};
   for (const market of MARKET_ORDER) {
-    const items = await searchProduct(product, market).catch((error) => {
+    let items = await searchProduct(product, market).catch((error) => {
       const message = String(error?.message || "unknown error");
       logScrape(MARKET_LABELS[market], message);
       errors[market] = message;
       return [];
     });
+    if (
+      (!Array.isArray(items) || !items.length) &&
+      ["bim", "fille", "metro", "carrefour"].includes(market)
+    ) {
+      const fallback = await scrapeDuckDuckGoFallback(product, market).catch(
+        () => [],
+      );
+      if (fallback.length) {
+        items = fallback;
+        delete errors[market];
+      }
+    }
     entries.push([market, Array.isArray(items) ? items : []]);
     if (!errors[market] && (!Array.isArray(items) || items.length === 0)) {
       errors[market] = "No matched products from source";
