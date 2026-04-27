@@ -5,6 +5,9 @@ const CHROME_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
   "(KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36";
 
+// Import Gemini service
+const { searchWithGemini, searchMultipleWithGemini } = require('./gemini_service');
+
 const MARKET_ORDER = [
   "bim",
   "fille", 
@@ -14,6 +17,7 @@ const MARKET_ORDER = [
   "tahtakale",
   "carrefour",
   "akakce",
+  "gemini",
 ];
 
 const MARKET_LABELS = {
@@ -25,6 +29,7 @@ const MARKET_LABELS = {
   tahtakale: "Tahtakale",
   carrefour: "Carrefour",
   akakce: "Akakce",
+  gemini: "Gemini AI",
 };
 
 // Direct market sources including Akakce for price comparison
@@ -801,6 +806,18 @@ async function scrapeAkakce(query) {
   return rankItemsForQuery(query, items, MARKET_RESULT_LIMIT);
 }
 
+// ---- GEMINI HANDLER ----
+async function scrapeGemini(query) {
+  logScrape("Gemini", `Starting AI search for "${query}"`);
+  try {
+    const products = await searchWithGemini(query);
+    return products.slice(0, MARKET_RESULT_LIMIT);
+  } catch (error) {
+    logScrape("Gemini", `Error: ${error.message}`);
+    return [];
+  }
+}
+
 // Market handlers
 const MARKET_HANDLERS = {
   bim: scrapeBim,
@@ -811,6 +828,7 @@ const MARKET_HANDLERS = {
   tahtakale: scrapeTahtakale,
   carrefour: scrapeCarrefour,
   akakce: scrapeAkakce,
+  gemini: scrapeGemini,
 };
 
 async function searchProduct(product, market) {
