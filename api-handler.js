@@ -126,13 +126,13 @@ async function routeApiRequest(method, urlPath, body) {
       throw new HttpError(400, "product name is required");
     }
     if (
-      !["bim", "sok", "migros", "file", "metro", "tahtakale", "carrefour"].includes(
+      !["bim", "fille", "sok", "migros", "metro", "tahtakale", "carrefour"].includes(
         market,
       )
     ) {
       throw new HttpError(
         400,
-        "market must be bim, sok, migros, file, metro, tahtakale, or carrefour",
+        "market must be bim, fille, sok, migros, metro, tahtakale, or carrefour",
       );
     }
     return jsonResponse(

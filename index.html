@@ -55,10 +55,17 @@
     </style>
   </head>
   <body>
-    <h1>Market Ürün Arama</h1>
-    <p>Sadece ürün adını yazın. Kayıtlı tatlı veya ayar yok.</p>
     <div class="search-row">
-      <input id="searchInput" type="text" placeholder="Ürün adı yazın..." />
+      <h1 id="title" style="margin: 0">Market Urun Arama</h1>
+      <select id="langSelect">
+        <option value="tr">Turkce</option>
+        <option value="en">English</option>
+        <option value="ar">العربية</option>
+      </select>
+    </div>
+    <p id="subtitle">Kayitli urun yok. Sadece urun adini yazip ara.</p>
+    <div class="search-row">
+      <input id="searchInput" type="text" placeholder="Urun adi yazin..." />
       <button id="searchBtn" type="button">Ara</button>
     </div>
     <p id="status"></p>

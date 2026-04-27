@@ -7,18 +7,18 @@ const CHROME_USER_AGENT =
 
 const MARKET_ORDER = [
   "bim",
+  "fille",
   "sok",
   "migros",
-  "file",
   "metro",
   "tahtakale",
   "carrefour",
 ];
 const MARKET_LABELS = {
   bim: "Bim",
+  fille: "Fille",
   sok: "Sok",
   migros: "Migros",
-  file: "File",
   metro: "Metro",
   tahtakale: "Tahtakale",
   carrefour: "Carrefour",
@@ -161,12 +161,17 @@ function dedupeItems(items) {
 }
 
 function rankItemsForQuery(query, items, limit = MARKET_RESULT_LIMIT) {
-  return dedupeItems(items)
+  const deduped = dedupeItems(items);
+  const scored = deduped
     .map((item) => ({ item, score: itemMatchScore(query, item.name) }))
     .filter(({ score }) => score > 0)
     .sort((a, b) => b.score - a.score || a.item.price - b.item.price)
     .slice(0, limit)
     .map(({ item }) => item);
+  if (scored.length) return scored;
+  return deduped
+    .sort((a, b) => a.price - b.price || a.name.localeCompare(b.name))
+    .slice(0, limit);
 }
 
 function parsePriceValue(text) {
@@ -409,9 +414,14 @@ function parseCimriByMarket(text, marketKey, aliases = []) {
 
 async function scrapeCimriMarket(query, marketKey, aliases = []) {
   logScrape(MARKET_LABELS[marketKey] || marketKey, `Starting scrape for "${query}"`);
-  const variants = queryVariants(query);
+  const variants = queryVariants(query).flatMap((variant) => [
+    variant,
+    `${variant} ${marketKey}`,
+    ...aliases.map((alias) => `${variant} ${alias}`),
+  ]);
+  const uniqueVariants = [...new Set(variants.map(normalizeText).filter(Boolean))];
   const items = [];
-  for (const variant of variants) {
+  for (const variant of uniqueVariants) {
     try {
       const text = await withTimeout(
         `${marketKey} Cimri Jina fetch`,
@@ -429,9 +439,9 @@ async function scrapeCimriMarket(query, marketKey, aliases = []) {
 
 const MARKET_HANDLERS = {
   bim: (query) => scrapeCimriMarket(query, "bim", ["bim a.s", "bim market"]),
+  fille: (query) => scrapeCimriMarket(query, "fille", ["file market", "fille market"]),
   sok: scrapeSok,
   migros: scrapeMigros,
-  file: (query) => scrapeCimriMarket(query, "file", ["file market"]),
   metro: (query) =>
     scrapeCimriMarket(query, "metro", ["metro grossmarket", "metro market"]),
   tahtakale: (query) =>
