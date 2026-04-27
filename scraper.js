@@ -182,10 +182,12 @@ function itemMatchScore(query, itemName) {
     'hafta', 'bu hafta', 'catalog', 'brochure', 'discount', 'campaign'
   ];
   const nonProductPatterns = [
-    'bileti', 'kart', 'fiyat listesi', 'tarifesi', 'ücret', 'giysi', 
+    'bileti', 'bilet', 'kart', 'fiyat listesi', 'tarifesi', 'ücret', 'giysi', 
     'kıyafet', 'ayakkabı', 'çanta', 'aksesuar', 'elektronik', 'telefon', 
-    'bilgisayar', 'bilet', 'kart', 'fiyatı', 'hakkında', 'hakkında bilgi',
-    'mağazacılık', 'perakende', 'şirket', 'kurumsal', 'hizmet', 'destek'
+    'bilgisayar', 'fiyatı', 'hakkında', 'hakkında bilgi', 'ürünlerimiz',
+    'mağazacılık', 'perakende', 'şirket', 'kurumsal', 'hizmet', 'destek',
+    'anonim kart', 'öğrenci kartı', 'istanbulkart', 'otobüs bileti', 'metro turizm',
+    'ürün çeşitliliği', 'markalı ürünler', 'toptancı market', 'fiyat arşivi'
   ];
   const babyProductPatterns = [
     'devam', 'bebek', 'aptamil', 'optipro', 'formula', 'anne', 'bebeği', 
@@ -507,6 +509,8 @@ async function scrapeMigros(query) {
 function parseCarrefourFromSearchText(text) {
   const items = [];
   const lines = String(text || "").split("\n");
+  
+  // Primary pattern for Carrefour products
   for (let i = 0; i < lines.length; i++) {
     const imageMatch = lines[i].match(
       /\[!\[Image \d+: ([^\]]+?)\]\((https?:\/\/[^)]+)\)\]\((https?:\/\/(?:www\.)?carrefoursa\.com\/[^)\s]+)\)/i,
@@ -523,7 +527,7 @@ function parseCarrefourFromSearchText(text) {
       if (price === null) price = parsePriceValue(line);
     }
 
-    if (name && price) {
+    if (name && price && price > 0 && price < 1000) {
       items.push({
         market: MARKET_LABELS.carrefour,
         name,
@@ -533,30 +537,73 @@ function parseCarrefourFromSearchText(text) {
     }
   }
   
-  // Alternative parsing for different Carrefour formats
+  // Enhanced alternative parsing for different Carrefour formats
   for (let i = 0; i < lines.length; i++) {
     const line = normalizeText(lines[i]);
-    const imageMatch = line.match(/!\[Image \d+: ([^\]]+)\]\((https?:\/\/[^)]+)\)/);
+    
+    // Look for any image pattern
+    const imageMatch = line.match(/!\[Image \d+: ([^\]]+)\]\((https?:\/\/[^)]+)\)/) ||
+                        line.match(/\[!\[([^\]]+)\]\((https?:\/\/[^)]+)\)/);
     if (imageMatch) {
       let name = normalizeText(imageMatch[1]);
       let price = null;
+      let image = normalizeText(imageMatch[2]);
       
-      // Look for price in nearby lines
-      for (let j = i + 1; j < Math.min(i + 8, lines.length); j++) {
+      // Look for price in nearby lines (wider range)
+      for (let j = i - 2; j < Math.min(i + 10, lines.length); j++) {
+        if (j < 0) continue;
         const nearbyLine = normalizeText(lines[j]);
         if (!nearbyLine) continue;
-        const heading = nearbyLine.match(/^# \[([^\]]+)\]/);
+        const heading = nearbyLine.match(/^# \[([^\]]+)\]/) || nearbyLine.match(/^#+\s*(.+)$/);
         if (heading) name = normalizeText(heading[1]);
         price = parsePriceValue(nearbyLine);
         if (price !== null) break;
       }
       
-      if (price && price > 0) {
+      // Also check for price in the same line
+      if (price === null) {
+        const priceMatch = line.match(/([\d]+[.,]\d{2})\s*(?:TL|₺)?/i);
+        if (priceMatch) {
+          const potentialPrice = Number.parseFloat(priceMatch[1].replace(",", "."));
+          if (potentialPrice > 0 && potentialPrice < 1000) {
+            price = potentialPrice;
+          }
+        }
+      }
+      
+      if (price && price > 0 && price < 1000) {
         items.push({
           market: MARKET_LABELS.carrefour,
           name,
           price,
-          image: normalizeText(imageMatch[2]),
+          image,
+        });
+      }
+    }
+  }
+  
+  // Generic product extraction from markdown links
+  for (let i = 0; i < lines.length; i++) {
+    const line = normalizeText(lines[i]);
+    const mdLink = line.match(/\[([^\]]{3,})\]\((https?:\/\/[^)]+)\)/);
+    if (mdLink) {
+      const name = normalizeText(mdLink[1]);
+      let price = parsePriceValue(line);
+      
+      // Look for price in nearby lines
+      if (price === null) {
+        for (let j = i + 1; j < Math.min(i + 3, lines.length); j++) {
+          price = parsePriceValue(lines[j]);
+          if (price !== null) break;
+        }
+      }
+      
+      if (price && price > 0 && price < 1000) {
+        items.push({
+          market: MARKET_LABELS.carrefour,
+          name,
+          price,
+          image: normalizeText(mdLink[2]),
         });
       }
     }
@@ -592,24 +639,91 @@ async function scrapeCarrefour(query) {
 function parseTahtakaleCategoryText(text) {
   const items = [];
   const lines = String(text || "").split("\n");
+  
+  // Primary pattern for Tahtakale products
   for (let i = 0; i < lines.length; i++) {
-    const linkMatch = lines[i].match(
+    const line = normalizeText(lines[i]);
+    
+    // Look for image patterns
+    const imageMatch = line.match(/\[!\[Image \d+:\s*([^\]]+)\]\((https?:\/\/[^)]+)\)/i) ||
+                        line.match(/!\[([^\]]+)\]\((https?:\/\/[^)]+)\)/i);
+    
+    if (imageMatch) {
+      let name = normalizeText(imageMatch[1]);
+      let price = null;
+      let image = normalizeText(imageMatch[2]);
+      
+      // Look for price in nearby lines
+      for (let j = i + 1; j < Math.min(i + 8, lines.length); j++) {
+        price = parsePriceValue(lines[j]);
+        if (price !== null) break;
+      }
+      
+      // Also check for price in the same line
+      if (price === null) {
+        const priceMatch = line.match(/([\d]+[.,]\d{2})\s*(?:TL|₺)?/i);
+        if (priceMatch) {
+          price = Number.parseFloat(priceMatch[1].replace(",", "."));
+        }
+      }
+      
+      if (price && price > 0 && price < 1000) {
+        items.push({
+          market: MARKET_LABELS.tahtakale,
+          name,
+          price,
+          image,
+        });
+      }
+    }
+    
+    // Alternative pattern for markdown links with images
+    const linkMatch = line.match(
       /\[!\[Image \d+:\s*([^\]]+)\]\((https?:\/\/[^)]+)\)\]\((https?:\/\/www\.tahtakalespot\.com\/[^)\s]+)\s+"([^"]+)"\)/i,
     );
-    if (!linkMatch) continue;
-    let price = null;
-    for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
-      price = parsePriceValue(lines[j]);
-      if (price !== null) break;
+    if (linkMatch) {
+      let price = null;
+      for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
+        price = parsePriceValue(lines[j]);
+        if (price !== null) break;
+      }
+      if (price === null) continue;
+      items.push({
+        market: MARKET_LABELS.tahtakale,
+        name: normalizeText(linkMatch[4] || linkMatch[1]),
+        price,
+        image: normalizeText(linkMatch[2]),
+      });
     }
-    if (price === null) continue;
-    items.push({
-      market: MARKET_LABELS.tahtakale,
-      name: normalizeText(linkMatch[4] || linkMatch[1]),
-      price,
-      image: normalizeText(linkMatch[2]),
-    });
   }
+  
+  // Generic product extraction from markdown links
+  for (let i = 0; i < lines.length; i++) {
+    const line = normalizeText(lines[i]);
+    const mdLink = line.match(/\[([^\]]{3,})\]\((https?:\/\/[^)]+)\)/);
+    if (mdLink) {
+      const name = normalizeText(mdLink[1]);
+      let price = parsePriceValue(line);
+      
+      // Look for price in nearby lines
+      if (price === null) {
+        for (let j = i + 1; j < Math.min(i + 3, lines.length); j++) {
+          price = parsePriceValue(lines[j]);
+          if (price !== null) break;
+        }
+      }
+      
+      if (price && price > 0 && price < 1000) {
+        items.push({
+          market: MARKET_LABELS.tahtakale,
+          name,
+          price,
+          image: normalizeText(mdLink[2]),
+        });
+      }
+    }
+  }
+  
   return dedupeItems(items);
 }
 
