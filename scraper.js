@@ -1,6 +1,6 @@
-const SEARCH_TIMEOUT_MS = Number(process.env.SEARCH_TIMEOUT_MS || 25000);
-const JINA_TIMEOUT_MS = Number(process.env.JINA_TIMEOUT_MS || 20000);
-const MARKET_RESULT_LIMIT = Number(process.env.MARKET_RESULT_LIMIT || 20);
+const SEARCH_TIMEOUT_MS = Number(process.env.SEARCH_TIMEOUT_MS || 35000);
+const JINA_TIMEOUT_MS = Number(process.env.JINA_TIMEOUT_MS || 30000);
+const MARKET_RESULT_LIMIT = Number(process.env.MARKET_RESULT_LIMIT || 50);
 const CHROME_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
   "(KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36";
@@ -29,7 +29,7 @@ const MARKET_SOURCES = {
   migros: "https://www.migros.com.tr/arama?q=",
   carrefour: "https://www.carrefoursa.com/arama?q=",
   cimri: "https://www.cimri.com/arama?q=",
-  tahtakaleMilkCategory: "https://www.tahtakalespot.com/uzun-omurlu-sutler-1175",
+  tahtakaleMilkCategory: "https://www.tahtakalespot.com/sut-ve-sut-urunleri-1175",
 };
 
 const CIMRI_MARKETS = new Set(["bim", "fille", "metro", "tahtakale"]);
@@ -110,17 +110,43 @@ function improveSearchQuery(query) {
     .replace(/\byogurt\b/g, "yoğurt")
     .replace(/\bsut\b/g, "süt")
     .replace(/\bkasar\b/g, "kaşar")
-    .replace(/\bcilek\b/g, "çilek");
+    .replace(/\bcilek\b/g, "çilek")
+    .replace(/\bbread\b/g, "ekmek")
+    .replace(/\bwater\b/g, "su")
+    .replace(/\begg\b/g, "yumurta")
+    .replace(/\b oil\b/g, "yağ")
+    .replace(/\bsugar\b/g, "şeker")
+    .replace(/\bsalt\b/g, "tuz");
 }
 
 function queryVariants(query) {
   const base = improveSearchQuery(query);
   const variants = new Set([base, transliterateTurkish(base)]);
-  if (base.includes("süt")) variants.add(base.replaceAll("süt", "sut"));
-  if (base.includes("yoğurt"))
+  
+  // Add common Turkish variations
+  if (base.includes("süt")) {
+    variants.add(base.replaceAll("süt", "sut"));
+    variants.add(`${base} içme`);
+    variants.add(`${base} ayran`);
+  }
+  if (base.includes("yoğurt")) {
     variants.add(base.replaceAll("yoğurt", "yogurt"));
-  if (base.includes("çilek")) variants.add(base.replaceAll("çilek", "cilek"));
-  if (base.includes("kaşar")) variants.add(base.replaceAll("kaşar", "kasar"));
+    variants.add(`${base} meyve`);
+  }
+  if (base.includes("çilek")) {
+    variants.add(base.replaceAll("çilek", "cilek"));
+    variants.add(`${base} taze`);
+  }
+  if (base.includes("kaşar")) {
+    variants.add(base.replaceAll("kaşar", "kasar"));
+    variants.add(`${base} taze`);
+    variants.add(`${base} eski`);
+  }
+  if (base.includes("ekmek")) {
+    variants.add(`${base} beyaz`);
+    variants.add(`${base} tam buğday`);
+  }
+  
   return [...variants].map(normalizeText).filter(Boolean);
 }
 
@@ -146,11 +172,23 @@ function itemMatchScore(query, itemName) {
   if (normalizedName.includes(normalizedQuery))
     score += 4;
 
-  // Filter obvious unrelated results for milk queries.
+  // Filter obvious unrelated results
   if (/\b(sut|süt|milk)\b/i.test(normalizedQuery)) {
-    if (/\b(devam|bebek|aptamil|optipro|formula)\b/i.test(normalizedName))
-      score -= 6;
+    // Exclude baby formula and related products
+    if (/\b(devam|bebek|aptamil|optipro|formula|anne|bebeği|mama|beslenme)\b/i.test(normalizedName))
+      score -= 10;
+    // Exclude non-food items
+    if (/\b(bileti|kart|fiyat|tarifesi|ücret|giysi|kıyafet|ayakkabı|çanta|aksesuar)\b/i.test(normalizedName))
+      score -= 8;
   }
+  
+  // Filter non-food items for general queries
+  if (/\b(bileti|kart|fiyat|tarifesi|ücret|giysi|kıyafet|ayakkabı|çanta|aksesuar|elektronik|telefon|bilgisayar)\b/i.test(normalizedName))
+    score -= 8;
+  
+  // Filter catalog and brochure items
+  if (/\b(katalog|broşür|indirim|kampanya|fırsat|aktüel|hafta|bu hafta)\b/i.test(normalizedName))
+    score -= 6;
 
   return score;
 }
@@ -249,6 +287,40 @@ function parseSokFromJinaText(text) {
       image: normalizeText(match[1]),
     });
   }
+  
+  // Alternative parsing for different Sok formats
+  const lines = String(text || "").split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const line = normalizeText(lines[i]);
+    const imageMatch = line.match(/!\[Image \d+: ([^\]]+)\]\((https?:\/\/[^)]+)\)/);
+    if (imageMatch) {
+      let name = normalizeText(imageMatch[1]);
+      let price = null;
+      // Look for price in the same line or nearby lines
+      const priceMatch = line.match(/([\d]+[.,]\d+)\u20BA/);
+      if (priceMatch) {
+        price = Number.parseFloat(priceMatch[1].replace(",", "."));
+      } else {
+        // Check nearby lines for price
+        for (let j = i + 1; j < Math.min(i + 3, lines.length); j++) {
+          const nearbyPrice = lines[j].match(/([\d]+[.,]\d+)\u20BA/);
+          if (nearbyPrice) {
+            price = Number.parseFloat(nearbyPrice[1].replace(",", "."));
+            break;
+          }
+        }
+      }
+      if (price && price > 0) {
+        items.push({
+          market: MARKET_LABELS.sok,
+          name,
+          price,
+          image: normalizeText(imageMatch[2]),
+        });
+      }
+    }
+  }
+  
   return dedupeItems(items);
 }
 
@@ -279,6 +351,8 @@ async function scrapeSok(query) {
 function parseMigrosFromSearchText(text) {
   const items = [];
   const lines = String(text || "").split("\n");
+  
+  // Primary parsing for standard Migros format
   for (let i = 0; i < lines.length; i++) {
     const imageMatch = lines[i].match(
       /\[!\[Image \d+: ([^\]]+?)\]\((https?:\/\/[^)]+)\)\]\((https?:\/\/www\.migros\.com\.tr\/[^)\s]+)\)/i,
@@ -301,6 +375,40 @@ function parseMigrosFromSearchText(text) {
       image: normalizeText(imageMatch[2]),
     });
   }
+  
+  // Alternative parsing for different Migros formats
+  for (let i = 0; i < lines.length; i++) {
+    const line = normalizeText(lines[i]);
+    
+    // Look for any image pattern
+    const imageMatch = line.match(/!\[Image \d+: ([^\]]+)\]\((https?:\/\/[^)]+)\)/) ||
+                        line.match(/\[!\[([^\]]+)\]\((https?:\/\/[^)]+)\)/);
+    if (imageMatch) {
+      let name = normalizeText(imageMatch[1]);
+      let price = null;
+      
+      // Look for price in nearby lines (wider range)
+      for (let j = i - 2; j < Math.min(i + 10, lines.length); j++) {
+        if (j < 0) continue;
+        const nearbyLine = normalizeText(lines[j]);
+        if (!nearbyLine) continue;
+        const heading = nearbyLine.match(/^# \[([^\]]+)\]/) || nearbyLine.match(/^#+\s*(.+)$/);
+        if (heading) name = normalizeText(heading[1]);
+        price = parsePriceValue(nearbyLine);
+        if (price !== null) break;
+      }
+      
+      if (price && price > 0) {
+        items.push({
+          market: MARKET_LABELS.migros,
+          name,
+          price,
+          image: normalizeText(imageMatch[2]),
+        });
+      }
+    }
+  }
+  
   return dedupeItems(items);
 }
 
@@ -356,6 +464,36 @@ function parseCarrefourFromSearchText(text) {
       });
     }
   }
+  
+  // Alternative parsing for different Carrefour formats
+  for (let i = 0; i < lines.length; i++) {
+    const line = normalizeText(lines[i]);
+    const imageMatch = line.match(/!\[Image \d+: ([^\]]+)\]\((https?:\/\/[^)]+)\)/);
+    if (imageMatch) {
+      let name = normalizeText(imageMatch[1]);
+      let price = null;
+      
+      // Look for price in nearby lines
+      for (let j = i + 1; j < Math.min(i + 8, lines.length); j++) {
+        const nearbyLine = normalizeText(lines[j]);
+        if (!nearbyLine) continue;
+        const heading = nearbyLine.match(/^# \[([^\]]+)\]/);
+        if (heading) name = normalizeText(heading[1]);
+        price = parsePriceValue(nearbyLine);
+        if (price !== null) break;
+      }
+      
+      if (price && price > 0) {
+        items.push({
+          market: MARKET_LABELS.carrefour,
+          name,
+          price,
+          image: normalizeText(imageMatch[2]),
+        });
+      }
+    }
+  }
+  
   return dedupeItems(items);
 }
 
@@ -409,13 +547,31 @@ function parseTahtakaleCategoryText(text) {
 
 async function scrapeTahtakale(query) {
   logScrape("Tahtakale", `Starting scrape for "${query}"`);
-  const text = await withTimeout(
-    "Tahtakale category fetch",
-    fetchViaJinaReader(MARKET_SOURCES.tahtakaleMilkCategory),
-    JINA_TIMEOUT_MS,
-  );
-  if (/attention required|cloudflare|blocked/i.test(text)) return [];
-  return rankItemsForQuery(query, parseTahtakaleCategoryText(text), MARKET_RESULT_LIMIT);
+  
+  // Try category-based search first
+  try {
+    const text = await withTimeout(
+      "Tahtakale category fetch",
+      fetchViaJinaReader(MARKET_SOURCES.tahtakaleMilkCategory),
+      JINA_TIMEOUT_MS,
+    );
+    if (!/attention required|cloudflare|blocked/i.test(text)) {
+      const categoryItems = parseTahtakaleCategoryText(text);
+      if (categoryItems.length > 0) {
+        return rankItemsForQuery(query, categoryItems, MARKET_RESULT_LIMIT);
+      }
+    }
+  } catch (error) {
+    logScrape("Tahtakale", `Category search failed: ${error.message}`);
+  }
+  
+  // Fallback to Cimri search
+  try {
+    return await scrapeCimriMarket(query, "tahtakale", ["tahtakale spot", "tahtakale market"]);
+  } catch (error) {
+    logScrape("Tahtakale", `Cimri fallback failed: ${error.message}`);
+    return [];
+  }
 }
 
 function parseCimriByMarket(text, marketKey, aliases = []) {
@@ -442,18 +598,22 @@ function parseCimriByMarket(text, marketKey, aliases = []) {
     if (price === null) continue;
 
     let name = "";
+    let image = "";
     for (let j = i - 5; j <= i + 2; j++) {
       if (j < 0 || j >= lines.length) continue;
       const candidate = normalizeText(lines[j]);
       const heading = candidate.match(/^#+\s*(.+)$/);
       if (heading && heading[1]) {
         name = normalizeText(heading[1]);
-        break;
       }
-      const mdLink = candidate.match(/\[([^\]]+)\]\(https?:\/\/[^)]+\)/);
+      const mdLink = candidate.match(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/);
       if (mdLink && mdLink[1] && mdLink[1].length > 3) {
-        name = normalizeText(mdLink[1]);
-        break;
+        if (!name) name = normalizeText(mdLink[1]);
+      }
+      // Extract image from markdown image syntax
+      const imageMatch = candidate.match(/!\[[^\]]*\]\((https?:\/\/[^)]+)\)/);
+      if (imageMatch && imageMatch[1]) {
+        image = normalizeText(imageMatch[1]);
       }
     }
     if (!name) name = normalizeText(line.replace(/\s*[-|].*$/, ""));
@@ -463,7 +623,7 @@ function parseCimriByMarket(text, marketKey, aliases = []) {
       market: MARKET_LABELS[marketKey] || marketKey,
       name,
       price,
-      image: "",
+      image,
     });
   }
   return dedupeItems(items);
@@ -487,11 +647,23 @@ function parseCimriGeneric(text, marketKey) {
       }
     }
     if (price === null) continue;
+    
+    // Look for images in nearby lines
+    let image = "";
+    for (let j = i - 2; j <= i + 2; j++) {
+      if (j < 0 || j >= lines.length) continue;
+      const imageMatch = lines[j].match(/!\[[^\]]*\]\((https?:\/\/[^)]+)\)/);
+      if (imageMatch && imageMatch[1]) {
+        image = normalizeText(imageMatch[1]);
+        break;
+      }
+    }
+    
     items.push({
       market: MARKET_LABELS[marketKey] || marketKey,
       name,
       price,
-      image: "",
+      image,
     });
   }
   return dedupeItems(items);
@@ -499,10 +671,13 @@ function parseCimriGeneric(text, marketKey) {
 
 async function scrapeCimriMarket(query, marketKey, aliases = []) {
   logScrape(MARKET_LABELS[marketKey] || marketKey, `Starting scrape for "${query}"`);
-  const baseVariants = queryVariants(query).slice(0, 1);
+  const baseVariants = queryVariants(query);
   const variants = baseVariants.flatMap((variant) => [
     `${variant} ${marketKey}`,
-    ...aliases.slice(0, 1).map((alias) => `${variant} ${alias}`),
+    `${variant} ${marketKey} fiyat`,
+    `${variant} ${marketKey} aktüel`,
+    ...aliases.slice(0, 2).map((alias) => `${variant} ${alias}`),
+    ...aliases.slice(0, 2).map((alias) => `${variant} ${alias} fiyat`),
   ]);
   const uniqueVariants = [...new Set(variants.map(normalizeText).filter(Boolean))];
   const items = [];
@@ -581,12 +756,12 @@ async function scrapeDuckDuckGoFallback(query, marketKey) {
 }
 
 const MARKET_HANDLERS = {
-  bim: (query) => scrapeCimriMarket(query, "bim", ["bim a.s", "bim market"]),
-  fille: (query) => scrapeCimriMarket(query, "fille", ["file market", "fille market"]),
+  bim: (query) => scrapeCimriMarket(query, "bim", ["bim a.s", "bim market", "bim aktüel"]),
+  fille: (query) => scrapeCimriMarket(query, "fille", ["file market", "fille market", "fille çarşı"]),
   sok: scrapeSok,
   migros: scrapeMigros,
   metro: (query) =>
-    scrapeCimriMarket(query, "metro", ["metro grossmarket", "metro market"]),
+    scrapeCimriMarket(query, "metro", ["metro grossmarket", "metro market", "metro grosmarket"]),
   tahtakale: scrapeTahtakale,
   carrefour: scrapeCarrefour,
 };

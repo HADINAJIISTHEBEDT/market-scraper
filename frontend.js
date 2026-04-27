@@ -108,7 +108,11 @@ function renderResults(data) {
     }
     html += `<div class="result-grid">`;
     for (const item of items) {
+      const imageHtml = item.image ? 
+        `<img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.name)}" class="item-image" onerror="this.style.display='none'">` : 
+        '';
       html += `<article class="item-card">
+        ${imageHtml}
         <div class="item-name">${escapeHtml(item.name)}</div>
         <div class="item-price">${formatPrice(item.price)}</div>
       </article>`;
