@@ -13,6 +13,7 @@ const MARKET_ORDER = [
   "metro",
   "tahtakale",
   "carrefour",
+  "akakce",
 ];
 
 const MARKET_LABELS = {
@@ -23,9 +24,10 @@ const MARKET_LABELS = {
   metro: "Metro",
   tahtakale: "Tahtakale",
   carrefour: "Carrefour",
+  akakce: "Akakce",
 };
 
-// Direct market sources - no comparison sites
+// Direct market sources including Akakce for price comparison
 const MARKET_SOURCES = {
   sok: "https://www.sokmarket.com.tr/arama?q=",
   migros: "https://www.migros.com.tr/arama?q=",
@@ -35,6 +37,8 @@ const MARKET_SOURCES = {
   fille: "https://www.file.com.tr/Arama?q=",
   metro: "https://www.metro.com.tr/Arama?q=",
   tahtakale: "https://www.tahtakalespot.com/Arama?q=",
+  // Akakce for price comparison and product extraction
+  akakce: "https://www.akakce.com/arama?q=",
 };
 
 function logScrape(stage, message) {
@@ -695,6 +699,108 @@ async function scrapeTahtakale(query) {
   return rankItemsForQuery(query, items, MARKET_RESULT_LIMIT);
 }
 
+// ---- AKAKCE PARSER ----
+function parseAkakceProducts(text) {
+  const items = [];
+  const lines = String(text || "").split("\n");
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = normalizeText(lines[i]);
+    
+    // Look for product patterns in Akakce format
+    const productMatch = line.match(/!\[Image \d+: ([^\]]+)\]\((https?:\/\/[^)]+)\)/) ||
+                         line.match(/\[!\[([^\]]+)\]\((https?:\/\/[^)]+)\)/) ||
+                         line.match(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/);
+    
+    if (productMatch) {
+      let name = normalizeText(productMatch[1]);
+      let image = normalizeText(productMatch[2]);
+      let price = null;
+      let market = null;
+      
+      // Look for price in the same line
+      const priceMatch = line.match(/([\d]+[.,]\d+)\s*(?:₺|TL|TL)/i);
+      if (priceMatch) {
+        price = Number.parseFloat(priceMatch[1].replace(",", "."));
+      }
+      
+      // Look for price in nearby lines
+      if (!price) {
+        for (let j = i + 1; j < Math.min(i + 8, lines.length); j++) {
+          const nearbyPrice = parsePriceValue(lines[j]);
+          if (nearbyPrice) {
+            price = nearbyPrice;
+            break;
+          }
+        }
+      }
+      
+      // Try to extract market name from the line or nearby lines
+      const marketPatterns = [
+        /(?:Bim|Fille|Sok|Migros|Metro|Tahtakale|Carrefour|A101|Şok|Migros|CarrefourSA)/i,
+        /(bim|fille|sok|migros|metro|tahtakale|carrefour|a101)/i
+      ];
+      
+      for (const pattern of marketPatterns) {
+        const marketMatch = line.match(pattern);
+        if (marketMatch) {
+          market = normalizeText(marketMatch[0]);
+          break;
+        }
+      }
+      
+      // If no market found, look in nearby lines
+      if (!market) {
+        for (let j = i - 2; j < Math.min(i + 5, lines.length); j++) {
+          if (j < 0) continue;
+          const nearbyLine = normalizeText(lines[j]);
+          for (const pattern of marketPatterns) {
+            const marketMatch = nearbyLine.match(pattern);
+            if (marketMatch) {
+              market = normalizeText(marketMatch[0]);
+              break;
+            }
+          }
+          if (market) break;
+        }
+      }
+      
+      // Only include if we have a valid grocery product with price
+      if (price && isGroceryProduct(name, price)) {
+        items.push({
+          market: market || MARKET_LABELS.akakce,
+          name,
+          price,
+          image,
+        });
+      }
+    }
+  }
+  
+  return dedupeItems(items);
+}
+
+async function scrapeAkakce(query) {
+  logScrape("Akakce", `Starting scrape for "${query}"`);
+  const variants = queryVariants(query);
+  const items = [];
+  
+  for (const variant of variants) {
+    try {
+      const text = await withTimeout(
+        `Akakce Jina fetch`,
+        fetchViaJinaReader(`${MARKET_SOURCES.akakce}${encodeURIComponent(variant)}`),
+      );
+      if (/attention required|cloudflare|blocked/i.test(text)) continue;
+      items.push(...parseAkakceProducts(text));
+    } catch (error) {
+      logScrape("Akakce", `Error for "${variant}": ${error.message}`);
+    }
+  }
+  
+  return rankItemsForQuery(query, items, MARKET_RESULT_LIMIT);
+}
+
 // Market handlers
 const MARKET_HANDLERS = {
   bim: scrapeBim,
@@ -704,6 +810,7 @@ const MARKET_HANDLERS = {
   metro: scrapeMetro,
   tahtakale: scrapeTahtakale,
   carrefour: scrapeCarrefour,
+  akakce: scrapeAkakce,
 };
 
 async function searchProduct(product, market) {
