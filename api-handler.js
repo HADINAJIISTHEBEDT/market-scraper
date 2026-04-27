@@ -125,8 +125,15 @@ async function routeApiRequest(method, urlPath, body) {
     if (!product) {
       throw new HttpError(400, "product name is required");
     }
-    if (!["sok", "migros", "carrefour"].includes(market)) {
-      throw new HttpError(400, "market must be sok, migros, or carrefour");
+    if (
+      !["bim", "sok", "migros", "file", "metro", "tahtakale", "carrefour"].includes(
+        market,
+      )
+    ) {
+      throw new HttpError(
+        400,
+        "market must be bim, sok, migros, file, metro, tahtakale, or carrefour",
+      );
     }
     return jsonResponse(
       200,

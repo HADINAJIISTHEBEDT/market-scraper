@@ -5,10 +5,22 @@ const CHROME_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
   "(KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36";
 
-const MARKET_ORDER = ["sok", "migros", "carrefour"];
+const MARKET_ORDER = [
+  "bim",
+  "sok",
+  "migros",
+  "file",
+  "metro",
+  "tahtakale",
+  "carrefour",
+];
 const MARKET_LABELS = {
+  bim: "Bim",
   sok: "Sok",
   migros: "Migros",
+  file: "File",
+  metro: "Metro",
+  tahtakale: "Tahtakale",
   carrefour: "Carrefour",
 };
 
@@ -16,6 +28,7 @@ const MARKET_SOURCES = {
   sok: "https://www.sokmarket.com.tr/arama?q=",
   migros: "https://www.migros.com.tr/arama?q=",
   carrefour: "https://www.carrefoursa.com/arama?q=",
+  cimri: "https://www.cimri.com/arama?q=",
 };
 
 function toBaseUnit(value, unit) {
@@ -343,9 +356,86 @@ async function scrapeCarrefour(query) {
   return rankItemsForQuery(query, items, MARKET_RESULT_LIMIT);
 }
 
+function parseCimriByMarket(text, marketKey, aliases = []) {
+  const items = [];
+  const lines = String(text || "").split("\n");
+  const marketTokens = [marketKey, ...aliases]
+    .map((value) => transliterateTurkish(String(value || "").toLowerCase()))
+    .filter(Boolean);
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = normalizeText(lines[i]);
+    if (!line) continue;
+    const normalizedLine = transliterateTurkish(line.toLowerCase());
+    if (!marketTokens.some((token) => normalizedLine.includes(token))) continue;
+
+    let price = parsePriceValue(line);
+    if (price === null) {
+      for (let j = i - 2; j <= i + 2; j++) {
+        if (j < 0 || j >= lines.length) continue;
+        price = parsePriceValue(lines[j]);
+        if (price !== null) break;
+      }
+    }
+    if (price === null) continue;
+
+    let name = "";
+    for (let j = i - 5; j <= i + 2; j++) {
+      if (j < 0 || j >= lines.length) continue;
+      const candidate = normalizeText(lines[j]);
+      const heading = candidate.match(/^#+\s*(.+)$/);
+      if (heading && heading[1]) {
+        name = normalizeText(heading[1]);
+        break;
+      }
+      const mdLink = candidate.match(/\[([^\]]+)\]\(https?:\/\/[^)]+\)/);
+      if (mdLink && mdLink[1] && mdLink[1].length > 3) {
+        name = normalizeText(mdLink[1]);
+        break;
+      }
+    }
+    if (!name) name = normalizeText(line.replace(/\s*[-|].*$/, ""));
+    if (!name) continue;
+
+    items.push({
+      market: MARKET_LABELS[marketKey] || marketKey,
+      name,
+      price,
+      image: "",
+    });
+  }
+  return dedupeItems(items);
+}
+
+async function scrapeCimriMarket(query, marketKey, aliases = []) {
+  logScrape(MARKET_LABELS[marketKey] || marketKey, `Starting scrape for "${query}"`);
+  const variants = queryVariants(query);
+  const items = [];
+  for (const variant of variants) {
+    try {
+      const text = await withTimeout(
+        `${marketKey} Cimri Jina fetch`,
+        fetchViaJinaReader(`${MARKET_SOURCES.cimri}${encodeURIComponent(variant)}`),
+        JINA_TIMEOUT_MS,
+      );
+      if (/attention required|cloudflare|blocked/i.test(text)) continue;
+      items.push(...parseCimriByMarket(text, marketKey, aliases));
+    } catch (error) {
+      logScrape(MARKET_LABELS[marketKey] || marketKey, `Error for "${variant}": ${error.message}`);
+    }
+  }
+  return rankItemsForQuery(query, items, MARKET_RESULT_LIMIT);
+}
+
 const MARKET_HANDLERS = {
+  bim: (query) => scrapeCimriMarket(query, "bim", ["bim a.s", "bim market"]),
   sok: scrapeSok,
   migros: scrapeMigros,
+  file: (query) => scrapeCimriMarket(query, "file", ["file market"]),
+  metro: (query) =>
+    scrapeCimriMarket(query, "metro", ["metro grossmarket", "metro market"]),
+  tahtakale: (query) =>
+    scrapeCimriMarket(query, "tahtakale", ["tahta kale", "tahtakale spot"]),
   carrefour: scrapeCarrefour,
 };
 
