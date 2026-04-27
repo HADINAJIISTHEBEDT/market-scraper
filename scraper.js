@@ -1,6 +1,6 @@
 const SEARCH_TIMEOUT_MS = Number(process.env.SEARCH_TIMEOUT_MS || 35000);
 const JINA_TIMEOUT_MS = Number(process.env.JINA_TIMEOUT_MS || 30000);
-const MARKET_RESULT_LIMIT = Number(process.env.MARKET_RESULT_LIMIT || 50);
+const MARKET_RESULT_LIMIT = Number(process.env.MARKET_RESULT_LIMIT || 7);
 const CHROME_USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
   "(KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36";
@@ -172,23 +172,45 @@ function itemMatchScore(query, itemName) {
   if (normalizedName.includes(normalizedQuery))
     score += 4;
 
-  // Filter obvious unrelated results
+  // Filter out websites, catalogs, and non-product content
+  const websitePatterns = [
+    'anasayfa', 'www', 'com', 'net', 'tr', 'org', 'gov', 'edu',
+    'https', 'http', 'site', 'web', 'sayfa', 'page', 'homepage'
+  ];
+  const catalogPatterns = [
+    'katalog', 'broşür', 'indirim', 'kampanya', 'fırsat', 'aktüel', 
+    'hafta', 'bu hafta', 'catalog', 'brochure', 'discount', 'campaign'
+  ];
+  const nonProductPatterns = [
+    'bileti', 'kart', 'fiyat listesi', 'tarifesi', 'ücret', 'giysi', 
+    'kıyafet', 'ayakkabı', 'çanta', 'aksesuar', 'elektronik', 'telefon', 
+    'bilgisayar', 'bilet', 'kart', 'fiyatı', 'hakkında', 'hakkında bilgi',
+    'mağazacılık', 'perakende', 'şirket', 'kurumsal', 'hizmet', 'destek'
+  ];
+  const babyProductPatterns = [
+    'devam', 'bebek', 'aptamil', 'optipro', 'formula', 'anne', 'bebeği', 
+    'mama', 'beslenme', 'bebek mamaları'
+  ];
+
+  // Heavy penalties for non-product content
+  if (websitePatterns.some(pattern => normalizedName.includes(pattern)))
+    score -= 15;
+  if (catalogPatterns.some(pattern => normalizedName.includes(pattern)))
+    score -= 12;
+  if (nonProductPatterns.some(pattern => normalizedName.includes(pattern)))
+    score -= 10;
+  if (babyProductPatterns.some(pattern => normalizedName.includes(pattern)))
+    score -= 8;
+
+  // Additional filtering for specific queries
   if (/\b(sut|süt|milk)\b/i.test(normalizedQuery)) {
     // Exclude baby formula and related products
-    if (/\b(devam|bebek|aptamil|optipro|formula|anne|bebeği|mama|beslenme)\b/i.test(normalizedName))
+    if (babyProductPatterns.some(pattern => normalizedName.includes(pattern)))
       score -= 10;
     // Exclude non-food items
     if (/\b(bileti|kart|fiyat|tarifesi|ücret|giysi|kıyafet|ayakkabı|çanta|aksesuar)\b/i.test(normalizedName))
       score -= 8;
   }
-  
-  // Filter non-food items for general queries
-  if (/\b(bileti|kart|fiyat|tarifesi|ücret|giysi|kıyafet|ayakkabı|çanta|aksesuar|elektronik|telefon|bilgisayar)\b/i.test(normalizedName))
-    score -= 8;
-  
-  // Filter catalog and brochure items
-  if (/\b(katalog|broşür|indirim|kampanya|fırsat|aktüel|hafta|bu hafta)\b/i.test(normalizedName))
-    score -= 6;
 
   return score;
 }
@@ -276,6 +298,9 @@ async function fetchViaJinaReader(url, timeoutMs = JINA_TIMEOUT_MS) {
 // Format: [![Image N: product-thumb](image_url) ## Product Name Price₺](link)
 function parseSokFromJinaText(text) {
   const items = [];
+  const lines = String(text || "").split("\n");
+  
+  // Primary pattern for Sok products
   const pattern =
     /\[!\[Image \d+: product-thumb\]\((https?:\/\/[^)]+)\)\s*##\s*([^\]]+?)\s+([\d]+[.,]\d+)\u20BA[^\]]*\]/g;
   let match;
@@ -288,21 +313,25 @@ function parseSokFromJinaText(text) {
     });
   }
   
-  // Alternative parsing for different Sok formats
-  const lines = String(text || "").split("\n");
+  // Enhanced alternative parsing for different Sok formats
   for (let i = 0; i < lines.length; i++) {
     const line = normalizeText(lines[i]);
-    const imageMatch = line.match(/!\[Image \d+: ([^\]]+)\]\((https?:\/\/[^)]+)\)/);
+    
+    // Look for any image pattern
+    const imageMatch = line.match(/!\[Image \d+: ([^\]]+)\]\((https?:\/\/[^)]+)\)/) ||
+                        line.match(/\[!\[([^\]]+)\]\((https?:\/\/[^)]+)\)/);
     if (imageMatch) {
       let name = normalizeText(imageMatch[1]);
       let price = null;
-      // Look for price in the same line or nearby lines
+      
+      // Look for price in the same line
       const priceMatch = line.match(/([\d]+[.,]\d+)\u20BA/);
       if (priceMatch) {
         price = Number.parseFloat(priceMatch[1].replace(",", "."));
       } else {
-        // Check nearby lines for price
-        for (let j = i + 1; j < Math.min(i + 3, lines.length); j++) {
+        // Check nearby lines for price (wider range)
+        for (let j = i - 1; j < Math.min(i + 5, lines.length); j++) {
+          if (j < 0) continue;
           const nearbyPrice = lines[j].match(/([\d]+[.,]\d+)\u20BA/);
           if (nearbyPrice) {
             price = Number.parseFloat(nearbyPrice[1].replace(",", "."));
@@ -310,12 +339,51 @@ function parseSokFromJinaText(text) {
           }
         }
       }
-      if (price && price > 0) {
+      
+      // Also check for price patterns without TL symbol
+      if (price === null) {
+        const genericPriceMatch = line.match(/([\d]+[.,]\d{2})/);
+        if (genericPriceMatch) {
+          const potentialPrice = Number.parseFloat(genericPriceMatch[1].replace(",", "."));
+          if (potentialPrice > 0 && potentialPrice < 1000) {
+            price = potentialPrice;
+          }
+        }
+      }
+      
+      if (price && price > 0 && price < 1000) {
         items.push({
           market: MARKET_LABELS.sok,
           name,
           price,
           image: normalizeText(imageMatch[2]),
+        });
+      }
+    }
+  }
+  
+  // Generic product extraction from markdown links
+  for (let i = 0; i < lines.length; i++) {
+    const line = normalizeText(lines[i]);
+    const mdLink = line.match(/\[([^\]]{3,})\]\((https?:\/\/[^)]+)\)/);
+    if (mdLink) {
+      const name = normalizeText(mdLink[1]);
+      let price = parsePriceValue(line);
+      
+      // Look for price in nearby lines
+      if (price === null) {
+        for (let j = i + 1; j < Math.min(i + 3, lines.length); j++) {
+          price = parsePriceValue(lines[j]);
+          if (price !== null) break;
+        }
+      }
+      
+      if (price && price > 0 && price < 1000) {
+        items.push({
+          market: MARKET_LABELS.sok,
+          name,
+          price,
+          image: normalizeText(mdLink[2]),
         });
       }
     }
@@ -548,26 +616,35 @@ function parseTahtakaleCategoryText(text) {
 async function scrapeTahtakale(query) {
   logScrape("Tahtakale", `Starting scrape for "${query}"`);
   
-  // Try category-based search first
-  try {
-    const text = await withTimeout(
-      "Tahtakale category fetch",
-      fetchViaJinaReader(MARKET_SOURCES.tahtakaleMilkCategory),
-      JINA_TIMEOUT_MS,
-    );
-    if (!/attention required|cloudflare|blocked/i.test(text)) {
-      const categoryItems = parseTahtakaleCategoryText(text);
-      if (categoryItems.length > 0) {
-        return rankItemsForQuery(query, categoryItems, MARKET_RESULT_LIMIT);
+  // Try multiple category URLs for better coverage
+  const categoryUrls = [
+    "https://www.tahtakalespot.com/sut-ve-sut-urunleri-1175",
+    "https://www.tahtakalespot.com/sutler-1175",
+    "https://www.tahtakalespot.com/kahvaltilik-1175"
+  ];
+  
+  for (const url of categoryUrls) {
+    try {
+      const text = await withTimeout(
+        `Tahtakale category fetch: ${url}`,
+        fetchViaJinaReader(url),
+        JINA_TIMEOUT_MS,
+      );
+      if (!/attention required|cloudflare|blocked/i.test(text)) {
+        const categoryItems = parseTahtakaleCategoryText(text);
+        if (categoryItems.length > 0) {
+          logScrape("Tahtakale", `Found ${categoryItems.length} items from category: ${url}`);
+          return rankItemsForQuery(query, categoryItems, MARKET_RESULT_LIMIT);
+        }
       }
+    } catch (error) {
+      logScrape("Tahtakale", `Category search failed for ${url}: ${error.message}`);
     }
-  } catch (error) {
-    logScrape("Tahtakale", `Category search failed: ${error.message}`);
   }
   
-  // Fallback to Cimri search
+  // Fallback to Cimri search with more variants
   try {
-    return await scrapeCimriMarket(query, "tahtakale", ["tahtakale spot", "tahtakale market"]);
+    return await scrapeCimriMarket(query, "tahtakale", ["tahtakale spot", "tahtakale market", "tahtakale toptan"]);
   } catch (error) {
     logScrape("Tahtakale", `Cimri fallback failed: ${error.message}`);
     return [];
