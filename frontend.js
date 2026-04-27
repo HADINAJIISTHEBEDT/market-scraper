@@ -90,13 +90,20 @@ function applyLanguage() {
 function renderResults(data) {
   const root = document.getElementById("results");
   if (!root) return;
+  const errors =
+    data && typeof data._errors === "object" && data._errors ? data._errors : {};
 
   let html = "";
   for (const market of MARKETS) {
     const items = Array.isArray(data?.[market.key]) ? data[market.key] : [];
     html += `<section class="panel"><h3>${market.label}</h3>`;
     if (!items.length) {
-      html += `<p>${t("noResults")}</p></section>`;
+      const errorText = escapeHtml(errors[market.key] || "");
+      if (errorText) {
+        html += `<p>${t("noResults")} (${errorText})</p></section>`;
+      } else {
+        html += `<p>${t("noResults")}</p></section>`;
+      }
       continue;
     }
     html += `<div class="result-grid">`;

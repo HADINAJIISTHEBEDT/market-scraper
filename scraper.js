@@ -31,6 +31,8 @@ const MARKET_SOURCES = {
   cimri: "https://www.cimri.com/arama?q=",
 };
 
+const CIMRI_MARKETS = new Set(["bim", "fille", "metro", "tahtakale"]);
+
 function toBaseUnit(value, unit) {
   const amount = Number(value);
   const normalizedUnit = String(unit || "")
@@ -138,8 +140,17 @@ function itemMatchScore(query, itemName) {
     else if (itemTokens.some((t) => t.includes(token) || token.includes(t)))
       score += 1;
   }
-  if (transliterateTurkish(itemName).includes(transliterateTurkish(query)))
+  const normalizedQuery = transliterateTurkish(query).toLowerCase();
+  const normalizedName = transliterateTurkish(itemName).toLowerCase();
+  if (normalizedName.includes(normalizedQuery))
     score += 4;
+
+  // Filter obvious unrelated results for milk queries.
+  if (/\b(sut|süt|milk)\b/i.test(normalizedQuery)) {
+    if (/\b(devam|bebek|aptamil|optipro|formula)\b/i.test(normalizedName))
+      score -= 6;
+  }
+
   return score;
 }
 
@@ -412,12 +423,40 @@ function parseCimriByMarket(text, marketKey, aliases = []) {
   return dedupeItems(items);
 }
 
+function parseCimriGeneric(text, marketKey) {
+  const items = [];
+  const lines = String(text || "").split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const line = normalizeText(lines[i]);
+    if (!line) continue;
+    const mdLink = line.match(/\[([^\]]{3,})\]\((https?:\/\/[^)]+)\)/);
+    if (!mdLink) continue;
+    const name = normalizeText(mdLink[1]);
+    if (!name) continue;
+    let price = parsePriceValue(line);
+    if (price === null) {
+      for (let j = i + 1; j < Math.min(i + 7, lines.length); j++) {
+        price = parsePriceValue(lines[j]);
+        if (price !== null) break;
+      }
+    }
+    if (price === null) continue;
+    items.push({
+      market: MARKET_LABELS[marketKey] || marketKey,
+      name,
+      price,
+      image: "",
+    });
+  }
+  return dedupeItems(items);
+}
+
 async function scrapeCimriMarket(query, marketKey, aliases = []) {
   logScrape(MARKET_LABELS[marketKey] || marketKey, `Starting scrape for "${query}"`);
-  const variants = queryVariants(query).flatMap((variant) => [
-    variant,
+  const baseVariants = queryVariants(query).slice(0, 1);
+  const variants = baseVariants.flatMap((variant) => [
     `${variant} ${marketKey}`,
-    ...aliases.map((alias) => `${variant} ${alias}`),
+    ...aliases.slice(0, 1).map((alias) => `${variant} ${alias}`),
   ]);
   const uniqueVariants = [...new Set(variants.map(normalizeText).filter(Boolean))];
   const items = [];
@@ -429,9 +468,13 @@ async function scrapeCimriMarket(query, marketKey, aliases = []) {
         JINA_TIMEOUT_MS,
       );
       if (/attention required|cloudflare|blocked/i.test(text)) continue;
-      items.push(...parseCimriByMarket(text, marketKey, aliases));
+      const strictItems = parseCimriByMarket(text, marketKey, aliases);
+      if (strictItems.length) items.push(...strictItems);
+      else items.push(...parseCimriGeneric(text, marketKey));
+      if (items.length >= MARKET_RESULT_LIMIT) break;
     } catch (error) {
       logScrape(MARKET_LABELS[marketKey] || marketKey, `Error for "${variant}": ${error.message}`);
+      if (/429/.test(String(error?.message || ""))) break;
     }
   }
   return rankItemsForQuery(query, items, MARKET_RESULT_LIMIT);
@@ -463,16 +506,26 @@ async function searchProduct(product, market) {
 }
 
 async function searchMultiple(product) {
-  const entries = await Promise.all(
-    MARKET_ORDER.map(async (market) => {
-      const items = await searchProduct(product, market).catch((error) => {
-        logScrape(MARKET_LABELS[market], error.message);
-        return [];
-      });
-      return [market, Array.isArray(items) ? items : []];
-    }),
-  );
-  return Object.fromEntries(entries);
+  const entries = [];
+  const errors = {};
+  for (const market of MARKET_ORDER) {
+    const items = await searchProduct(product, market).catch((error) => {
+      const message = String(error?.message || "unknown error");
+      logScrape(MARKET_LABELS[market], message);
+      errors[market] = message;
+      return [];
+    });
+    entries.push([market, Array.isArray(items) ? items : []]);
+    if (!errors[market] && (!Array.isArray(items) || items.length === 0)) {
+      errors[market] = "No matched products from source";
+    }
+    if (CIMRI_MARKETS.has(market)) {
+      await new Promise((resolve) => setTimeout(resolve, 350));
+    }
+  }
+  const payload = Object.fromEntries(entries);
+  payload._errors = errors;
+  return payload;
 }
 
 async function compareIngredients(ingredients) {
