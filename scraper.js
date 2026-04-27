@@ -287,53 +287,35 @@ async function scrapeMigros(query) {
 }
 
 // ---- CARREFOUR PARSER ----
-// CarrefourSA is blocked by Cloudflare via Jina, so we try alternative sources
-// Try carrefoursa.com first, then fall back to trying to find prices via alternative means
-function parseCarrefourFromJinaText(text) {
+// Use Jina reader extraction (same flow as Sok/Migros).
+function parseCarrefourFromSearchText(text) {
   const items = [];
-  // Same general pattern as other markets: look for product-name + price pairs
-  // CarrefourSA Jina output format (when not blocked): similar to Sok
-  const pattern =
-    /\[!\[Image \d+: product-thumb\]\((https?:\/\/[^)]+)\)\s*##\s*([^\]]+?)\s+([\d]+[.,]\d+)\u20BA[^\]]*\]/g;
-  let match;
-  while ((match = pattern.exec(String(text || ""))) !== null) {
-    items.push({
-      market: MARKET_LABELS.carrefour,
-      name: normalizeText(match[2]),
-      price: Number.parseFloat(match[3].replace(",", ".")),
-      image: normalizeText(match[1]),
-    });
-  }
+  const lines = String(text || "").split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const imageMatch = lines[i].match(
+      /\[!\[Image \d+: ([^\]]+?)\]\((https?:\/\/[^)]+)\)\]\((https?:\/\/(?:www\.)?carrefoursa\.com\/[^)\s]+)\)/i,
+    );
+    if (!imageMatch) continue;
 
-  // Also try generic pattern: heading with price
-  if (items.length === 0) {
-    const lines = String(text || "").split("\n");
-    let currentName = null;
-    let currentImage = null;
-    for (const line of lines) {
-      const normalized = normalizeText(line);
-      const imgMatch = normalized.match(/\!\[.*?\]\((https?:\/\/[^)]+)\)/);
-      if (imgMatch) currentImage = normalizeText(imgMatch[1]);
+    let name = normalizeText(imageMatch[1]);
+    let price = null;
+    for (let j = i + 1; j < Math.min(i + 12, lines.length); j++) {
+      const line = normalizeText(lines[j]);
+      if (!line) continue;
+      const heading = line.match(/^# \[([^\]]+)\]/);
+      if (heading) name = normalizeText(heading[1]);
+      if (price === null) price = parsePriceValue(line);
+    }
 
-      const headingMatch = normalized.match(/^##\s+(.+)$/);
-      if (headingMatch) currentName = normalizeText(headingMatch[1]);
-
-      if (currentName) {
-        const price = parsePriceValue(normalized);
-        if (price !== null && price < 50000) {
-          items.push({
-            market: MARKET_LABELS.carrefour,
-            name: currentName,
-            price,
-            image: currentImage || "",
-          });
-          currentName = null;
-          currentImage = null;
-        }
-      }
+    if (name && price) {
+      items.push({
+        market: MARKET_LABELS.carrefour,
+        name,
+        price,
+        image: normalizeText(imageMatch[2]),
+      });
     }
   }
-
   return dedupeItems(items);
 }
 
@@ -345,14 +327,14 @@ async function scrapeCarrefour(query) {
   for (const variant of variants) {
     try {
       const text = await withTimeout(
-        `CarrefourSA Jina fetch`,
+        `Carrefour Jina fetch`,
         fetchViaJinaReader(
           `${MARKET_SOURCES.carrefour}${encodeURIComponent(variant)}`,
         ),
         JINA_TIMEOUT_MS,
       );
       if (/attention required|cloudflare|blocked/i.test(text)) continue;
-      items.push(...parseCarrefourFromJinaText(text));
+      items.push(...parseCarrefourFromSearchText(text));
     } catch (error) {
       logScrape("Carrefour", `Error for "${variant}": ${error.message}`);
     }
