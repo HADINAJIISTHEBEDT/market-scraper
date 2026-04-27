@@ -10,8 +10,6 @@ let SCRAPER_API_BASE = null;
 const AUTO_EMAIL = "5000";
 const AUTO_PASSWORD = "5000";
 const LOCAL_KEY = "desserts_offline_data_v2";
-const REPORT_KEY = "desserts_monthly_reports_v1";
-const TIMER_USAGE_KEY = "desserts_timer_usage_v1";
 let pushToken = null;
 let pushStatus = {
   checked: false,
@@ -30,10 +28,7 @@ const FIREBASE_CONFIG_FALLBACK = {
   appId: "1:635656922703:web:a27e2c407484ed641b2c3a",
 };
 
-let currentLang = localStorage.getItem("app_lang") || "en";
-let monthlyReports = {};
-let selectedReportMonth = null;
-let timerUsage = {};
+let currentLang = localStorage.getItem("app_lang") || "tr";
 
 const translations = {
   en: {
@@ -54,7 +49,7 @@ const translations = {
     marketPrices: "Market Prices",
     dessert: "Dessert",
     findCheapestBtn: "Find Cheapest Market",
-    marketHint: "Uses ingredient quantities from Settings.",
+    marketHint: "Uses saved ingredient quantities.",
     ingredient: "Ingredient",
     qty: "Qty",
     unit: "Unit",
@@ -168,7 +163,7 @@ const translations = {
     marketPrices: "أسعار السوق",
     dessert: "الحلوى",
     findCheapestBtn: "البحث عن أرخص سوق",
-    marketHint: "يستخدم كميات المكونات من الإعدادات.",
+    marketHint: "يستخدم كميات المكونات المحفوظة.",
     ingredient: "المكون",
     qty: "الكمية",
     unit: "الوحدة",
@@ -243,7 +238,7 @@ const translations = {
     marketPrices: "Market Fiyatları",
     dessert: "Tatlı",
     findCheapestBtn: "En Ucuz Marketi Bul",
-    marketHint: "Ayarlar'daki malzeme miktarlarını kullanır.",
+    marketHint: "Kaydedilen malzeme miktarlarını kullanır.",
     ingredient: "Malzeme",
     qty: "Miktar",
     unit: "Birim",
@@ -643,8 +638,6 @@ function translateUI() {
   if (m) m.textContent = t("marketTab");
   const s = document.getElementById("navSettings");
   if (s) s.textContent = t("settingsTab");
-  const r = document.getElementById("navReports");
-  if (r) r.textContent = t("reportsTab");
   const lt = document.querySelector("#login h2");
   if (lt) lt.textContent = t("loginTitle");
   const lb = document.querySelector("#login button");
@@ -660,7 +653,6 @@ function translateUI() {
   const pqu = document.getElementById("pickQuantityUnit");
   if (pqu) pqu.title = t("quantityUnit");
   renderLanguageSwitcher();
-  renderMonthlyReport();
 }
 
 function setLanguage(lang) {
@@ -669,10 +661,8 @@ function setLanguage(lang) {
   document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
   document.documentElement.lang = lang;
   translateUI();
-  render();
   renderSettings();
   renderDessertSelect();
-  renderMonthlyReport();
 }
 
 function renderLanguageSwitcher() {
@@ -684,793 +674,6 @@ function renderLanguageSwitcher() {
     <option value="tr" ${currentLang === "tr" ? "selected" : ""}>${t("turkish")}</option></select>`;
 }
 window.setLanguage = setLanguage;
-
-function loadReports() {
-  const raw = localStorage.getItem(REPORT_KEY);
-  if (!raw) {
-    monthlyReports = {};
-    selectedReportMonth = currentMonthKey();
-    return;
-  }
-  try {
-    const parsed = JSON.parse(raw);
-    monthlyReports = parsed && typeof parsed === "object" ? parsed : {};
-  } catch (_) {
-    monthlyReports = {};
-  }
-  const months = getReportMonths();
-  selectedReportMonth =
-    selectedReportMonth && monthlyReports[selectedReportMonth]
-      ? selectedReportMonth
-      : months[0] || currentMonthKey();
-}
-
-function saveReports() {
-  localStorage.setItem(REPORT_KEY, JSON.stringify(monthlyReports));
-}
-
-function loadTimerUsage() {
-  const raw = localStorage.getItem(TIMER_USAGE_KEY);
-  if (!raw) {
-    timerUsage = {};
-    return;
-  }
-  try {
-    const parsed = JSON.parse(raw);
-    timerUsage = parsed && typeof parsed === "object" ? parsed : {};
-  } catch (_) {
-    timerUsage = {};
-  }
-}
-
-function saveTimerUsage() {
-  localStorage.setItem(TIMER_USAGE_KEY, JSON.stringify(timerUsage));
-}
-
-function recordTimerUsage(dessertName) {
-  const monthKey = currentMonthKey();
-  if (!timerUsage[monthKey]) timerUsage[monthKey] = {};
-  if (!timerUsage[monthKey][dessertName]) timerUsage[monthKey][dessertName] = 0;
-  timerUsage[monthKey][dessertName] += 1;
-  saveTimerUsage();
-}
-
-function getTimerUsageForMonth(monthKey) {
-  return timerUsage[monthKey] || {};
-}
-
-function currentMonthKey(date = new Date()) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  return `${year}-${month}`;
-}
-
-function getReportMonths() {
-  return Object.keys(monthlyReports || {}).sort((a, b) => b.localeCompare(a));
-}
-
-function formatReportMonth(monthKey) {
-  if (!monthKey || !/^\d{4}-\d{2}$/.test(monthKey))
-    return monthKey || t("reportNoData");
-  const [year, month] = monthKey.split("-").map(Number);
-  return new Date(year, month - 1, 1).toLocaleDateString(
-    currentLang === "ar" ? "ar" : "en",
-    {
-      year: "numeric",
-      month: "long",
-    },
-  );
-}
-
-function recordMonthlyReport(dessertName, reportData) {
-  const monthKey = currentMonthKey();
-  if (!Array.isArray(monthlyReports[monthKey])) monthlyReports[monthKey] = [];
-  monthlyReports[monthKey].push({
-    timestamp: new Date().toISOString(),
-    dessertName: String(dessertName || ""),
-    totals: {
-      sok: Number(reportData?.totals?.sok ?? 0),
-      migros: Number(reportData?.totals?.migros ?? 0),
-    },
-    cheapestMarket: String(reportData?.cheapestMarket || ""),
-    rows: Array.isArray(reportData?.rows)
-      ? reportData.rows.map((row) => ({
-          ingredient: String(row?.ingredient || ""),
-          quantity: String(row?.quantity || ""),
-          sok: {
-            name: String(row?.sok?.name || ""),
-            unitPrice: Number.isFinite(Number(row?.sok?.unitPrice))
-              ? Number(row.sok.unitPrice)
-              : null,
-            cost: Number.isFinite(Number(row?.sok?.cost))
-              ? Number(row.sok.cost)
-              : null,
-          },
-          migros: {
-            name: String(row?.migros?.name || ""),
-            unitPrice: Number.isFinite(Number(row?.migros?.unitPrice))
-              ? Number(row.migros.unitPrice)
-              : null,
-            cost: Number.isFinite(Number(row?.migros?.cost))
-              ? Number(row.migros.cost)
-              : null,
-          },
-        }))
-      : [],
-  });
-  if (monthlyReports[monthKey].length > 250)
-    monthlyReports[monthKey] = monthlyReports[monthKey].slice(-250);
-  selectedReportMonth = monthKey;
-  saveReports();
-}
-
-function summarizeMonthlyReport(monthKey) {
-  const entries = Array.isArray(monthlyReports?.[monthKey])
-    ? monthlyReports[monthKey]
-    : [];
-  const dessertCounts = {};
-  const ingredientMap = new Map();
-  const totals = { sok: 0, migros: 0 };
-
-  entries.forEach((entry) => {
-    const dessertName = String(entry?.dessertName || "").trim();
-    if (dessertName)
-      dessertCounts[dessertName] = (dessertCounts[dessertName] || 0) + 1;
-    if (Number.isFinite(Number(entry?.totals?.sok)))
-      totals.sok += Number(entry.totals.sok);
-    if (Number.isFinite(Number(entry?.totals?.migros)))
-      totals.migros += Number(entry.totals.migros);
-
-    (Array.isArray(entry?.rows) ? entry.rows : []).forEach((row) => {
-      const ingredientName = String(row?.ingredient || "").trim();
-      if (!ingredientName) return;
-      if (!ingredientMap.has(ingredientName)) {
-        ingredientMap.set(ingredientName, { count: 0, values: [] });
-      }
-      const stats = ingredientMap.get(ingredientName);
-      stats.count += 1;
-      const numericValues = [row?.sok?.cost, row?.migros?.cost]
-        .map((value) => Number(value))
-        .filter((value) => Number.isFinite(value) && value >= 0);
-      if (numericValues.length) {
-        stats.values.push({
-          timestamp: String(entry?.timestamp || ""),
-          value: Math.min(...numericValues),
-        });
-      }
-    });
-  });
-
-  const ingredientRows = [...ingredientMap.entries()]
-    .map(([ingredient, stats]) => {
-      const orderedValues = stats.values
-        .slice()
-        .sort((a, b) => String(a.timestamp).localeCompare(String(b.timestamp)));
-      const firstValue = orderedValues.length ? orderedValues[0].value : null;
-      const lastValue = orderedValues.length
-        ? orderedValues[orderedValues.length - 1].value
-        : null;
-      let increases = 0;
-      let decreases = 0;
-      let same = 0;
-      for (let index = 1; index < orderedValues.length; index += 1) {
-        const prev = orderedValues[index - 1].value;
-        const next = orderedValues[index].value;
-        if (next > prev) increases += 1;
-        else if (next < prev) decreases += 1;
-        else same += 1;
-      }
-      return {
-        ingredient,
-        count: stats.count,
-        firstValue,
-        lastValue,
-        change:
-          firstValue !== null && lastValue !== null
-            ? lastValue - firstValue
-            : null,
-        increases,
-        decreases,
-        same,
-      };
-    })
-    .sort(
-      (a, b) => b.count - a.count || a.ingredient.localeCompare(b.ingredient),
-    );
-
-  const dessertRows = Object.entries(dessertCounts)
-    .map(([dessert, count]) => ({ dessert, count }))
-    .sort((a, b) => b.count - a.count || a.dessert.localeCompare(b.dessert));
-
-  return {
-    monthKey,
-    entries,
-    ingredientRows,
-    dessertRows,
-    totals,
-    timerUsage: getTimerUsageForMonth(monthKey),
-  };
-}
-
-function renderMonthlyReport() {
-  const panel = document.getElementById("monthlyReport");
-  if (!panel) return;
-  const months = getReportMonths();
-  const activeMonth =
-    selectedReportMonth &&
-    (monthlyReports[selectedReportMonth] ||
-      selectedReportMonth === currentMonthKey())
-      ? selectedReportMonth
-      : months[0] || currentMonthKey();
-  selectedReportMonth = activeMonth;
-  const summary = summarizeMonthlyReport(activeMonth);
-  const monthOptions = months.length
-    ? months
-        .map(
-          (month) =>
-            `<option value="${escapeAttr(month)}" ${month === activeMonth ? "selected" : ""}>${escapeText(formatReportMonth(month))}</option>`,
-        )
-        .join("")
-    : `<option value="${escapeAttr(activeMonth)}">${escapeText(formatReportMonth(activeMonth))}</option>`;
-
-  // Build all months summary table
-  const allMonthsSummary = buildAllMonthsSummary(months);
-
-  if (!summary.entries.length && !allMonthsSummary.rows.length) {
-    panel.innerHTML = `<div class="report-toolbar"><label for="reportMonthSelect">${t("reportMonth")}</label><select id="reportMonthSelect" onchange="changeReportMonth(this.value)">${monthOptions}</select></div><p class="hint">${t("reportMonthEmpty")}</p>`;
-    return;
-  }
-
-  const dessertRows = summary.dessertRows.length
-    ? summary.dessertRows
-        .map((row) => {
-          const timerCount = summary.timerUsage[row.dessert] || 0;
-          return `<tr><td>${escapeText(row.dessert)}</td><td>${row.count}</td><td>${timerCount}</td></tr>`;
-        })
-        .join("")
-    : `<tr><td colspan="3">${t("reportNoData")}</td></tr>`;
-
-  const ingredientRows = summary.ingredientRows.length
-    ? summary.ingredientRows
-        .map(
-          (row) =>
-            `<tr><td>${escapeText(row.ingredient)}</td><td>${row.count}</td><td>${formatTryPrice(row.firstValue)}</td><td>${formatTryPrice(row.lastValue)}</td><td class="${row.change !== null && row.change > 0 ? "price-up" : row.change !== null && row.change < 0 ? "price-down" : ""}">${row.change === null ? "-" : formatTryPrice(row.change)}</td><td>${escapeText(`${t("reportIncrease")} ${row.increases} / ${t("reportDecrease")} ${row.decreases} / ${t("reportSame")} ${row.same}`)}</td></tr>`,
-        )
-        .join("")
-    : `<tr><td colspan="6">${t("reportNoData")}</td></tr>`;
-
-  // All months table rows
-  const allMonthsRows = allMonthsSummary.rows.length
-    ? allMonthsSummary.rows
-        .map(
-          (row) =>
-            `<tr><td>${escapeText(row.month)}</td><td>${row.searchCount}</td><td>${formatTryPrice(row.totalSok)}</td><td>${formatTryPrice(row.totalMigros)}</td><td>${escapeText(row.cheapestMarket)}</td><td>${formatTryPrice(row.cheapestTotal)}</td></tr>`,
-        )
-        .join("")
-    : `<tr><td colspan="6">${t("reportNoData")}</td></tr>`;
-
-  // Timer usage table rows
-  const timerUsageRows =
-    Object.entries(summary.timerUsage || {})
-      .sort((a, b) => b[1] - a[1])
-      .map(
-        ([name, count]) =>
-          `<tr><td>${escapeText(name)}</td><td>${count}</td></tr>`,
-      )
-      .join("") || `<tr><td colspan="2">${t("reportNoData")}</td></tr>`;
-
-  panel.innerHTML = `
-    <div class="report-toolbar">
-      <label for="reportMonthSelect">${t("reportMonth")}</label>
-      <select id="reportMonthSelect" onchange="changeReportMonth(this.value)">${monthOptions}</select>
-      <button class="btn-export-pdf" onclick="exportReportPDF()">${t("exportPDF")}</button>
-      <button class="btn-erase-all" onclick="eraseAllData()">${t("eraseAll")}</button>
-    </div>
-    <div class="report-card-grid">
-      <article class="report-card"><span>${t("reportRuns")}</span><strong>${summary.entries.length}</strong></article>
-      <article class="report-card"><span>${t("reportDesserts")}</span><strong>${summary.dessertRows.length}</strong></article>
-      <article class="report-card"><span>${t("reportTrackedIngredients")}</span><strong>${summary.ingredientRows.length}</strong></article>
-    </div>
-
-    <!-- All Months Comparison Table -->
-    <section class="report-section report-section-full">
-      <h3>${t("allMonthsComparison")}</h3>
-      <div class="report-table-wrap">
-        <table class="report-table months-table">
-          <thead>
-            <tr>
-              <th>${t("reportMonth")}</th>
-              <th>${t("reportSearchCount")}</th>
-              <th>${marketLabel("sok")} ${t("totalCost")}</th>
-              <th>${marketLabel("migros")} ${t("totalCost")}</th>
-              <th>${t("cheapestMarket")}</th>
-              <th>${t("bestPrice")}</th>
-            </tr>
-          </thead>
-          <tbody>${allMonthsRows}</tbody>
-        </table>
-      </div>
-    </section>
-
-    <div class="report-summary-grid">
-      <section class="report-section">
-        <h3>${t("reportMarketTotals")} - ${escapeText(formatReportMonth(summary.monthKey))}</h3>
-        <div class="market-totals">
-          <p class="market-total sok"><span class="market-label">${marketLabel("sok")}:</span> <span class="market-value">${formatTryPrice(summary.totals.sok)}</span></p>
-          <p class="market-total migros"><span class="market-label">${marketLabel("migros")}:</span> <span class="market-value">${formatTryPrice(summary.totals.migros)}</span></p>
-          <p class="market-total savings"><span class="market-label">${t("potentialSavings")}:</span> <span class="market-value">${formatTryPrice(Math.abs(summary.totals.sok - summary.totals.migros))}</span></p>
-        </div>
-      </section>
-      <section class="report-section">
-        <h3>${t("reportDessertUsage")}</h3>
-        <div class="report-table-wrap">
-          <table class="report-table">
-            <thead><tr><th>${t("dessert")}</th><th>${t("reportSearchCount")}</th><th>${t("reportTimerUsage")}</th></tr></thead>
-            <tbody>${dessertRows}</tbody>
-          </table>
-        </div>
-      </section>
-    </div>
-
-    <!-- Timer Usage Summary -->
-    <section class="report-section report-section-full">
-      <h3>${t("timerUsageSummary")}</h3>
-      <div class="report-table-wrap">
-        <table class="report-table">
-          <thead><tr><th>${t("dessert")}</th><th>${t("reportTimerCount")}</th></tr></thead>
-          <tbody>${timerUsageRows}</tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="report-section report-section-full">
-      <h3>${t("reportIngredientTrends")}</h3>
-      <div class="report-table-wrap">
-        <table class="report-table">
-          <thead>
-            <tr>
-              <th>${t("reportIngredientName")}</th>
-              <th>${t("reportTimesUsed")}</th>
-              <th>${t("reportFirstPrice")}</th>
-              <th>${t("reportLastPrice")}</th>
-              <th>${t("reportChange")}</th>
-              <th>${t("reportMoves")}</th>
-            </tr>
-          </thead>
-          <tbody>${ingredientRows}</tbody>
-        </table>
-      </div>
-    </section>
-  `;
-}
-
-window.changeReportMonth = function (monthKey) {
-  selectedReportMonth = monthKey || currentMonthKey();
-  renderMonthlyReport();
-};
-
-window.eraseAllData = function () {
-  if (!confirm(t("eraseAllConfirm"))) return;
-  localStorage.removeItem(LOCAL_KEY);
-  localStorage.removeItem(REPORT_KEY);
-  localStorage.removeItem(TIMER_USAGE_KEY);
-  monthlyReports = {};
-  timerUsage = {};
-  selectedReportMonth = null;
-  desserts = [
-    {
-      name: "Magnolia",
-      days: 5,
-      hours: 0,
-      minutes: 0,
-      startTime: null,
-      finished: false,
-      notified: false,
-      ingredients: [],
-    },
-    {
-      name: "English Cake",
-      days: 5,
-      hours: 0,
-      minutes: 0,
-      startTime: null,
-      finished: false,
-      notified: false,
-      ingredients: [],
-    },
-    {
-      name: "Cheese Cake",
-      days: 5,
-      hours: 0,
-      minutes: 0,
-      startTime: null,
-      finished: false,
-      notified: false,
-      ingredients: [],
-    },
-    {
-      name: "Tirimasu",
-      days: 5,
-      hours: 0,
-      minutes: 0,
-      startTime: null,
-      finished: false,
-      notified: false,
-      ingredients: [],
-    },
-    {
-      name: "Othmaliye",
-      days: 10,
-      hours: 0,
-      minutes: 0,
-      startTime: null,
-      finished: false,
-      notified: false,
-      ingredients: [],
-    },
-    {
-      name: "Fondant",
-      days: 5,
-      hours: 0,
-      minutes: 0,
-      startTime: null,
-      finished: false,
-      notified: false,
-      ingredients: [],
-    },
-    {
-      name: "Sweet Syrup",
-      days: 30,
-      hours: 0,
-      minutes: 0,
-      startTime: null,
-      finished: false,
-      notified: false,
-      ingredients: [],
-    },
-    {
-      name: "Ashta",
-      days: 10,
-      hours: 0,
-      minutes: 0,
-      startTime: null,
-      finished: false,
-      notified: false,
-      ingredients: [],
-    },
-    {
-      name: "Cookies",
-      days: 5,
-      hours: 0,
-      minutes: 0,
-      startTime: null,
-      finished: false,
-      notified: false,
-      ingredients: [],
-    },
-  ];
-  saveLocal();
-  render();
-  renderSettings();
-  renderDessertSelect();
-  renderMonthlyReport();
-  alert(t("dataErased"));
-};
-
-function buildAllMonthsSummary(months) {
-  const rows = months
-    .map((month) => {
-      const summary = summarizeMonthlyReport(month);
-      const searchCount = summary.entries.length;
-      const totalSok = summary.totals.sok;
-      const totalMigros = summary.totals.migros;
-      const cheapestMarket = totalSok <= totalMigros ? "sok" : "migros";
-      const cheapestTotal = Math.min(totalSok, totalMigros);
-      return {
-        month: formatReportMonth(month),
-        monthKey: month,
-        searchCount,
-        totalSok,
-        totalMigros,
-        cheapestMarket,
-        cheapestTotal,
-      };
-    })
-    .sort((a, b) => b.monthKey.localeCompare(a.monthKey));
-
-  return { rows };
-}
-
-window.exportReportPDF = function () {
-  const months = getReportMonths();
-  if (!months.length) {
-    alert(t("reportMonthEmpty"));
-    return;
-  }
-
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
-
-  const isArabic = currentLang === "ar";
-  const activeMonth = selectedReportMonth || months[0];
-  const summary = summarizeMonthlyReport(activeMonth);
-  const monthName = formatReportMonth(activeMonth);
-
-  function pdfLabel(key) {
-    const labels = isArabic
-      ? {
-          title: "Dessert Cafe Report",
-          generated: "Generated",
-          currentMonth: "Current Month",
-          sokTotal: "Sok Total",
-          migrosTotal: "Migros Total",
-          savings: "Savings",
-          dessertActivity: "Dessert Activity",
-          dessert: "Dessert",
-          searches: "Searches",
-          timerUses: "Timer",
-          ingredientTrends: "Price Trends",
-          ingredient: "Ingredient",
-          used: "Used",
-          firstPrice: "First",
-          lastPrice: "Last",
-          change: "Change",
-          moves: "Moves",
-          allMonths: "All Months",
-          month: "Month",
-          count: "Count",
-          sok: "Sok",
-          migros: "Migros",
-          best: "Best",
-          price: "Price",
-          recentComparisons: "Recent Comparisons",
-          date: "Date",
-          totalComparisons: "Total Comparisons",
-        }
-      : {
-          title: "Dessert Cafe Report",
-          generated: "Generated",
-          currentMonth: "Current Month",
-          sokTotal: "Sok Total",
-          migrosTotal: "Migros Total",
-          savings: "Savings",
-          dessertActivity: "Dessert Activity",
-          dessert: "Dessert",
-          searches: "Searches",
-          timerUses: "Timer",
-          ingredientTrends: "Price Trends",
-          ingredient: "Ingredient",
-          used: "Used",
-          firstPrice: "First",
-          lastPrice: "Last",
-          change: "Change",
-          moves: "Moves",
-          allMonths: "All Months",
-          month: "Month",
-          count: "Count",
-          sok: "Sok",
-          migros: "Migros",
-          best: "Best",
-          price: "Price",
-          recentComparisons: "Recent Comparisons",
-          date: "Date",
-          totalComparisons: "Total Comparisons",
-        };
-    return labels[key] || key;
-  }
-
-  // === PAGE 1: Current Month Report ===
-  let y = 15;
-
-  doc.setFontSize(16);
-  doc.setTextColor(43, 33, 24);
-  doc.text(pdfLabel("title"), 105, y, { align: "center" });
-  y += 7;
-
-  doc.setFontSize(9);
-  doc.setTextColor(118, 101, 84);
-  doc.text(
-    `${pdfLabel("generated")}: ${new Date().toLocaleDateString(isArabic ? "ar" : "en-GB")}`,
-    105,
-    y,
-    { align: "center" },
-  );
-  y += 5;
-
-  doc.setFontSize(11);
-  doc.setTextColor(43, 33, 24);
-  doc.text(`${pdfLabel("currentMonth")}: ${monthName}`, 14, y);
-  y += 8;
-
-  doc.setFontSize(9);
-  doc.text(
-    `${pdfLabel("sokTotal")}: ${summary.totals.sok.toFixed(2)} TL`,
-    14,
-    y,
-  );
-  y += 5;
-  doc.text(
-    `${pdfLabel("migrosTotal")}: ${summary.totals.migros.toFixed(2)} TL`,
-    14,
-    y,
-  );
-  y += 5;
-  doc.text(
-    `${pdfLabel("savings")}: ${Math.abs(summary.totals.sok - summary.totals.migros).toFixed(2)} TL`,
-    14,
-    y,
-  );
-  y += 10;
-
-  // Dessert Activity Table
-  doc.setFontSize(10);
-  doc.text(pdfLabel("dessertActivity"), 14, y);
-  y += 3;
-
-  const dessertData = summary.dessertRows.map((r) => {
-    const timerCount = summary.timerUsage[r.dessert] || 0;
-    return [r.dessert, String(r.count), String(timerCount)];
-  });
-
-  doc.autoTable({
-    startY: y,
-    head: [[pdfLabel("dessert"), pdfLabel("searches"), pdfLabel("timerUses")]],
-    body: dessertData,
-    theme: "grid",
-    headStyles: { fillColor: [15, 118, 110], fontSize: 8 },
-    bodyStyles: { fontSize: 8 },
-    alternateRowStyles: { fillColor: [255, 248, 239] },
-    margin: { left: 14, right: 14 },
-    tableWidth: 180,
-  });
-
-  y = doc.lastAutoTable.finalY + 8;
-
-  // Ingredient Trends Table
-  doc.setFontSize(10);
-  doc.text(pdfLabel("ingredientTrends"), 14, y);
-  y += 3;
-
-  const ingredientData = summary.ingredientRows.map((r) => [
-    r.ingredient,
-    String(r.count),
-    r.firstValue !== null ? `${r.firstValue.toFixed(2)} TL` : "-",
-    r.lastValue !== null ? `${r.lastValue.toFixed(2)} TL` : "-",
-    r.change !== null ? `${r.change.toFixed(2)} TL` : "-",
-    `+${r.increases}/-${r.decreases}`,
-  ]);
-
-  doc.autoTable({
-    startY: y,
-    head: [
-      [
-        pdfLabel("ingredient"),
-        pdfLabel("used"),
-        pdfLabel("firstPrice"),
-        pdfLabel("lastPrice"),
-        pdfLabel("change"),
-        pdfLabel("moves"),
-      ],
-    ],
-    body: ingredientData,
-    theme: "grid",
-    headStyles: { fillColor: [233, 120, 39], fontSize: 7 },
-    bodyStyles: { fontSize: 7 },
-    alternateRowStyles: { fillColor: [248, 239, 228] },
-    margin: { left: 14, right: 14 },
-    tableWidth: 180,
-  });
-
-  // === PAGE 2: All Months Summary ===
-  doc.addPage();
-  y = 15;
-
-  doc.setFontSize(14);
-  doc.setTextColor(43, 33, 24);
-  doc.text(pdfLabel("allMonths"), 14, y);
-  y += 8;
-
-  const allMonthsSummary = buildAllMonthsSummary(months);
-  let grandTotalSok = 0;
-  let grandTotalMigros = 0;
-  let totalSearches = 0;
-
-  allMonthsSummary.rows.forEach((r) => {
-    grandTotalSok += r.totalSok;
-    grandTotalMigros += r.totalMigros;
-    totalSearches += r.searchCount;
-  });
-
-  doc.setFontSize(9);
-  doc.text(`${pdfLabel("totalComparisons")}: ${totalSearches}`, 14, y);
-  y += 5;
-  doc.text(`${pdfLabel("sokTotal")}: ${grandTotalSok.toFixed(2)} TL`, 14, y);
-  y += 5;
-  doc.text(
-    `${pdfLabel("migrosTotal")}: ${grandTotalMigros.toFixed(2)} TL`,
-    14,
-    y,
-  );
-  y += 5;
-  doc.text(
-    `${pdfLabel("savings")}: ${Math.abs(grandTotalSok - grandTotalMigros).toFixed(2)} TL`,
-    14,
-    y,
-  );
-  y += 8;
-
-  const monthsTableData = allMonthsSummary.rows.map((r) => [
-    r.monthKey,
-    String(r.searchCount),
-    `${r.totalSok.toFixed(2)}`,
-    `${r.totalMigros.toFixed(2)}`,
-    r.cheapestMarket === "sok" ? pdfLabel("sok") : pdfLabel("migros"),
-    `${r.cheapestTotal.toFixed(2)} TL`,
-  ]);
-
-  doc.autoTable({
-    startY: y,
-    head: [
-      [
-        pdfLabel("month"),
-        pdfLabel("count"),
-        pdfLabel("sok"),
-        pdfLabel("migros"),
-        pdfLabel("best"),
-        pdfLabel("price"),
-      ],
-    ],
-    body: monthsTableData,
-    theme: "grid",
-    headStyles: { fillColor: [233, 120, 39], fontSize: 8 },
-    bodyStyles: { fontSize: 8 },
-    alternateRowStyles: { fillColor: [248, 239, 228] },
-    margin: { left: 14, right: 14 },
-    tableWidth: 180,
-  });
-
-  y = doc.lastAutoTable.finalY + 8;
-
-  if (summary.entries.length > 0) {
-    doc.setFontSize(10);
-    doc.text(pdfLabel("recentComparisons"), 14, y);
-    y += 3;
-
-    const runsData = summary.entries
-      .slice(-10)
-      .map((entry, idx) => [
-        String(idx + 1),
-        new Date(entry.timestamp).toLocaleDateString(isArabic ? "ar" : "en-GB"),
-        entry.dessertName,
-        `${entry.totals.sok.toFixed(2)}`,
-        `${entry.totals.migros.toFixed(2)}`,
-        entry.cheapestMarket === "sok" ? pdfLabel("sok") : pdfLabel("migros"),
-      ]);
-
-    doc.autoTable({
-      startY: y,
-      head: [
-        [
-          "#",
-          pdfLabel("date"),
-          pdfLabel("dessert"),
-          pdfLabel("sok"),
-          pdfLabel("migros"),
-          pdfLabel("best"),
-        ],
-      ],
-      body: runsData,
-      theme: "grid",
-      headStyles: { fillColor: [15, 118, 110], fontSize: 7 },
-      bodyStyles: { fontSize: 7 },
-      alternateRowStyles: { fillColor: [255, 248, 239] },
-      margin: { left: 14, right: 14 },
-      tableWidth: 180,
-    });
-  }
-
-  doc.save(`dessert-cafe-report-${new Date().toISOString().slice(0, 10)}.pdf`);
-};
 
 let desserts = [
   {
@@ -1804,7 +1007,7 @@ async function cancelTimerPush(index) {
 }
 
 window.addEventListener("DOMContentLoaded", async () => {
-  currentLang = localStorage.getItem("app_lang") || "en";
+  currentLang = localStorage.getItem("app_lang") || "tr";
   document.documentElement.dir = currentLang === "ar" ? "rtl" : "ltr";
   document.documentElement.lang = currentLang;
   const lt = document.getElementById("loadingText");
@@ -1812,8 +1015,6 @@ window.addEventListener("DOMContentLoaded", async () => {
   const connected = await detectServerPort();
   if (!connected || !serverFound) return;
   loadLocal();
-  loadReports();
-  loadTimerUsage();
   renderLanguageSwitcher();
   translateUI();
   const emailEl = document.getElementById("email"),
@@ -1904,8 +1105,7 @@ function showApp() {
   render();
   renderSettings();
   renderDessertSelect();
-  renderMonthlyReport();
-  switchTab("timer");
+  switchTab("market");
   initNotifications();
   if (notificationsEnabled && Notification.permission === "granted") {
     ensurePushSubscription().catch(() => {
@@ -1938,7 +1138,7 @@ function triggerDessertFinishedAlert(dessert) {
 }
 
 window.switchTab = function (tabName) {
-  ["market", "settings", "reports"].forEach((tab) => {
+  ["market"].forEach((tab) => {
     const el = document.getElementById(`tab-${tab}`);
     if (el) el.classList.toggle("hidden", tab !== tabName);
   });
@@ -3473,9 +2673,7 @@ window.findCheapestForSelectedDessert = async function () {
     });
     if (!res.ok) throw new Error(`API error ${res.status}`);
     const data = await res.json();
-    recordMonthlyReport(dessert.name, data);
     renderMarketResult(data);
-    renderMonthlyReport();
   } catch (err) {
     resultBox.innerHTML = `<p>${t("marketServiceError")}: ${err.message}</p>`;
   }
@@ -3972,9 +3170,7 @@ window.findCheapestForSelectedDessert = async function () {
     });
     if (!res.ok) throw new Error(`API error ${res.status}`);
     const data = await res.json();
-    recordMonthlyReport(dessert.name, data);
     renderMarketResult(data);
-    renderMonthlyReport();
   } catch (err) {
     resultBox.innerHTML = `<p>${t("marketServiceError")}: ${err.message}</p>`;
   }

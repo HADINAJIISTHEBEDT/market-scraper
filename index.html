@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="tr">
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -132,16 +132,10 @@
                 <button id="navMarket" onclick="switchTab('market')">
                     Market Prices
                 </button>
-                <button id="navSettings" onclick="switchTab('settings')">
-                    Settings
-                </button>
-                <button id="navReports" onclick="switchTab('reports')">
-                    Reports
-                </button>
             </div>
 
             <!-- MARKET TAB -->
-            <section id="tab-market" class="tab-section hidden">
+            <section id="tab-market" class="tab-section">
                 <h2 id="marketPricesTitle">Market Prices</h2>
                 <div class="panel">
                     <label for="dessertSelect" id="dessertLabel">Dessert</label>
@@ -159,16 +153,14 @@
                 <div id="marketResult" class="panel"></div>
             </section>
 
-            <!-- SETTINGS TAB -->
-            <section id="tab-settings" class="tab-section hidden">
+            <!-- SETTINGS TAB (kept hidden for internal ingredient data handling) -->
+            <section
+                id="tab-settings"
+                class="tab-section hidden"
+                style="display: none"
+            >
                 <h2 id="ingredientsTitle">Ingredients and Quantity</h2>
                 <div id="ingredientsSettings" class="panel"></div>
-            </section>
-
-            <!-- REPORTS TAB -->
-            <section id="tab-reports" class="tab-section hidden">
-                <h2 id="reportsTitle">Monthly Cost Report</h2>
-                <div id="monthlyReport" class="panel"></div>
             </section>
         </div>
 
