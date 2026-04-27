@@ -63,7 +63,7 @@ const translations = {
     totalSok: "Total Şok",
     totalMigros: "Total Migros",
     cheapestMarket: "Cheapest Market",
-    searching: "Searching Şok and Migros, please wait…",
+    searching: "Searching Şok, Migros and Carrefour, please wait…",
     selectDessert: "Please select a dessert.",
     addIngredientsFirst: "Please add ingredients in Settings first.",
     marketServiceError: "Market service error",
@@ -84,6 +84,8 @@ const translations = {
     pickFromMarket: "🛒 Pick from Market",
     openSok: "Open Şok",
     openMigros: "Open Migros",
+    openCarrefour: "Open Carrefour",
+    totalCarrefour: "Total Carrefour",
     ingredientNameRequired: "Ingredient name is required.",
     quantityMustBeGreater: "Needed quantity must be greater than 0.",
     packageSizeMustBeGreater: "Package size must be greater than 0.",
@@ -144,6 +146,9 @@ const translations = {
     language: "Language",
     english: "English",
     arabic: "العربية",
+    openCarrefour: "فتح كارفور",
+    totalCarrefour: "إجمالي كارفور",
+    carrefourLabel: "كارفور",
   },
   ar: {
     loginTitle: "تسجيل الدخول",
@@ -171,8 +176,9 @@ const translations = {
     best: "الأفضل",
     totalSok: "إجمالي شوك",
     totalMigros: "إجمالي ميغروس",
+    totalCarrefour: "إجمالي كارفور",
     cheapestMarket: "أرخص سوق",
-    searching: "جاري البحث في شوك وميغروس، يرجى الانتظار…",
+    searching: "جاري البحث في شوك وميغروس وكارفور، يرجى الانتظار…",
     selectDessert: "يرجى اختيار حلوى.",
     addIngredientsFirst: "يرجى إضافة المكونات في الإعدادات أولاً.",
     marketServiceError: "خطأ في خدمة السوق",
@@ -193,6 +199,7 @@ const translations = {
     pickFromMarket: "🛒 اختيار من السوق",
     openSok: "فتح شوك",
     openMigros: "فتح ميغروس",
+    openCarrefour: "فتح كارفور",
     ingredientNameRequired: "اسم المكون مطلوب.",
     quantityMustBeGreater: "يجب أن تكون الكمية المطلوبة أكبر من 0.",
     packageSizeMustBeGreater: "يجب أن يكون حجم العبوة أكبر من 0.",
@@ -205,7 +212,7 @@ const translations = {
     modalHint: "سيتم ملء اسم المكون من النتائج.",
     clearResults: "مسح النتائج",
     closeBtn: "إغلاق",
-    searchingFor: "البحث في شوك وميغروس عن",
+    searchingFor: "البحث في شوك وميغروس وكارفور عن",
     noResultsFound: "لم يتم العثور على نتائج",
     select: "اختيار",
     deleteConfirm: "حذف",
@@ -216,6 +223,119 @@ const translations = {
     language: "اللغة",
     english: "English",
     arabic: "العربية",
+    turkish: "Türkçe",
+  },
+  tr: {
+    loginTitle: "Giriş Yap",
+    email: "E-posta",
+    password: "Şifre",
+    loginBtn: "Giriş / Kayıt",
+    loginError: "5000 e-posta ve 5000 şifre kullanın",
+    appTitle: "Tatlı Kafe Yöneticisi",
+    timerTab: "Zamanlayıcı",
+    marketTab: "Market Fiyatları",
+    settingsTab: "Ayarlar",
+    activeDesserts: "Aktif Tatlılar",
+    expiredDesserts: "Süresi Dolan Tatlılar",
+    startBtn: "Başlat",
+    resetBtn: "Sıfırla",
+    timeFinished: "Süre doldu:",
+    marketPrices: "Market Fiyatları",
+    dessert: "Tatlı",
+    findCheapestBtn: "En Ucuz Marketi Bul",
+    marketHint: "Ayarlar'daki malzeme miktarlarını kullanır.",
+    ingredient: "Malzeme",
+    qty: "Miktar",
+    unit: "Birim",
+    cost: "Maliyet",
+    best: "En İyi",
+    totalSok: "Toplam Şok",
+    totalMigros: "Toplam Migros",
+    totalCarrefour: "Toplam Carrefour",
+    cheapestMarket: "En Ucuz Market",
+    searching: "Şok, Migros ve Carrefour aranıyor, lütfen bekleyin…",
+    selectDessert: "Lütfen bir tatlı seçin.",
+    addIngredientsFirst: "Lütfen önce Ayarlar'da malzeme ekleyin.",
+    marketServiceError: "Market hizmeti hatası",
+    timerSettings: "Zamanlayıcı Ayarları",
+    days: "gün",
+    hours: "saat",
+    minutes: "dakika",
+    saveBtn: "Kaydet",
+    deleteBtn: "🗑 Sil",
+    addNewDessertBtn: "+ Yeni Tatlı Ekle",
+    ingredientsTitle: "Malzemeler ve Miktar",
+    addIngredientBtn: "+ Malzeme Ekle",
+    ingredientName: "Malzeme",
+    description: "Açıklama / Marka",
+    need: "Gerekli",
+    perPackage: "paket başına:",
+    packSize: "Paket boyutu",
+    pickFromMarket: "🛒 Marketten Seç",
+    openSok: "Şok'u Aç",
+    openMigros: "Migros'u Aç",
+    openCarrefour: "Carrefour'u Aç",
+    ingredientNameRequired: "Malzeme adı gerekli.",
+    quantityMustBeGreater: "Gerekli miktar 0'dan büyük olmalı.",
+    packageSizeMustBeGreater: "Paket boyutu 0'dan büyük olmalı.",
+    ingredientSaved: "Malzeme kaydedildi.",
+    noIngredientsYet: "Henüz malzeme yok.",
+    writeIngredientFirst: "Önce malzeme adını yazın.",
+    pickItemFromMarket: "🛒 Marketten Ürün Seç",
+    typeProductName: "Ürün adını yazın ve Enter'a basın…",
+    searchBtn: "Ara",
+    modalHint: "Seçilen isim malzeme adını dolduracak.",
+    clearResults: "Sonuçları Temizle",
+    closeBtn: "Kapat",
+    searchingFor: "Şok, Migros ve Carrefour'da aranıyor:",
+    noResultsFound: "Sonuç bulunamadı",
+    select: "Seç",
+    pickChooseBoth: "Kaydetmeden önce her marketten bir ürün seçin.",
+    pickSelectedFrom: "Seçildi:",
+    pickSelectionReady: "Her iki market seçimi de hazır.",
+    pickSaveBoth: "Her İki Seçimi de Kaydet",
+    pickNeedOtherMarket: "Diğer marketten de bir ürün seçin.",
+    deleteConfirm: "Sil",
+    enterDessertName: "Tatlı adını girin:",
+    quantityToSearch: "Miktar",
+    quantityUnit: "Birim",
+    estimatedCost: "Tahmini Maliyet",
+    sokLabel: "Şok",
+    migrosLabel: "Migros",
+    carrefourLabel: "Carrefour",
+    chosenItem: "Seçilen Ürün",
+    selectedState: "Seçildi",
+    none: "Yok",
+    onePiece: "1 adet",
+    fromLabel: "-",
+    unavailable: "Mevcut Değil",
+    checkingConnection: "Bağlantı kontrol ediliyor...",
+    loadingStartServer:
+      "Sunucuyu başlattıktan sonra http://localhost:5050 açın",
+    startServerFirst: "Önce sunucuyu başlatın!",
+    runStartBat: "start.bat çalıştırın",
+    connected: "Bağlandı!",
+    portLabel: "Port",
+    serverNotRunning: "Sunucu çalışmıyor - start.bat çalıştırın",
+    serverNotFound: "Sunucu bulunamadı",
+    reopenSettings: "Ayarlar sekmesini tekrar açın.",
+    errorPrefix: "Hata",
+    browserNoNotifications: "Tarayıcı bildirimleri desteklemiyor",
+    notificationsBlocked:
+      "Bildirimler engellendi. İzin vermek için adres çubuğundaki kilit simgesine tıklayın.",
+    enableNotifications: "Bildirimleri Etkinleştir",
+    disableNotifications: "Bildirimleri Devre Dışı Bırak",
+    notificationsEnabledTitle: "Bildirimler Etkin!",
+    notificationsEnabledBody:
+      "Tatlı zamanlayıcıları bittiğinde bildirim alacaksınız.",
+    pushUnavailableNow: "Anında bildirimler şu anda kullanılamıyor.",
+    pushNotConfigured: "Bu sunucuda anında bildirimler yapılandırılmamış",
+    pushUnsupportedDevice: "Bu cihazda anında bildirimler desteklenmiyor",
+    pushFailedToken: "FCM token alınamadı",
+    language: "Dil",
+    english: "English",
+    arabic: "العربية",
+    turkish: "Türkçe",
   },
 };
 
@@ -223,6 +343,7 @@ const extraTranslations = {
   en: {
     sokLabel: "Sok",
     migrosLabel: "Migros",
+    carrefourLabel: "Carrefour",
     chosenItem: "Chosen Item",
     selectedState: "Selected",
     none: "None",
@@ -289,8 +410,9 @@ const extraTranslations = {
     dataErased: "All data has been erased.",
   },
   ar: {
-    sokLabel: "\u0634\u0648\u0643",
-    migrosLabel: "\u0645\u064a\u063a\u0631\u0648\u0633",
+    sokLabel: "شوك",
+    migrosLabel: "ميغروس",
+    carrefourLabel: "كارفور",
     chosenItem:
       "\u0627\u0644\u0639\u0646\u0635\u0631 \u0627\u0644\u0645\u062e\u062a\u0627\u0631",
     selectedState: "\u0645\u062d\u062f\u062f",
@@ -384,6 +506,76 @@ const extraTranslations = {
     dataErased:
       "\u062a\u0645 \u0645\u0633\u062d \u062c\u0645\u064a\u0639 \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a.",
   },
+  tr: {
+    sokLabel: "Şok",
+    migrosLabel: "Migros",
+    carrefourLabel: "Carrefour",
+    chosenItem: "Seçilen Ürün",
+    selectedState: "Seçildi",
+    none: "Yok",
+    onePiece: "1 adet",
+    fromLabel: "-",
+    unavailable: "Mevcut Değil",
+    checkingConnection: "Bağlantı kontrol ediliyor...",
+    loadingStartServer:
+      "Sunucuyu başlattıktan sonra http://localhost:5050 açın",
+    startServerFirst: "Önce sunucuyu başlatın!",
+    runStartBat: "start.bat çalıştırın",
+    connected: "Bağlandı!",
+    portLabel: "Port",
+    serverNotRunning: "Sunucu çalışmıyor - start.bat çalıştırın",
+    serverNotFound: "Sunucu bulunamadı",
+    reopenSettings: "Ayarlar sekmesini tekrar açın.",
+    errorPrefix: "Hata",
+    browserNoNotifications: "Tarayıcı bildirimleri desteklemiyor",
+    notificationsBlocked:
+      "Bildirimler engellendi. İzin vermek için adres çubuğundaki kilit simgesine tıklayın.",
+    enableNotifications: "Bildirimleri Etkinleştir",
+    disableNotifications: "Bildirimleri Devre Dışı Bırak",
+    notificationsEnabledTitle: "Bildirimler Etkin!",
+    notificationsEnabledBody:
+      "Tatlı zamanlayıcıları bittiğinde bildirim alacaksınız.",
+    pushUnavailableNow: "Anında bildirimler şu anda kullanılamıyor.",
+    pushNotConfigured: "Bu sunucuda anında bildirimler yapılandırılmamış",
+    pushUnsupportedDevice: "Bu cihazda anında bildirimler desteklenmiyor",
+    pushFailedToken: "FCM token alınamadı",
+    arabic: "العربية",
+    turkish: "Türkçe",
+    reportsTab: "Raporlar",
+    reportsTitle: "Aylık Maliyet Raporu",
+    reportMonth: "Ay",
+    reportRuns: "Karşılaştırma Sayısı",
+    reportDesserts: "Karşılaştırılan Tatlılar",
+    reportTrackedIngredients: "Takip Edilen Malzemeler",
+    reportMarketTotals: "Aylık Market Toplamları",
+    reportDessertUsage: "Tatlı Aktivitesi",
+    reportIngredientTrends: "Malzeme Fiyat Trendi",
+    reportIngredientName: "Malzeme",
+    reportTimesUsed: "Kullanım Sayısı",
+    reportFirstPrice: "İlk Fiyat",
+    reportLastPrice: "Son Fiyat",
+    reportChange: "Değişim",
+    reportMoves: "Değişiklikler",
+    reportNoData: "Henüz veri yok",
+    reportMonthEmpty:
+      "Henüz aylık rapor yok. Takibi başlatmak için En Ucuz Marketi Bul çalıştırın.",
+    reportIncrease: "yukarı",
+    reportDecrease: "aşağı",
+    reportSame: "aynı",
+    exportPDF: "PDF Dışa Aktar",
+    allMonthsComparison: "Tüm Aylar Karşılaştırması",
+    reportSearchCount: "Arama Sayısı",
+    totalCost: "Toplam",
+    bestPrice: "En İyi Fiyat",
+    potentialSavings: "Olası Tasarruf",
+    timerUsageSummary: "Zamanlayıcı Kullanım Özeti",
+    reportTimerUsage: "Zamanlayıcı Kullanımı",
+    reportTimerCount: "Zamanlayıcı Sayısı",
+    eraseAll: "Tümünü Sil",
+    eraseAllConfirm:
+      "TÜM verileri silmek istediğinizden emin misiniz? Bu tüm raporları, zamanlayıcı kullanımını ve malzemeleri içerir. Bu geri alınamaz.",
+    dataErased: "Tüm veriler silindi.",
+  },
 };
 
 function t(key) {
@@ -400,6 +592,7 @@ function marketLabel(market) {
   const value = String(market || "").toLowerCase();
   if (value === "sok") return t("sokLabel");
   if (value === "migros") return t("migrosLabel");
+  if (value === "carrefour") return t("carrefourLabel");
   if (value === "n/a") return t("unavailable");
   return market || t("unavailable");
 }
@@ -428,10 +621,7 @@ function hasAndroidNotificationPermission() {
 function translateUI() {
   const map = {
     appTitle: "appTitle",
-    activeDessertsTitle: "activeDesserts",
-    expiredDessertsTitle: "expiredDesserts",
     marketPricesTitle: "marketPrices",
-    timerSettingsTitle: "timerSettings",
     ingredientsTitle: "ingredientsTitle",
     reportsTitle: "reportsTitle",
     dessertLabel: "dessert",
@@ -490,7 +680,8 @@ function renderLanguageSwitcher() {
   if (!c) return;
   c.innerHTML = `<select onchange="setLanguage(this.value)" class="lang-select">
     <option value="en" ${currentLang === "en" ? "selected" : ""}>${t("english")}</option>
-    <option value="ar" ${currentLang === "ar" ? "selected" : ""}>${t("arabic")}</option></select>`;
+    <option value="ar" ${currentLang === "ar" ? "selected" : ""}>${t("arabic")}</option>
+    <option value="tr" ${currentLang === "tr" ? "selected" : ""}>${t("turkish")}</option></select>`;
 }
 window.setLanguage = setLanguage;
 
@@ -1747,113 +1938,20 @@ function triggerDessertFinishedAlert(dessert) {
 }
 
 window.switchTab = function (tabName) {
-  ["timer", "market", "settings", "reports"].forEach((tab) => {
+  ["market", "settings", "reports"].forEach((tab) => {
     const el = document.getElementById(`tab-${tab}`);
     if (el) el.classList.toggle("hidden", tab !== tabName);
   });
 };
 
-function render() {
-  const list = document.getElementById("list"),
-    expired = document.getElementById("expired");
-  list.innerHTML = "";
-  expired.innerHTML = "";
-  const now = Date.now();
-  desserts.forEach((d, i) => {
-    let remaining = 0;
-    if (d.startTime)
-      remaining =
-        d.days * 86400000 +
-        d.hours * 3600000 +
-        d.minutes * 60000 -
-        (now - d.startTime);
-    if (d.startTime && remaining <= 0 && !d.finished) {
-      d.finished = true;
-      const alarm = document.getElementById("alarm");
-      if (alarm) alarm.play().catch(() => {});
-      saveLocal();
-    }
-    if (d.startTime && remaining <= 0) triggerDessertFinishedAlert(d);
-    const div = document.createElement("div");
-    div.className = "row";
-    div.innerHTML = `<span>${d.name}</span><button onclick="start(${i})">${t("startBtn")}</button><button onclick="reset(${i})">${t("resetBtn")}</button><span>${d.startTime ? formatTime(Math.max(0, remaining)) : ""}</span>`;
-    if (d.finished || (d.startTime && remaining <= 0)) expired.appendChild(div);
-    else list.appendChild(div);
-  });
-}
-
-window.start = function (i) {
-  desserts[i].startTime = Date.now();
-  desserts[i].finished = false;
-  desserts[i].notified = false;
-  desserts[i].notifyInFlight = false;
-  recordTimerUsage(desserts[i].name);
-  render();
-  saveLocal();
-  syncTimerPush(i).catch(() => {});
-};
-window.reset = function (i) {
-  desserts[i].startTime = null;
-  desserts[i].finished = false;
-  desserts[i].notified = false;
-  desserts[i].notifyInFlight = false;
-  render();
-  saveLocal();
-  syncTimerPush(i).catch(() => {});
-};
-function formatTime(ms) {
-  const s = Math.floor(ms / 1000),
-    d = Math.floor(s / 86400),
-    h = Math.floor((s % 86400) / 3600),
-    m = Math.floor((s % 3600) / 60),
-    sec = s % 60;
-  return `${d}d ${h}h ${m}m ${sec}s`;
-}
-
-setInterval(render, 1000);
-
 function renderSettings() {
-  const panel = document.getElementById("settings");
-  panel.innerHTML = "";
-  desserts.forEach((d, i) => {
-    const row = document.createElement("div");
-    row.className = "settings-row";
-    row.innerHTML = `<span class="settings-name">${d.name}</span><input type="number" value="${d.days}" min="0" id="days_${i}"> ${t("days")}<input type="number" value="${d.hours}" min="0" max="23" id="hours_${i}"> ${t("hours")}<input type="number" value="${d.minutes}" min="0" max="59" id="min_${i}"> ${t("minutes")}<button onclick="saveAdmin(${i})">${t("saveBtn")}</button><button class="btn-delete" onclick="deleteDessert(${i})">${t("deleteBtn")}</button>`;
-    panel.appendChild(row);
-  });
-  const addBtn = document.createElement("button");
-  addBtn.textContent = t("addNewDessertBtn");
-  addBtn.className = "btn-add-dessert";
-  addBtn.onclick = addNewDessert;
-  panel.appendChild(addBtn);
   renderIngredientsSettings();
 }
-
-window.saveAdmin = function (i) {
-  desserts[i].days = Math.max(
-    0,
-    parseInt(document.getElementById(`days_${i}`).value, 10) || 0,
-  );
-  desserts[i].hours = Math.max(
-    0,
-    Math.min(
-      23,
-      parseInt(document.getElementById(`hours_${i}`).value, 10) || 0,
-    ),
-  );
-  desserts[i].minutes = Math.max(
-    0,
-    Math.min(59, parseInt(document.getElementById(`min_${i}`).value, 10) || 0),
-  );
-  saveLocal();
-  render();
-};
 
 window.deleteDessert = function (index) {
   if (!confirm(`${t("deleteConfirm")} "${desserts[index].name}"?`)) return;
   desserts.splice(index, 1);
   saveLocal();
-  render();
   renderSettings();
   renderDessertSelect();
 };
@@ -1862,15 +1960,9 @@ window.addNewDessert = function () {
   if (!name || !name.trim()) return;
   desserts.push({
     name: name.trim(),
-    days: 5,
-    hours: 0,
-    minutes: 0,
-    startTime: null,
-    finished: false,
     ingredients: [],
   });
   saveLocal();
-  render();
   renderSettings();
   renderDessertSelect();
 };
@@ -1881,10 +1973,12 @@ let _pickState = {
   results: null,
   quantity: 1,
   quantityUnit: "piece",
-  draftSelections: { sok: null, migros: null },
+  draftSelections: { sok: null, migros: null, carrefour: null },
 };
 function currentPickSelections() {
-  return _pickState?.draftSelections || { sok: null, migros: null };
+  return (
+    _pickState?.draftSelections || { sok: null, migros: null, carrefour: null }
+  );
 }
 window.openPickModal = async function (dessertIndex, ingredientIndex) {
   _pickTarget = { dessertIndex, ingredientIndex };
@@ -2193,7 +2287,7 @@ function renderIngredientsSettings() {
         sokPicked || migrosPicked
           ? `<div class="picked-market-summary">${sokPicked ? `<span>Şok: ${sokPicked}</span>` : ""}${migrosPicked ? `<span>Migros: ${migrosPicked}</span>` : ""}</div>`
           : "";
-      row.innerHTML = `<input type="text" id="ing_name_${di}_${ii}" placeholder="${t("ingredientName")}" value="${s.name}"><input type="text" id="ing_desc_${di}_${ii}" placeholder="${t("description")}" value="${s.description}"><input type="number" step="0.01" min="0.01" id="ing_qty_${di}_${ii}" placeholder="${t("need")}" value="${s.quantity}"><select id="ing_unit_${di}_${ii}">${renderUnitOptions(s.unit)}</select><span>${t("perPackage")}</span><input type="number" step="0.01" min="0.01" id="ing_pack_${di}_${ii}" placeholder="${t("packSize")}" value="${s.packageSize}"><select id="ing_pack_unit_${di}_${ii}">${renderUnitOptions(s.packageUnit)}</select><button class="btn-pick" onclick="openPickModal(${di},${ii})">${t("pickFromMarket")}</button><button onclick="saveIngredient(${di},${ii})">${t("saveBtn")}</button><button onclick="openMarketLink('sok',${di},${ii})">${t("openSok")}</button><button onclick="openMarketLink('migros',${di},${ii})">${t("openMigros")}</button><button class="btn-delete" onclick="removeIngredient(${di},${ii})">${t("deleteBtn")}</button>${pickedSummary}`;
+      row.innerHTML = `<input type="text" id="ing_name_${di}_${ii}" placeholder="${t("ingredientName")}" value="${s.name}"><input type="text" id="ing_desc_${di}_${ii}" placeholder="${t("description")}" value="${s.description}"><input type="number" step="0.01" min="0.01" id="ing_qty_${di}_${ii}" placeholder="${t("need")}" value="${s.quantity}"><select id="ing_unit_${di}_${ii}">${renderUnitOptions(s.unit)}</select><span>${t("perPackage")}</span><input type="number" step="0.01" min="0.01" id="ing_pack_${di}_${ii}" placeholder="${t("packSize")}" value="${s.packageSize}"><select id="ing_pack_unit_${di}_${ii}">${renderUnitOptions(s.packageUnit)}</select><button class="btn-pick" onclick="openPickModal(${di},${ii})">${t("pickFromMarket")}</button><button onclick="saveIngredient(${di},${ii})">${t("saveBtn")}</button><button onclick="openMarketLink('sok',${di},${ii})">${t("openSok")}</button><button onclick="openMarketLink('migros',${di},${ii})">${t("openMigros")}</button><button onclick="openMarketLink('carrefour',${di},${ii})">${t("openCarrefour")}</button><button class="btn-delete" onclick="removeIngredient(${di},${ii})">${t("deleteBtn")}</button>${pickedSummary}`;
       list.appendChild(row);
     });
   });
@@ -2289,6 +2383,7 @@ window.findCheapestForSelectedDessert = async function () {
         marketNames: {
           sok: ing.marketSelections?.sok?.name || baseName,
           migros: ing.marketSelections?.migros?.name || baseName,
+          carrefour: ing.marketSelections?.carrefour?.name || baseName,
         },
         quantity: calculateEffectiveQuantity(
           ing.quantity,
@@ -2324,11 +2419,15 @@ function renderMarketResult(data) {
     totals = data.totals || {},
     cheapest = data.cheapestMarket || "N/A",
     cheapestTotal = Number(data.cheapestTotal || 0);
-  let html = `<table class="market-table"><thead><tr><th>${t("ingredient")}</th><th>${t("qty")}</th><th>Şok ${t("unit")}</th><th>Şok ${t("cost")}</th><th>Migros ${t("unit")}</th><th>Migros ${t("cost")}</th></tr></thead><tbody>`;
+  let html = `<table class="market-table"><thead><tr><th>${t("ingredient")}</th><th>${t("qty")}</th><th>${marketLabel("sok")} ${t("cost")}</th><th>${marketLabel("migros")} ${t("cost")}</th><th>${marketLabel("carrefour")} ${t("cost")}</th></tr></thead><tbody>`;
   rows.forEach((r) => {
-    html += `<tr><td>${r.ingredient}</td><td>${r.quantity}</td><td>${formatTryPrice(r.sok?.unitPrice)}</td><td>${formatTryPrice(r.sok?.cost)}</td><td>${formatTryPrice(r.migros?.unitPrice)}</td><td>${formatTryPrice(r.migros?.cost)}</td></tr>`;
+    html += `<tr><td>${r.ingredient}</td><td>${r.quantity}</td><td>${formatTryPrice(r.sok?.cost)}</td><td>${formatTryPrice(r.migros?.cost)}</td><td>${formatTryPrice(r.carrefour?.cost)}</td></tr>`;
   });
-  html += `</tbody></table><p><strong>${t("totalSok")}:</strong> ${formatTryPrice(totals.sok)}</p><p><strong>${t("totalMigros")}:</strong> ${formatTryPrice(totals.migros)}</p><p class="best-market">${t("cheapestMarket")}: ${cheapest} (${formatTryPrice(cheapestTotal)})</p>`;
+  html += `</tbody></table>`;
+  html += `<p><strong>${t("totalSok")}:</strong> ${formatTryPrice(totals.sok)}</p>`;
+  html += `<p><strong>${t("totalMigros")}:</strong> ${formatTryPrice(totals.migros)}</p>`;
+  html += `<p><strong>${t("totalCarrefour")}:</strong> ${formatTryPrice(totals.carrefour)}</p>`;
+  html += `<p class="best-market">${t("cheapestMarket")}: ${marketLabel(cheapest)} (${formatTryPrice(cheapestTotal)})</p>`;
   resultBox.innerHTML = html;
 }
 
@@ -2343,6 +2442,7 @@ window.openMarketLink = function (market, di, ii) {
   const urls = {
     sok: `https://www.sokmarket.com.tr/arama?q=${encodeURIComponent(query)}`,
     migros: `https://www.migros.com.tr/arama?q=${encodeURIComponent(query)}`,
+    carrefour: `https://www.carrefoursa.com/arama?q=${encodeURIComponent(query)}`,
   };
   if (urls[market]) window.open(urls[market], "_blank");
 };
@@ -3428,6 +3528,13 @@ const MARKET_DEFS_V2 = [
     url: (query) =>
       `https://www.migros.com.tr/arama?q=${encodeURIComponent(query)}`,
   },
+  {
+    key: "carrefour",
+    label: "Carrefour",
+    color: "#1d4ed8",
+    url: (query) =>
+      `https://www.carrefoursa.com/arama?q=${encodeURIComponent(query)}`,
+  },
 ];
 
 function marketKeys() {
@@ -3832,6 +3939,7 @@ window.findCheapestForSelectedDessert = async function () {
         marketNames: {
           sok: ing.marketSelections?.sok?.name || baseName,
           migros: ing.marketSelections?.migros?.name || baseName,
+          carrefour: ing.marketSelections?.carrefour?.name || baseName,
         },
         cachedSelections: {
           sok: ing.marketSelections?.sok || null,
