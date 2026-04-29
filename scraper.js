@@ -3,9 +3,6 @@ const JINA_TIMEOUT_MS = Number(process.env.JINA_TIMEOUT_MS || 20000);
 // Remove limit to get all items - set to a high number
 const MARKET_RESULT_LIMIT = Number(process.env.MARKET_RESULT_LIMIT || 1000);
 
-// Import Gemini service
-const { searchWithGemini, searchMultipleWithGemini } = require('./gemini_service');
-
 // Import MarketFiyati scraper
 let scrapeMarketFiyati = null;
 try {
@@ -17,12 +14,10 @@ try {
 
 const MARKET_ORDER = [
   "marketfiyati",
-  "gemini",
 ];
 
 const MARKET_LABELS = {
   marketfiyati: "Market Fiyatı",
-  gemini: "Gemini AI",
 };
 
 function logScrape(stage, message) {
@@ -62,22 +57,9 @@ async function scrapeMarketFiyatiWrapper(query) {
   }
 }
 
-// ---- GEMINI HANDLER ----
-async function scrapeGemini(query) {
-  logScrape("Gemini", `Starting AI search for "${query}"`);
-  try {
-    const products = await searchWithGemini(query);
-    return products; // Remove limit to get all items
-  } catch (error) {
-    logScrape("Gemini", `Error: ${error.message}`);
-    return [];
-  }
-}
-
 // Market handlers
 const MARKET_HANDLERS = {
   marketfiyati: scrapeMarketFiyatiWrapper,
-  gemini: scrapeGemini,
 };
 
 async function searchProduct(product, market) {
