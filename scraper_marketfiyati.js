@@ -18,8 +18,8 @@ const https = require("https");
 
 const API_BASE = "https://api.marketfiyati.org.tr";
 const SEARCH_TIMEOUT_MS = Number(process.env.SEARCH_TIMEOUT_MS || 30000);
-// Remove limit to get all items - set to a high number
-const MARKET_RESULT_LIMIT = Number(process.env.MARKET_RESULT_LIMIT || 50000);
+// Remove limit to get all items - set to a very high number to disable effective limit
+const MARKET_RESULT_LIMIT = Number(process.env.MARKET_RESULT_LIMIT || 1000000);
 
 // Default Istanbul coordinates (Kadıköy) — covers most chains nationwide.
 // Override via env vars if you need a different region.
@@ -213,14 +213,13 @@ async function scrapeMarketFiyati(query) {
     return [];
   }
 
-  // Step 2: search — fetch up to 5 pages (page 0, 1, 2, 3, 4) with 200 items each
-  // to maximise coverage across all markets.
+  // Step 2: search — fetch pages until we get fewer results than page size
+  // to get ALL available results across all markets.
   const PAGE_SIZE = 200;
-  const MAX_PAGES = 5;
-
   let allProducts = [];
+  let page = 0;
 
-  for (let page = 0; page < MAX_PAGES; page++) {
+  while (true) {
     let response;
     try {
       response = await searchProducts(
@@ -245,13 +244,12 @@ async function scrapeMarketFiyati(query) {
 
     allProducts = allProducts.concat(flattenProducts(content));
 
-    // Stop early if we have enough or there are no more results
-    if (
-      content.length < PAGE_SIZE ||
-      allProducts.length >= MARKET_RESULT_LIMIT
-    ) {
+    // Stop if we got fewer results than page size (means we've reached the end)
+    if (content.length < PAGE_SIZE) {
       break;
     }
+
+    page++;
   }
 
   const limited = allProducts.slice(0, MARKET_RESULT_LIMIT);
