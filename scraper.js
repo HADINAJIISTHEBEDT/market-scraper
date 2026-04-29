@@ -1,4 +1,4 @@
-const SEARCH_TIMEOUT_MS = Number(process.env.SEARCH_TIMEOUT_MS || 45000);
+const SEARCH_TIMEOUT_MS = Number(process.env.SEARCH_TIMEOUT_MS || 120000);
 const JINA_TIMEOUT_MS = Number(process.env.JINA_TIMEOUT_MS || 20000);
 // Remove limit to get all items - set to a high number
 const MARKET_RESULT_LIMIT = Number(process.env.MARKET_RESULT_LIMIT || 1000);
