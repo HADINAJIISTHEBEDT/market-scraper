@@ -1,8 +1,16 @@
+"use strict";
+
 let SCRAPER_API_BASE = "";
 let currentLang = "tr";
 
 const MARKETS = [
-  { key: "marketfiyati", label: "Tüm Marketler" },
+  { key: "bim", label: "BIM" },
+  { key: "fille", label: "Fille" },
+  { key: "sok", label: "Sok" },
+  { key: "migros", label: "Migros" },
+  { key: "metro", label: "Metro" },
+  { key: "tahtakale", label: "Tahtakale" },
+  { key: "carrefour", label: "Carrefour" },
 ];
 
 const I18N = {
@@ -29,35 +37,39 @@ const I18N = {
     noResults: "No results found.",
   },
   ar: {
-    title: "بحث منتجات المتاجر",
-    subtitle: "لا توجد عناصر محفوظة. اكتب اسم المنتج فقط وابحث.",
+    title: "بحث منتجات السوق",
+    subtitle: "لا توجد عناصر محفوظة. فقط اكتب منتج وابحث.",
     placeholder: "اكتب اسم المنتج...",
-    search: "بحث",
-    statusSearching: "جاري البحث...",
+    search: "ابحث",
+    statusSearching: "جار البحث...",
     statusDone: "اكتمل البحث.",
-    statusWriteProduct: "يرجى كتابة اسم المنتج.",
+    statusWriteProduct: "يرجى إدخال اسم المنتج.",
     statusError: "خطأ",
-    noResults: "لا توجد نتائج.",
+    noResults: "لم يتم العثور على نتائج.",
   },
 };
 
 function t(key) {
-  return I18N[currentLang]?.[key] || I18N.tr[key] || key;
+  return I18N[currentLang] && I18N[currentLang][key]
+    ? I18N[currentLang][key]
+    : I18N.tr[key]
+    || key;
 }
 
-function escapeHtml(value) {
-  return String(value || "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
+function escapeHtml(text) {
+  const map = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  };
+  return String(text).replace(/[&<>"']/g, m => map[m]);
 }
 
 function formatPrice(price) {
-  const n = Number(price);
-  if (!Number.isFinite(n)) return "-";
-  return `${n.toFixed(2)} TL`;
+  if (price === null || price === undefined) return "";
+  return `${price.toFixed(2).replace('.', ',')} ₺`;
 }
 
 function setStatus(message, isError = false) {
@@ -87,9 +99,22 @@ function renderResults(data) {
   const errors =
     data && typeof data._errors === "object" && data._errors ? data._errors : {};
 
+  // Get all items from marketfiyati (our API returns all items here)
+  const allItems = Array.isArray(data?.marketfiyati) ? data.marketfiyati : [];
+
+  // Group items by market
+  const groupedItems = {};
+  allItems.forEach(item => {
+    const market = item.market || "unknown";
+    if (!groupedItems[market]) {
+      groupedItems[market] = [];
+    }
+    groupedItems[market].push(item);
+  });
+
   let html = "";
   for (const market of MARKETS) {
-    const items = Array.isArray(data?.[market.key]) ? data[market.key] : [];
+    const items = groupedItems[market.key] || [];
     html += `<section class="panel"><h3>${market.label}</h3>`;
     if (!items.length) {
       const errorText = escapeHtml(errors[market.key] || "");
@@ -105,10 +130,8 @@ function renderResults(data) {
       const imageHtml = item.image ? 
         `<img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.name)}" class="item-image" onerror="this.style.display='none'">` : 
         '';
-      const marketBadge = item.market ? `<span class="market-badge">${escapeHtml(item.market)}</span>` : '';
       html += `<article class="item-card">
         ${imageHtml}
-        ${marketBadge}
         <div class="item-name">${escapeHtml(item.name)}</div>
         <div class="item-price">${formatPrice(item.price)}</div>
         ${item.unitPrice ? `<div class="item-unit">${escapeHtml(item.unitPrice)}</div>` : ''}
