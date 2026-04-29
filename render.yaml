@@ -28,3 +28,5 @@ services:
         sync: false
       - key: FIREBASE_WEB_CONFIG_JSON
         sync: false
+      - key: GEMINI_API_KEY
+        sync: false
