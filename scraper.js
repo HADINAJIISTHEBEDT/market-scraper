@@ -19,11 +19,13 @@ const cheerio = require('cheerio');
 const MARKET_ORDER = [
   "marketfiyati",
   "sok",
+  "metro",
 ];
 
 const MARKET_LABELS = {
   marketfiyati: "Market Fiyatı",
   sok: "Sok",
+  metro: "Metro",
 };
 
 function logScrape(stage, message) {
@@ -190,10 +192,134 @@ async function scrapeSok(query) {
   }
 }
 
+// ---- METRO HANDLER ----
+async function scrapeMetro(query) {
+  logScrape("Metro", `Starting search for "${query}"`);
+  try {
+    const searchUrl = `https://www.metro-tr.com/arama?q=${encodeURIComponent(query)}`;
+    const response = await axios.get(searchUrl, {
+      timeout: JINA_TIMEOUT_MS,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
+      }
+    });
+    
+    const $ = cheerio.load(response.data);
+    const products = [];
+    
+    // Try Metro-specific product card selectors
+    const productContainers = $('.product-card, .product-item, .product-tile');
+    
+    // Fallback to more general selectors if the specific ones don't work
+    if (productContainers.length === 0) {
+      const fallbackSelectors = [
+        '.product',
+        '[data-test-id="product-card"]',
+        '.plp-product-item',
+        '.item-box',
+        '.product-item-wrapper',
+        '.product-list-item',
+        'article'
+      ];
+      
+      for (const selector of fallbackSelectors) {
+        const elements = $(selector);
+        if (elements.length > 0) {
+          productContainers.add(elements);
+          break;
+        }
+      }
+    }
+    
+    logScrape("Metro", `Found ${productContainers.length} product containers`);
+    
+    productContainers.each((index, element) => {
+      const $element = $(element);
+      
+      // Extract product name and price from text content
+      let fullText = $element.text().trim();
+      
+      // Extract price (look for Turkish Lira format)
+      let price = null;
+      const priceMatch = fullText.match(/(\d+[.,]\d{2})\s*(?:₺|TL)/i);
+      if (priceMatch) {
+        const priceValue = parseFloat(priceMatch[1].replace(',', '.'));
+        if (!isNaN(priceValue) && priceValue > 0) {
+          price = priceValue;
+        }
+      }
+      
+      // Extract product name (remove price from text)
+      let name = fullText;
+      if (priceMatch) {
+        // Remove the price part to get clean product name
+        name = fullText.replace(priceMatch[0], '').trim();
+      }
+      
+      // Clean up extra whitespace
+      name = name.replace(/\s+/g, ' ').trim();
+      
+      // Extract image URL
+      let image = null;
+      const imgElement = $element.find('img').first();
+      if (imgElement.length) {
+        image = imgElement.attr('src') || imgElement.attr('data-src') || imgElement.attr('data-lazy') || imgElement.attr('data-original');
+        if (image && !image.startsWith('http')) {
+          try {
+            image = new URL(image, searchUrl).toString();
+          } catch (e) {
+            // If URL construction fails, keep as is
+          }
+        }
+      }
+      
+      // Extract product URL
+      let url = null;
+      const linkElement = $element.find('a').first();
+      if (linkElement.length && linkElement.attr('href')) {
+        const href = linkElement.attr('href');
+        if (href.startsWith('http')) {
+          url = href;
+        } else if (href.startsWith('/')) {
+          try {
+            url = new URL(href, 'https://www.metro-tr.com').toString();
+          } catch (e) {
+            url = `https://www.metro-tr.com${href}`;
+          }
+        } else {
+          url = href;
+        }
+      }
+      
+      // Only add product if we have at least a name
+      if (name && name.length > 0) {
+        products.push({
+          name,
+          price,
+          image: image || null,
+          market: 'metro',
+          unitPrice: null,
+          brand: null,
+          url: url || searchUrl
+        });
+      }
+    });
+    
+    logScrape("Metro", `Extracted ${products.length} products`);
+    return products;
+  } catch (error) {
+    logScrape("Metro", `Error: ${error.message}`);
+    return [];
+  }
+}
+
 // Market handlers
 const MARKET_HANDLERS = {
   marketfiyati: scrapeMarketFiyatiWrapper,
   sok: scrapeSok,
+  metro: scrapeMetro,
 };
 
 async function searchProduct(product, market) {
