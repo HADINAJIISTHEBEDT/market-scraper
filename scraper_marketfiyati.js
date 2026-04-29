@@ -142,55 +142,64 @@ async function searchProducts(keywords, depotIds, lat, lon, distance, page, size
   return data;
 }
 
-/**
- * Flatten API product list into the shape the rest of the app expects:
- *   { name, price, market, image, unitPrice, brand, url }
- *
- * One product can appear in multiple markets — we emit one result per market.
- */
-function flattenProducts(apiProducts) {
-  const results = [];
+  /**
+   * Flatten API product list into the shape the rest of the app expects:
+   *   { name, price, market, image, unitPrice, brand, url }
+   *
+   * One product can appear in multiple markets — we emit one result per market.
+   * 
+   * @param {Array} apiProducts - Array of product objects from API
+   * @returns {Array} Flattened product list with Sok market excluded
+   */
+  function flattenProducts(apiProducts) {
+    const results = [];
 
-  for (const product of apiProducts) {
-    const title = String(product.title || "").trim();
-    const brand = String(product.brand || "").trim();
-    const imageUrl = String(product.imageUrl || "").trim();
-    const depotInfoList = Array.isArray(product.productDepotInfoList)
-      ? product.productDepotInfoList
-      : [];
+    for (const product of apiProducts) {
+      const title = String(product.title || "").trim();
+      const brand = String(product.brand || "").trim();
+      const imageUrl = String(product.imageUrl || "").trim();
+      const depotInfoList = Array.isArray(product.productDepotInfoList)
+        ? product.productDepotInfoList
+        : [];
 
-    if (depotInfoList.length === 0) {
-      // No market info — emit a placeholder entry
-      results.push({
-        name: title,
-        brand,
-        price: null,
-        market: "Market Fiyatı",
-        image: imageUrl,
-        unitPrice: null,
-      });
-      continue;
+      if (depotInfoList.length === 0) {
+        // No market info — emit a placeholder entry
+        results.push({
+          name: title,
+          brand,
+          price: null,
+          market: "Market Fiyatı",
+          image: imageUrl,
+          unitPrice: null,
+        });
+        continue;
+      }
+
+      for (const depot of depotInfoList) {
+        const marketName = String(depot.marketAdi || depot.depotName || "").trim();
+        
+        // Skip Sok market as requested
+        if (marketName.toLowerCase() === "sok") {
+          continue;
+        }
+        
+        const price =
+          typeof depot.price === "number" && depot.price > 0 ? depot.price : null;
+        const unitPrice = String(depot.unitPrice || "").trim() || null;
+
+        results.push({
+          name: title,
+          brand,
+          price,
+          market: marketName || "Market Fiyatı",
+          image: imageUrl,
+          unitPrice,
+        });
+      }
     }
 
-    for (const depot of depotInfoList) {
-      const marketName = String(depot.marketAdi || depot.depotName || "").trim();
-      const price =
-        typeof depot.price === "number" && depot.price > 0 ? depot.price : null;
-      const unitPrice = String(depot.unitPrice || "").trim() || null;
-
-      results.push({
-        name: title,
-        brand,
-        price,
-        market: marketName || "Market Fiyatı",
-        image: imageUrl,
-        unitPrice,
-      });
-    }
+    return results;
   }
-
-  return results;
-}
 
 /**
  * Main entry point — mirrors the signature used by scraper.js.
