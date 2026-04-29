@@ -213,48 +213,70 @@ async function scrapeMarketFiyati(query) {
     return [];
   }
 
-  // Step 2: search — fetch pages until we get fewer results than page size
-  // to get ALL available results across all markets.
-  const PAGE_SIZE = 200;
-  let allProducts = [];
-  let page = 0;
+// Step 2: search — fetch pages until we have retrieved all available products
+// to maximise coverage across all markets.
+const PAGE_SIZE = 100; // items per page request
+let allProducts = [];
+let page = 0;
+let totalProductsFetched = 0;
+let totalFoundProducts = null; // will be set from first response
 
-  while (true) {
-    let response;
-    try {
-      response = await searchProducts(
-        query,
-        depotIds,
-        lat,
-        lon,
-        distance,
-        page,
-        PAGE_SIZE,
-      );
-    } catch (err) {
-      logScrape("Search", `Page ${page} failed: ${err.message}`);
-      break;
-    }
-
-    const content = Array.isArray(response.content) ? response.content : [];
-    logScrape(
-      "Search",
-      `Page ${page}: ${content.length} products (total found: ${response.numberOfFound ?? "?"})`,
+while (true) {
+  let response;
+  try {
+    response = await searchProducts(
+      query,
+      depotIds,
+      lat,
+      lon,
+      distance,
+      page,
+      PAGE_SIZE,
     );
-
-    allProducts = allProducts.concat(flattenProducts(content));
-
-    // Stop if we got fewer results than page size (means we've reached the end)
-    if (content.length < PAGE_SIZE) {
-      break;
-    }
-
-    page++;
+  } catch (err) {
+    logScrape("Search", `Page ${page} failed: ${err.message}`);
+    break;
   }
 
-  const limited = allProducts.slice(0, MARKET_RESULT_LIMIT);
-  logScrape("Results", `Returning ${limited.length} product-market entries`);
-  return limited;
+  const content = Array.isArray(response.content) ? response.content : [];
+  logScrape(
+    "Search",
+    `Page ${page}: ${content.length} products (total found: ${response.numberOfFound ?? "?"})`,
+  );
+
+  // Set totalFoundProducts from the first response
+  if (totalFoundProducts === null) {
+    totalFoundProducts = response.numberOfFound ?? 0;
+    logScrape("Search", `Total products found according to API: ${totalFoundProducts}`);
+  }
+
+  // If no products returned, we've reached the end
+  if (content.length === 0) {
+    break;
+  }
+
+  allProducts = allProducts.concat(flattenProducts(content));
+  totalProductsFetched += content.length;
+
+  // Stop if we have fetched all available products
+  if (totalFoundProducts !== null && totalProductsFetched >= totalFoundProducts) {
+    break;
+  }
+
+  page++;
+  // Safety stop to avoid infinite loops
+  if (page > 20) {
+    logScrape("Search", "Safety stop: exceeded 20 pages");
+    break;
+  }
+}
+
+// Apply the overall result limit (if configured) after fetching all from API
+const limited = MARKET_RESULT_LIMIT > 0 
+  ? allProducts.slice(0, MARKET_RESULT_LIMIT) 
+  : allProducts;
+logScrape("Results", `Returning ${limited.length} product-market entries (fetched ${allProducts.length} entries from ${totalProductsFetched} products)`);
+return limited;
 }
 
 module.exports = { scrapeMarketFiyati };
