@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "description": "Dessert Cafe Manager - Timer and Market Price Tracker",
   "main": "main.js",
-  "bin": "main.js",
+  "bin": {
+    "dessert-cafe-manager": "main.js"
+  },
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
@@ -33,6 +35,8 @@
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
     "@sparticuz/chromium": "^133.0.0",
+    "axios": "^1.15.2",
+    "cheerio": "^1.2.0",
     "firebase": "^12.12.0",
     "firebase-admin": "^13.8.0",
     "puppeteer": "^24.0.0",
@@ -46,5 +50,13 @@
   "devDependencies": {
     "node-windows": "^1.0.0-beta.8",
     "pkg": "^5.8.1"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HADINAJIISTHEBEDT/market-scraper.git"
+  },
+  "bugs": {
+    "url": "https://github.com/HADINAJIISTHEBEDT/market-scraper/issues"
+  },
+  "homepage": "https://github.com/HADINAJIISTHEBEDT/market-scraper#readme"
 }

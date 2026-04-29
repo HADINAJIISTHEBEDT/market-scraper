@@ -992,6 +992,21 @@ html[dir="rtl"] .market-table td {
     margin-bottom: 4px;
 }
 
+.market-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    margin-left: 8px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: rgba(15, 118, 110, 0.12);
+    color: var(--teal-deep);
+    font-size: 0.78rem;
+    font-weight: 800;
+    vertical-align: middle;
+}
+
 .item-unit {
     font-size: 11px;
     color: var(--muted);

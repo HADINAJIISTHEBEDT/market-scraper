@@ -100,8 +100,14 @@ function renderResults(data) {
   const errors =
     data && typeof data._errors === "object" && data._errors ? data._errors : {};
 
-  // Get all items from marketfiyati (our API returns all items here)
-  const allItems = Array.isArray(data?.marketfiyati) ? data.marketfiyati : [];
+  // Get all items from all markets
+  const allItems = [];
+  for (const key in data) {
+    if (key === '_errors') continue;
+    if (Array.isArray(data[key])) {
+      allItems.push(...data[key]);
+    }
+  }
 
   // Group items by market
   const groupedItems = {};
