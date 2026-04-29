@@ -19,13 +19,13 @@ const https = require("https");
 const API_BASE = "https://api.marketfiyati.org.tr";
 const SEARCH_TIMEOUT_MS = Number(process.env.SEARCH_TIMEOUT_MS || 30000);
 // Remove limit to get all items - set to a high number
-const MARKET_RESULT_LIMIT = Number(process.env.MARKET_RESULT_LIMIT || 5000);
+const MARKET_RESULT_LIMIT = Number(process.env.MARKET_RESULT_LIMIT || 50000);
 
 // Default Istanbul coordinates (Kadıköy) — covers most chains nationwide.
 // Override via env vars if you need a different region.
 const DEFAULT_LAT = Number(process.env.MF_LATITUDE || 41.0082);
 const DEFAULT_LON = Number(process.env.MF_LONGITUDE || 28.9784);
-const DEFAULT_DISTANCE = Number(process.env.MF_DISTANCE || 200); // km radius
+const DEFAULT_DISTANCE = Number(process.env.MF_DISTANCE || 300); // Increased radius to 300km
 
 const HEADERS = {
   "Content-Type": "application/json",
