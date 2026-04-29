@@ -2,13 +2,7 @@ let SCRAPER_API_BASE = "";
 let currentLang = "tr";
 
 const MARKETS = [
-  { key: "bim", label: "BIM" },
-  { key: "fille", label: "Fille" },
-  { key: "sok", label: "Sok" },
-  { key: "migros", label: "Migros" },
-  { key: "metro", label: "Metro" },
-  { key: "tahtakale", label: "Tahtakale" },
-  { key: "carrefour", label: "Carrefour" },
+  { key: "marketfiyati", label: "Tüm Marketler" },
 ];
 
 const I18N = {
@@ -111,10 +105,13 @@ function renderResults(data) {
       const imageHtml = item.image ? 
         `<img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.name)}" class="item-image" onerror="this.style.display='none'">` : 
         '';
+      const marketBadge = item.market ? `<span class="market-badge">${escapeHtml(item.market)}</span>` : '';
       html += `<article class="item-card">
         ${imageHtml}
+        ${marketBadge}
         <div class="item-name">${escapeHtml(item.name)}</div>
         <div class="item-price">${formatPrice(item.price)}</div>
+        ${item.unitPrice ? `<div class="item-unit">${escapeHtml(item.unitPrice)}</div>` : ''}
       </article>`;
     }
     html += `</div></section>`;
