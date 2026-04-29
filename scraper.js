@@ -12,7 +12,7 @@ try {
   console.log('[Scraper] MarketFiyati module not available:', error.message);
 }
 
-// Dependencies for direct web scraping (Sok)
+// Dependencies for direct web scraping (Sok, Metro via Cimri)
 const axios = require('axios');
 const cheerio = require('cheerio');
 
@@ -108,7 +108,7 @@ async function scrapeSok(query) {
         }
       }
     }
-    
+
     logScrape("Sok", `Found ${productContainers.length} product containers`);
     
     productContainers.each((index, element) => {
@@ -193,119 +193,93 @@ async function scrapeSok(query) {
 }
 
 // ---- METRO HANDLER ----
+// Since direct Metro scraping requires authentication, use Cimri as fallback
 async function scrapeMetro(query) {
-  logScrape("Metro", `Starting search for "${query}"`);
+  logScrape("Metro", `Starting search for "${query}" via Cimri`);
   try {
-    // Try multiple possible search URL patterns for Metro Turkey
-    const searchUrls = [
-      `https://www.metro-tr.com/urun/ara?q=${encodeURIComponent(query)}`,
-      `https://www.metro-tr.com/arama?q=${encodeURIComponent(query)}`,
-      `https://www.metro-tr.com/search?q=${encodeURIComponent(query)}`,
-      `https://www.metro-tr.com/urunler?q=${encodeURIComponent(query)}`,
-    ];
-    
-    let response = null;
-    let searchUrl = null;
-    
-    // Try each URL until we get a successful response with content
-    for (const url of searchUrls) {
-      try {
-        const res = await axios.get(url, {
-          timeout: JINA_TIMEOUT_MS,
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
-          }
-        });
-        
-        if (res.data && res.data.length > 1000) {
-          response = res;
-          searchUrl = url;
-          logScrape("Metro", `Found working search URL: ${url}`);
-          break;
-        }
-      } catch (err) {
-        continue;
+    // Use Cimri to get Metro prices
+    const cimriUrl = `https://www.cimri.com/arama?q=${encodeURIComponent(query)}+metro`;
+
+    const response = await axios.get(cimriUrl, {
+      timeout: JINA_TIMEOUT_MS,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
       }
-    }
-    
-    if (!response) {
-      logScrape("Metro", "No working search URL found");
-      return [];
-    }
-    
+    });
+
     const $ = cheerio.load(response.data);
     const products = [];
-    
-    // Try multiple product container selectors that Metro might use
+
+    // Cimri uses various selectors for products
     const selectors = [
-      '.product-card',
       '.product-item',
-      '.product-tile',
-      '.product',
-      '[data-product]',
-      '.product-grid-item',
-      '.product-list-item',
-      '.item-box',
-      '.product-wrapper',
-      '.catalog-product',
-      'article.product',
-      '.product-card-wrapper',
+      '.s1wytvda',
+      '[data-product-id]',
+      '.z7ntrt-0',
     ];
-    
+
     let productContainers = $();
-    
+
     for (const selector of selectors) {
       const elements = $(selector);
       if (elements.length > 0) {
         productContainers = productContainers.add(elements);
-        logScrape("Metro", `Found ${elements.length} products with selector "${selector}"`);
       }
     }
-    
-    logScrape("Metro", `Found ${productContainers.length} total product containers`);
-    
+
+    logScrape("Metro", `Found ${productContainers.length} product containers on Cimri`);
+
     productContainers.each((index, element) => {
       const $element = $(element);
-      
-      // Extract product name and price from text content
-      let fullText = $element.text().trim();
-      
-      // Extract price (look for Turkish Lira format)
-      let price = null;
-      const priceMatch = fullText.match(/(\d+[.,]\d{2})\s*(?:₺|TL)/i);
-      if (priceMatch) {
-        const priceValue = parseFloat(priceMatch[1].replace(',', '.'));
-        if (!isNaN(priceValue) && priceValue > 0) {
-          price = priceValue;
+
+      // Check if this is a Metro product
+      const merchantText = $element.text().toLowerCase();
+      if (!merchantText.includes('metro') && !merchantText.includes('grossmarket')) {
+        return; // Skip non-Metro products
+      }
+
+      // Extract product name
+      let name = null;
+      const titleSelectors = ['.product-title', '.link-detail', 'h3', '.product-name', 'a[title]'];
+      for (const selector of titleSelectors) {
+        const titleElement = $element.find(selector).first();
+        if (titleElement.length) {
+          name = titleElement.text().trim() || titleElement.attr('title');
+          if (name) break;
         }
       }
-      
-      // Extract product name (remove price from text)
-      let name = fullText;
-      if (priceMatch) {
-        // Remove the price part to get clean product name
-        name = fullText.replace(priceMatch[0], '').trim();
+
+      // Extract price
+      let price = null;
+      const priceSelectors = ['.price', '.product-price', '[class*="price"]'];
+      for (const selector of priceSelectors) {
+        const priceElement = $element.find(selector).first();
+        if (priceElement.length) {
+          const priceText = priceElement.text().trim();
+          const priceMatch = priceText.match(/(\d+[.,]\d{2})\s*(?:₺|TL|tl)/i);
+          if (priceMatch) {
+            price = parseFloat(priceMatch[1].replace(',', '.'));
+            break;
+          }
+        }
       }
-      
-      // Clean up extra whitespace
-      name = name.replace(/\s+/g, ' ').trim();
-      
+
       // Extract image URL
       let image = null;
       const imgElement = $element.find('img').first();
       if (imgElement.length) {
-        image = imgElement.attr('src') || imgElement.attr('data-src') || imgElement.attr('data-lazy') || imgElement.attr('data-original');
-        if (image && !image.startsWith('http')) {
+        image = imgElement.attr('src') || imgElement.attr('data-src') || imgElement.attr('data-lazy');
+        if (image && !image.startsWith('http') && !image.startsWith('//')) {
           try {
-            image = new URL(image, searchUrl).toString();
+            image = new URL(image, 'https://www.cimri.com').toString();
           } catch (e) {
-            // If URL construction fails, keep as is
+            // Keep as is
           }
         }
       }
-      
+
       // Extract product URL
       let url = null;
       const linkElement = $element.find('a').first();
@@ -314,18 +288,12 @@ async function scrapeMetro(query) {
         if (href.startsWith('http')) {
           url = href;
         } else if (href.startsWith('/')) {
-          try {
-            url = new URL(href, 'https://www.metro-tr.com').toString();
-          } catch (e) {
-            url = `https://www.metro-tr.com${href}`;
-          }
-        } else {
-          url = href;
+          url = `https://www.cimri.com${href}`;
         }
       }
-      
-      // Only add product if we have at least a name
-      if (name && name.length > 0) {
+
+      // Only add product if we have at least a name and price
+      if (name && name.length > 0 && price && price > 0) {
         products.push({
           name,
           price,
@@ -333,13 +301,13 @@ async function scrapeMetro(query) {
           market: 'metro',
           unitPrice: null,
           brand: null,
-          url: url || searchUrl
+          url: url || cimriUrl
         });
       }
     });
-    
-    logScrape("Metro", `Extracted ${products.length} products`);
-    return products;
+
+    logScrape("Metro", `Extracted ${products.length} Metro products from Cimri`);
+    return products.slice(0, MARKET_RESULT_LIMIT); // Limit results
   } catch (error) {
     logScrape("Metro", `Error: ${error.message}`);
     return [];
