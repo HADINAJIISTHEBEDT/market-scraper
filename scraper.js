@@ -260,7 +260,7 @@ async function scrapeMetro(query) {
     await page.goto(searchUrl, { waitUntil: 'networkidle0', timeout: SEARCH_TIMEOUT_MS });
 
     // Wait for the page to be fully loaded
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise(resolve => setTimeout(resolve, 5000));
 
     // Check if we're on a product page or if there's content
     const pageTitle = await page.title();
@@ -297,7 +297,7 @@ async function scrapeMetro(query) {
     }
 
     // Give extra time for dynamic content
-    await new Promise(resolve => setTimeout(resolve, 5000));
+    await new Promise(resolve => setTimeout(resolve, 8000));
 
     const content = await page.content();
     const $ = cheerio.load(content);
