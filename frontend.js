@@ -5,6 +5,7 @@ let currentLang = "tr";
 
 const MARKETS = [
   { key: "bim", label: "BIM" },
+  { key: "a101", label: "A101" },
   { key: "fille", label: "Fille" },
   { key: "sok", label: "Sok" },
   { key: "migros", label: "Migros" },
