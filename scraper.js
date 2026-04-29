@@ -259,6 +259,10 @@ async function scrapeMetro(query) {
 
     await page.goto(searchUrl, { waitUntil: 'networkidle0', timeout: SEARCH_TIMEOUT_MS });
 
+    // Check final URL after redirects
+    const finalUrl = page.url();
+    logScrape("Metro", `Final URL: ${finalUrl}`);
+
     // Wait for the page to be fully loaded
     await new Promise(resolve => setTimeout(resolve, 5000));
 
