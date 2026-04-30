@@ -196,231 +196,110 @@ async function scrapeSok(query) {
 }
 
 // ---- METRO HANDLER ----
-// Metro scraper using Puppeteer (required due to anti-bot measures)
 async function scrapeMetro(query) {
-  logScrape("Metro", `Starting search for "${query}" from https://www.metro-tr.com/`);
-  let browser = null;
+  logScrape("Metro", `Starting search for "${query}" via Cimri`);
   try {
-    // Use Metro's main site search URL
-    const searchUrl = `https://www.metro-tr.com/sonuclar?q=${encodeURIComponent(query)}`;
-
-    // Try to find Chrome executable
-    let executablePath = undefined;
-    const possiblePaths = [
-      'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-      'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-      'C:\\Program Files\\Chromium\\Application\\chrome.exe',
-      'C:\\Program Files (x86)\\Chromium\\Application\\chrome.exe',
-    ];
-
-    for (const path of possiblePaths) {
-      try {
-        const fs = require('fs');
-        if (fs.existsSync(path)) {
-          executablePath = path;
-          break;
-        }
-      } catch (e) {
-        // Ignore
+    const cimriUrl = `https://www.cimri.com/arama?q=${encodeURIComponent(query)}+metro`;
+    const response = await axios.get(cimriUrl, {
+      timeout: JINA_TIMEOUT_MS,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
       }
-    }
-
-    browser = await puppeteer.launch({
-      headless: 'new',
-      executablePath,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--disable-web-security',
-        '--disable-features=VizDisplayCompositor',
-        '--disable-gpu',
-        '--disable-dev-tools',
-        '--disable-extensions',
-        '--disable-background-timer-throttling',
-        '--disable-backgrounding-occluded-windows',
-        '--disable-renderer-backgrounding',
-        '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-      ]
     });
 
-    const page = await browser.newPage();
-
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-    await page.setExtraHTTPHeaders({
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-      'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
-    });
-
-    logScrape("Metro", `Loading search URL: ${searchUrl}`);
-
-    await page.goto(searchUrl, { waitUntil: 'networkidle0', timeout: SEARCH_TIMEOUT_MS });
-
-    // Check final URL after redirects
-    const finalUrl = page.url();
-    logScrape("Metro", `Final URL: ${finalUrl}`);
-
-    // Wait for the page to be fully loaded
-    await new Promise(resolve => setTimeout(resolve, 5000));
-
-    // Check if we're on a product page or if there's content
-    const pageTitle = await page.title();
-    logScrape("Metro", `Page title: ${pageTitle}`);
-
-    // Wait for products to load - try multiple selectors
-    const productSelectors = [
-      '.product-teaser-container',
-      '.product-item',
-      '.product-card',
-      '.m-product-card',
-      '[data-product]',
-      '.product',
-      '.item',
-      '.product-wrapper'
-    ];
-
-    let foundSelector = null;
-    for (const selector of productSelectors) {
-      try {
-        await page.waitForSelector(selector, { timeout: 5000 });
-        foundSelector = selector;
-        logScrape("Metro", `Found products with selector: ${selector}`);
-        break;
-      } catch (e) {
-        // Continue to next selector
-      }
-    }
-
-    if (!foundSelector) {
-      logScrape("Metro", "No product selectors found, checking page content...");
-      const bodyText = await page.evaluate(() => document.body.innerText);
-      logScrape("Metro", `Page body contains: ${bodyText.substring(0, 200)}...`);
-    }
-
-    // Give extra time for dynamic content
-    await new Promise(resolve => setTimeout(resolve, 8000));
-
-    const content = await page.content();
-    const $ = cheerio.load(content);
+    const $ = cheerio.load(response.data);
     const products = [];
 
-    // Metro product selectors
-    const selectors = [
-      '.product-teaser-container',
-      '.product-item',
-      '.product-card',
-      '[data-product-id]',
-    ];
-
+    const selectors = ['.product-item', '.s1wytvda', '[data-product-id]', '.z7ntrt-0'];
     let productContainers = $();
 
     for (const selector of selectors) {
       const elements = $(selector);
       if (elements.length > 0) {
         productContainers = productContainers.add(elements);
-        logScrape("Metro", `Found ${elements.length} products with selector "${selector}"`);
       }
     }
 
-    logScrape("Metro", `Found ${productContainers.length} total product containers`);
+    logScrape("Metro", `Found ${productContainers.length} product containers on Cimri`);
 
     productContainers.each((index, element) => {
       const $element = $(element);
+      const merchantText = $element.text().toLowerCase();
 
-      // Extract product name from the title wrapper
+      if (!merchantText.includes('metro') && !merchantText.includes('grossmarket')) {
+        return;
+      }
+
       let name = null;
-      const titleElement = $element.find('.title-wrapper .h4').first();
-      if (titleElement.length) {
-        name = titleElement.text().trim();
-      }
+      const titleSelectors = ['.product-title', '.link-detail', 'h3', '.product-name', 'a[title]'];
 
-      // If not found, try other selectors
-      if (!name) {
-        const altTitle = $element.find('.product-title, h3, h4, .name').first();
-        if (altTitle.length) {
-          name = altTitle.text().trim();
+      for (const selector of titleSelectors) {
+        const titleElement = $element.find(selector).first();
+        if (titleElement.length) {
+          name = titleElement.text().trim() || titleElement.attr('title');
+          if (name) break;
         }
       }
 
-      // Extract price from price position
       let price = null;
-      const priceElement = $element.find('.price-position .h4.field-price-netto').first();
-      if (priceElement.length) {
-        const priceText = priceElement.text().trim();
-        const priceMatch = priceText.match(/(\d+[.,]\d{2})\s*(?:₺|TL)?/i);
-        if (priceMatch) {
-          price = parseFloat(priceMatch[1].replace(',', '.'));
-        }
-      }
+      const priceSelectors = ['.price', '.product-price', '[class*="price"]'];
 
-      // If not found, try other price selectors
-      if (!price) {
-        const altPrice = $element.find('.price, .product-price, [class*="price"]').first();
-        if (altPrice.length) {
-          const priceText = altPrice.text().trim();
-          const priceMatch = priceText.match(/(\d+[.,]\d{2})\s*(?:₺|TL)?/i);
+      for (const selector of priceSelectors) {
+        const priceElement = $element.find(selector).first();
+        if (priceElement.length) {
+          const priceText = priceElement.text().trim();
+          const priceMatch = priceText.match(/(\d+[.,]\d{2})\s*(?:₺|TL|tl)/i);
           if (priceMatch) {
             price = parseFloat(priceMatch[1].replace(',', '.'));
+            break;
           }
         }
       }
 
-      // Extract image URL
       let image = null;
-      const imgElement = $element.find('.field-image img').first();
+      const imgElement = $element.find('img').first();
       if (imgElement.length) {
-        image = imgElement.attr('src') || imgElement.attr('data-src') || imgElement.attr('data-lazy') || imgElement.attr('data-original');
+        image = imgElement.attr('src') || imgElement.attr('data-src') || imgElement.attr('data-lazy');
         if (image && !image.startsWith('http') && !image.startsWith('//')) {
           try {
-            image = new URL(image, searchUrl).toString();
+            image = new URL(image, 'https://www.cimri.com').toString();
           } catch (e) {
             // Keep as is
           }
         }
       }
 
-      // Extract product URL
       let url = null;
-      const linkElement = $element.find('a.product-teaser-link').first();
+      const linkElement = $element.find('a').first();
       if (linkElement.length && linkElement.attr('href')) {
         const href = linkElement.attr('href');
         if (href.startsWith('http')) {
           url = href;
         } else if (href.startsWith('/')) {
-          try {
-            url = new URL(href, 'https://www.metro-tr.com').toString();
-          } catch (e) {
-            url = `https://www.metro-tr.com${href}`;
-          }
+          url = `https://www.cimri.com${href}`;
         }
       }
 
-      // Only add product if we have at least a name
-      if (name && name.length > 0) {
+      if (name && name.length > 0 && price && price > 0) {
         products.push({
           name,
-          price: price && !isNaN(price) ? price : null,
+          price,
           image: image || null,
           market: 'metro',
           unitPrice: null,
           brand: null,
-          url: url || searchUrl
+          url: url || cimriUrl
         });
       }
     });
 
-    logScrape("Metro", `Extracted ${products.length} products`);
-    return products;
+    logScrape("Metro", `Extracted ${products.length} Metro products from Cimri`);
+    return products.slice(0, MARKET_RESULT_LIMIT);
   } catch (error) {
     logScrape("Metro", `Error: ${error.message}`);
     return [];
-  } finally {
-    if (browser) {
-      await browser.close();
-    }
   }
 }
 
