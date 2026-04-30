@@ -221,10 +221,27 @@ function applyLanguage() {
   const subtitle = document.getElementById("subtitle");
   const input = document.getElementById("searchInput");
   const button = document.getElementById("searchBtn");
+  const marketFilter = document.getElementById("marketFilter");
+  const sortFilter = document.getElementById("sortFilter");
+  const minPrice = document.getElementById("minPrice");
+  const maxPrice = document.getElementById("maxPrice");
+  
   if (title) title.textContent = t("title");
   if (subtitle) subtitle.textContent = t("subtitle");
   if (input) input.placeholder = t("placeholder");
   if (button) button.textContent = t("search");
+  
+  // Update filter options
+  if (marketFilter) {
+    marketFilter.options[0].textContent = t("filterAllMarkets");
+  }
+  if (sortFilter) {
+    sortFilter.options[0].textContent = t("filterSort");
+    if (sortFilter.options[1]) sortFilter.options[1].textContent = t("filterSortAsc");
+    if (sortFilter.options[2]) sortFilter.options[2].textContent = t("filterSortDesc");
+  }
+  if (minPrice) minPrice.placeholder = t("filterMinPrice");
+  if (maxPrice) maxPrice.placeholder = t("filterMaxPrice");
 }
 
 function getFilters() {
@@ -294,35 +311,73 @@ function renderResults(data) {
   });
 
   let html = "";
-  for (const market of MARKETS) {
-    let items = groupedItems[market.key] || [];
-    
-    // Apply filters to items
-    items = applyFilters(items, filters);
-    
-    html += `<section class="panel"><h3>${market.label}</h3>`;
-    if (!items.length) {
-      const errorText = escapeHtml(errors[market.key] || "");
-      if (errorText) {
-        html += `<p>${t("noResults")} (${errorText})</p></section>`;
+  
+  // If a specific market is filtered, only show that market
+  if (filters.market) {
+    const marketKey = filters.market;
+    const marketObj = MARKETS.find(m => m.key === marketKey);
+    if (marketObj) {
+      let items = groupedItems[marketKey] || [];
+      
+      // Apply filters to items
+      items = applyFilters(items, filters);
+      
+      html += `<section class="panel"><h3>${marketObj.label}</h3>`;
+      if (!items.length) {
+        const errorText = escapeHtml(errors[marketKey] || "");
+        if (errorText) {
+          html += `<p>${t("noResults")} (${errorText})</p></section>`;
+        } else {
+          html += `<p>${t("noResults")}</p></section>`;
+        }
       } else {
-        html += `<p>${t("noResults")}</p></section>`;
+        html += `<div class="result-grid">`;
+        for (const item of items) {
+          const imageHtml = item.image ? 
+            `<img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.name)}" class="item-image" onerror="this.style.display='none'">` : 
+            '';
+          html += `<article class="item-card">
+            ${imageHtml}
+            <div class="item-name">${escapeHtml(item.name)}</div>
+            <div class="item-price">${formatPrice(item.price)}</div>
+            ${item.unitPrice ? `<div class="item-unit">${escapeHtml(item.unitPrice)}</div>` : ''}
+          </article>`;
+        }
+        html += `</div></section>`;
       }
-      continue;
     }
-    html += `<div class="result-grid">`;
-    for (const item of items) {
-      const imageHtml = item.image ? 
-        `<img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.name)}" class="item-image" onerror="this.style.display='none'">` : 
-        '';
-      html += `<article class="item-card">
-        ${imageHtml}
-        <div class="item-name">${escapeHtml(item.name)}</div>
-        <div class="item-price">${formatPrice(item.price)}</div>
-        ${item.unitPrice ? `<div class="item-unit">${escapeHtml(item.unitPrice)}</div>` : ''}
-      </article>`;
+  } else {
+    // Show all markets
+    for (const market of MARKETS) {
+      let items = groupedItems[market.key] || [];
+      
+      // Apply filters to items
+      items = applyFilters(items, filters);
+      
+      html += `<section class="panel"><h3>${market.label}</h3>`;
+      if (!items.length) {
+        const errorText = escapeHtml(errors[market.key] || "");
+        if (errorText) {
+          html += `<p>${t("noResults")} (${errorText})</p></section>`;
+        } else {
+          html += `<p>${t("noResults")}</p></section>`;
+        }
+        continue;
+      }
+      html += `<div class="result-grid">`;
+      for (const item of items) {
+        const imageHtml = item.image ? 
+          `<img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.name)}" class="item-image" onerror="this.style.display='none'">` : 
+          '';
+        html += `<article class="item-card">
+          ${imageHtml}
+          <div class="item-name">${escapeHtml(item.name)}</div>
+          <div class="item-price">${formatPrice(item.price)}</div>
+          ${item.unitPrice ? `<div class="item-unit">${escapeHtml(item.unitPrice)}</div>` : ''}
+        </article>`;
+      }
+      html += `</div></section>`;
     }
-    html += `</div></section>`;
   }
   root.innerHTML = html;
 }
