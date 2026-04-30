@@ -7,12 +7,121 @@ const MARKETS = [
   { key: "bim", label: "BIM" },
   { key: "a101", label: "A101" },
   { key: "fille", label: "Fille" },
-  { key: "sok", label: "Sok" },
+  { key: "sok", label: "SOK" },
   { key: "migros", label: "Migros" },
   { key: "metro", label: "Metro" },
   { key: "tahtakale", label: "Tahtakale" },
   { key: "carrefour", label: "Carrefour" },
 ];
+
+// Comprehensive English to Turkish product name translation
+const PRODUCT_TRANSLATIONS = {
+  // Dairy
+  "milk": "sut",
+  "yogurt": "yogurt",
+  "cheese": "peynir",
+  "butter": "tereyag",
+  "cream": "krem",
+  
+  // Fruits
+  "apple": "elma",
+  "orange": "portakal",
+  "banana": "muz",
+  "strawberry": "ciliek",
+  "watermelon": "karpu",
+  "grape": "uzum",
+  "lemon": "limon",
+  "mango": "mango",
+  "pear": "armut",
+  "peach": "seftali",
+  
+  // Vegetables
+  "tomato": "domates",
+  "cucumber": "salatalik",
+  "onion": "sogan",
+  "garlic": "sarimsak",
+  "pepper": "biber",
+  "carrot": "havuc",
+  "lettuce": "marul",
+  "spinach": "ispanak",
+  "broccoli": "brokoli",
+  "potato": "patates",
+  
+  // Meat & Fish
+  "chicken": "tavuk",
+  "beef": "sigi eti",
+  "fish": "balik",
+  "shrimp": "karides",
+  "lamb": "kuzueti",
+  "turkey": "hindi",
+  
+  // Grains & Bread
+  "bread": "ekmek",
+  "rice": "pirinc",
+  "pasta": "makarna",
+  "flour": "un",
+  "oats": "yulaf",
+  
+  // Beverages
+  "tea": "cay",
+  "coffee": "kahve",
+  "juice": "meyve suyu",
+  "water": "su",
+  "wine": "sarap",
+  "beer": "bira",
+  "soda": "gazli icecek",
+  "cola": "kola",
+  
+  // Oils & Condiments
+  "oil": "yag",
+  "olive oil": "zeytin yagi",
+  "salt": "tuz",
+  "sugar": "seker",
+  "honey": "bal",
+  "ketchup": "ketcap",
+  "mayonnaise": "mayonez",
+  "vinegar": "sirke",
+  "soy sauce": "soya sosu",
+  
+  // Snacks
+  "chocolate": "cokolata",
+  "candy": "seker",
+  "biscuit": "bisküvi",
+  "chips": "cipis",
+  "nuts": "kuruyemis",
+  "popcorn": "patlamis misir",
+  
+  // Breakfast Items
+  "egg": "yumurta",
+  "jam": "receli",
+  "honey": "bal",
+  "cereal": "tahil cereali",
+  
+  // Spices & Seasonings
+  "pepper": "karabiber",
+  "cinnamon": "tarçin",
+  "turmeric": "kurkumin",
+  "paprika": "toz biber",
+  
+  // Frozen Foods
+  "frozen vegetables": "donmus sebzeler",
+  "frozen pizza": "donmus pizza",
+  "ice cream": "dondurma",
+  
+  // Canned Foods
+  "canned tomato": "konserve domates",
+  "canned beans": "konserve fasulye",
+  "canned fish": "konserve balik",
+  
+  // Cleaning & Personal Care
+  "soap": "sabun",
+  "shampoo": "sampuan",
+  "toothpaste": "dis macunu",
+  "toilet paper": "tuvalet kagidi",
+  "detergent": "deterjan",
+  "dish soap": "bulaşık deterjanı",
+  "hand sanitizer": "el dezenfektanı"
+};
 
 const I18N = {
   tr: {
@@ -25,6 +134,12 @@ const I18N = {
     statusWriteProduct: "Lutfen urun adi yazin.",
     statusError: "Hata",
     noResults: "Sonuc bulunamadi.",
+    filterAllMarkets: "Tum Marketler",
+    filterSort: "Sirala",
+    filterSortAsc: "Fiyat: Dusuk > Yuksek",
+    filterSortDesc: "Fiyat: Yuksek > Dusuk",
+    filterMinPrice: "Min fiyat",
+    filterMaxPrice: "Max fiyat",
   },
   en: {
     title: "Market Product Search",
@@ -36,6 +151,12 @@ const I18N = {
     statusWriteProduct: "Please enter a product name.",
     statusError: "Error",
     noResults: "No results found.",
+    filterAllMarkets: "All Markets",
+    filterSort: "Sort",
+    filterSortAsc: "Price: Low > High",
+    filterSortDesc: "Price: High > Low",
+    filterMinPrice: "Min price",
+    filterMaxPrice: "Max price",
   },
   ar: {
     title: "بحث منتجات السوق",
@@ -47,6 +168,12 @@ const I18N = {
     statusWriteProduct: "يرجى إدخال اسم المنتج.",
     statusError: "خطأ",
     noResults: "لم يتم العثور على نتائج.",
+    filterAllMarkets: "جميع الأسواق",
+    filterSort: "ترتيب",
+    filterSortAsc: "السعر: منخفض > مرتفع",
+    filterSortDesc: "السعر: مرتفع > منخفض",
+    filterMinPrice: "السعر الأدنى",
+    filterMaxPrice: "السعر الأقصى",
   },
 };
 
@@ -55,6 +182,12 @@ function t(key) {
     ? I18N[currentLang][key]
     : I18N.tr[key]
     || key;
+}
+
+// Translate English product names to Turkish
+function translateProductToTurkish(input) {
+  const lower = String(input || "").toLowerCase().trim();
+  return PRODUCT_TRANSLATIONS[lower] || input;
 }
 
 function escapeHtml(text) {
@@ -196,11 +329,14 @@ function renderResults(data) {
 
 async function runSearch() {
   const input = document.getElementById("searchInput");
-  const query = String(input?.value || "").trim();
+  let query = String(input?.value || "").trim();
   if (!query) {
     setStatus(t("statusWriteProduct"), true);
     return;
   }
+
+  // Translate product name from English to Turkish if needed
+  query = translateProductToTurkish(query);
 
   setStatus(t("statusSearching"));
   const results = document.getElementById("results");
