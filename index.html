@@ -73,9 +73,24 @@
       </select>
     </div>
     <p id="subtitle">Kayitli urun yok. Sadece urun adini yazip ara.</p>
-    <div class="search-row">
+<div class="search-row">
       <input id="searchInput" type="text" placeholder="Urun adi yazin..." />
       <button id="searchBtn" type="button">Ara</button>
+    </div>
+    <div class="search-row">
+      <select id="marketFilter">
+        <option value="">Butun Marketler</option>
+        <option value="marketfiyati">Market Fiyati</option>
+        <option value="sok">SOK</option>
+        <option value="metro">Metro</option>
+      </select>
+      <select id="sortFilter">
+        <option value="">Sirala</option>
+        <option value="asc">Fiyat: Dusuk > Yuksek</option>
+        <option value="desc">Fiyat: Yuksek > Dusuk</option>
+      </select>
+      <input id="minPrice" type="number" placeholder="Min fiyat" style="width:80px" />
+      <input id="maxPrice" type="number" placeholder="Max fiyat" style="width:80px" />
     </div>
     <p id="status"></p>
     <div id="results"></div>

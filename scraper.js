@@ -1,7 +1,7 @@
-const SEARCH_TIMEOUT_MS = Number(process.env.SEARCH_TIMEOUT_MS || 120000);
-const JINA_TIMEOUT_MS = Number(process.env.JINA_TIMEOUT_MS || 20000);
+const SEARCH_TIMEOUT_MS = Number(process.env.SEARCH_TIMEOUT_MS || 30000);
+const JINA_TIMEOUT_MS = Number(process.env.JINA_TIMEOUT_MS || 15000);
 // Remove limit to get all items - set to a high number
-const MARKET_RESULT_LIMIT = Number(process.env.MARKET_RESULT_LIMIT || 1000);
+const MARKET_RESULT_LIMIT = Number(process.env.MARKET_RESULT_LIMIT || 500);
 
 // Import MarketFiyati scraper
 let scrapeMarketFiyati = null;
@@ -69,6 +69,7 @@ async function scrapeMarketFiyatiWrapper(query) {
 }
 
 // ---- SOK HANDLER ----
+// Improved SOK scraper with better selector detection and fallback parsing
 async function scrapeSok(query) {
   logScrape("Sok", `Starting search for "${query}"`);
   try {
@@ -85,61 +86,61 @@ async function scrapeSok(query) {
     const $ = cheerio.load(response.data);
     const products = [];
     
-    // Based on analysis, Sok uses specific class names for product cards
-    const productContainers = $('.CProductCard-module_productCardWrapper__okAmT.CProductCard-module_PLPCard__rB4tw, .CProductCard-module_productCardWrapper__okAmT');
+    // Use multiple stable selectors - try class patterns that don't change
+    // Look for any div/li/article that contains both image and price
+    const allDivs = $('div[class*="wrap"]');
+    logScrape("Sok", `Analyzing ${allDivs.length} potential product containers`);
     
-    // Fallback to more general selectors if the specific ones don't work
-    if (productContainers.length === 0) {
-      const fallbackSelectors = [
-        '.product-item',
-        '.product-card', 
-        '.product',
-        '[data-test-id="product-card"]',
-        '.plp-product-item',
-        '.item-box',
-        '.product-item-wrapper',
-        '.product-list-item',
-        '.product-tile',
-        'article'
-      ];
-      
-      for (const selector of fallbackSelectors) {
-        const elements = $(selector);
-        if (elements.length > 0) {
-          productContainers.add(elements);
-          break;
-        }
-      }
-    }
-
-    logScrape("Sok", `Found ${productContainers.length} product containers`);
+    // More robust approach: iterate all elements and find ones with product-like content
+    const productCandidates = [];
     
-    productContainers.each((index, element) => {
-      const $element = $(element);
+    // Try to find any elements that might be products
+    $('div, li, article, section').each((index, element) => {
+      const $el = $(element);
+      const text = $el.text().trim();
       
-      // Extract product name and price from text content
-      // Based on observed format: "Mis Uht S├╝t Yar─▒m Ya─ƒl─▒ 1 L37,50Γé║"
-      let fullText = $element.text().trim();
+      // Must have reasonable text length for a product
+      if (text.length < 10 || text.length > 400) return;
       
-      // Extract price (look for Turkish Lira format)
+      // Must have a price-like pattern (number with decimal)
+      const hasPrice = /(\d+[.,]\d{2})/.test(text);
+      if (!hasPrice) return;
+      
+      // Must have an image
+      const hasImg = $el.find('img').length > 0;
+      if (!hasImg) return;
+      
+      productCandidates.push($el);
+    });
+    
+    logScrape("Sok", `Found ${productCandidates.length} product candidates`);
+    
+    productCandidates.slice(0, 50).forEach(($element) => {
+      const fullText = $element.text().trim();
+      
+      // Extract first price found (should be the actual price)
       let price = null;
-      const priceMatch = fullText.match(/(\d+[.,]\d{2})\s*(?:Γé║|TL)/i);
-      if (priceMatch) {
-        const priceValue = parseFloat(priceMatch[1].replace(',', '.'));
-        if (!isNaN(priceValue) && priceValue > 0) {
-          price = priceValue;
+      const priceMatches = fullText.match(/(\d+[.,]\d{2})/g);
+      if (priceMatches && priceMatches.length > 0) {
+        // Try to find the most likely price (often first large number)
+        for (const priceStr of priceMatches) {
+          const priceValue = parseFloat(priceStr.replace(',', '.'));
+          if (!isNaN(priceValue) && priceValue > 5 && priceValue < 10000) {
+            price = priceValue;
+            break;
+          }
         }
       }
       
-      // Extract product name (remove price from text)
-      let name = fullText;
-      if (priceMatch) {
-        // Remove the price part to get clean product name
-        name = fullText.replace(priceMatch[0], '').trim();
-      }
+      // Extract product name - remove price and clean up
+      let name = fullText
+        .replace(/(\d+[.,]\d{2})/g, '')
+        .replace(/,(?:\s*)?/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
       
-      // Clean up extra whitespace
-      name = name.replace(/\s+/g, ' ').trim();
+      // Clean up common suffix patterns
+      name = name.replace(/\s+(tl|₺|tl\.)$/i, '').trim();
       
       // Extract image URL
       let image = null;
@@ -150,7 +151,7 @@ async function scrapeSok(query) {
           try {
             image = new URL(image, searchUrl).toString();
           } catch (e) {
-            // If URL construction fails, keep as is
+            // Keep as is
           }
         }
       }
@@ -163,18 +164,12 @@ async function scrapeSok(query) {
         if (href.startsWith('http')) {
           url = href;
         } else if (href.startsWith('/')) {
-          try {
-            url = new URL(href, 'https://www.sokmarket.com.tr').toString();
-          } catch (e) {
-            url = `https://www.sokmarket.com.tr${href}`;
-          }
-        } else {
-          url = href;
+          url = `https://www.sokmarket.com.tr${href}`;
         }
       }
       
-      // Only add product if we have at least a name
-      if (name && name.length > 0) {
+      // Only add if we have meaningful product info
+      if (name && name.length > 2 && price) {
         products.push({
           name,
           price,
@@ -263,45 +258,15 @@ async function scrapeMetro(query) {
     const finalUrl = page.url();
     logScrape("Metro", `Final URL: ${finalUrl}`);
 
-    // Wait for the page to be fully loaded
-    await new Promise(resolve => setTimeout(resolve, 5000));
+// Wait for the page to be fully loaded - reduced from 5+8=13s to 2s
+    await new Promise(resolve => setTimeout(resolve, 2000));
 
     // Check if we're on a product page or if there's content
     const pageTitle = await page.title();
     logScrape("Metro", `Page title: ${pageTitle}`);
 
-    // Wait for products to load - try multiple selectors
-    const productSelectors = [
-      '.product-teaser-container',
-      '.product-item',
-      '.product-card',
-      '.m-product-card',
-      '[data-product]',
-      '.product',
-      '.item',
-      '.product-wrapper'
-    ];
-
-    let foundSelector = null;
-    for (const selector of productSelectors) {
-      try {
-        await page.waitForSelector(selector, { timeout: 5000 });
-        foundSelector = selector;
-        logScrape("Metro", `Found products with selector: ${selector}`);
-        break;
-      } catch (e) {
-        // Continue to next selector
-      }
-    }
-
-    if (!foundSelector) {
-      logScrape("Metro", "No product selectors found, checking page content...");
-      const bodyText = await page.evaluate(() => document.body.innerText);
-      logScrape("Metro", `Page body contains: ${bodyText.substring(0, 200)}...`);
-    }
-
-    // Give extra time for dynamic content
-    await new Promise(resolve => setTimeout(resolve, 8000));
+    // Try dynamic content loading with shorter timeout (5s instead of multiple 5s)
+    await page.waitForSelector('.product-teaser-container, .product-item, .product-card, article', { timeout: 5000 }).catch(() => {});
 
     const content = await page.content();
     const $ = cheerio.load(content);
@@ -325,9 +290,22 @@ async function scrapeMetro(query) {
       }
     }
 
-    logScrape("Metro", `Found ${productContainers.length} total product containers`);
+logScrape("Metro", `Found ${productContainers.length} total product containers`);
 
-    productContainers.each((index, element) => {
+    // Fallback: find any element with both price and image patterns
+    if (productContainers.length === 0) {
+      $('div, li, article').each((index, element) => {
+        const $el = $(element);
+        const text = $el.text().trim();
+        if (text.length < 10 || text.length > 500) return;
+        if (!/(\d+[.,]\d{2})/.test(text)) return;
+        if ($el.find('img').length === 0) return;
+        productContainers = productContainers.add($el);
+      });
+      logScrape("Metro", `Fallback found ${productContainers.length} candidates`);
+    }
+
+    productContainers.slice(0, 50).each((index, element) => {
       const $element = $(element);
 
       // Extract product name from the title wrapper

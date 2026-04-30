@@ -94,9 +94,50 @@ function applyLanguage() {
   if (button) button.textContent = t("search");
 }
 
+function getFilters() {
+  return {
+    market: document.getElementById("marketFilter")?.value || "",
+    sort: document.getElementById("sortFilter")?.value || "",
+    minPrice: parseFloat(document.getElementById("minPrice")?.value) || null,
+    maxPrice: parseFloat(document.getElementById("maxPrice")?.value) || null
+  };
+}
+
+function applyFilters(items, filters) {
+  if (!filters || !Array.isArray(items)) return items;
+  
+  let filtered = items;
+  
+  // Filter by market
+  if (filters.market) {
+    filtered = filtered.filter(item => 
+      (item.market || "").toLowerCase() === filters.market.toLowerCase()
+    );
+  }
+  
+  // Filter by price range
+  if (filters.minPrice !== null) {
+    filtered = filtered.filter(item => item.price >= filters.minPrice);
+  }
+  if (filters.maxPrice !== null) {
+    filtered = filtered.filter(item => item.price <= filters.maxPrice);
+  }
+  
+  // Sort by price
+  if (filters.sort === "asc") {
+    filtered = filtered.sort((a, b) => (a.price || 0) - (b.price || 0));
+  } else if (filters.sort === "desc") {
+    filtered = filtered.sort((a, b) => (b.price || 0) - (a.price || 0));
+  }
+  
+  return filtered;
+}
+
 function renderResults(data) {
   const root = document.getElementById("results");
   if (!root) return;
+  
+  const filters = getFilters();
   const errors =
     data && typeof data._errors === "object" && data._errors ? data._errors : {};
 
@@ -121,7 +162,11 @@ function renderResults(data) {
 
   let html = "";
   for (const market of MARKETS) {
-    const items = groupedItems[market.key] || [];
+    let items = groupedItems[market.key] || [];
+    
+    // Apply filters to items
+    items = applyFilters(items, filters);
+    
     html += `<section class="panel"><h3>${market.label}</h3>`;
     if (!items.length) {
       const errorText = escapeHtml(errors[market.key] || "");
