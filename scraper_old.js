@@ -8,10 +8,10 @@ const CHROME_USER_AGENT =
 const MARKET_ORDER = [
   "bim",
   "fille",
-  "sok",
+  "sok",  
+  "tahtakale",
   "migros",
   "metro",
-  "tahtakale",
   "carrefour",
 ];
 const MARKET_LABELS = {

@@ -140,6 +140,7 @@ const I18N = {
     filterSortDesc: "Fiyat: Yuksek > Dusuk",
     filterMinPrice: "Min fiyat",
     filterMaxPrice: "Max fiyat",
+    filterItemLimit: "Urun adedi",
   },
   en: {
     title: "Market Product Search",
@@ -157,6 +158,7 @@ const I18N = {
     filterSortDesc: "Price: High > Low",
     filterMinPrice: "Min price",
     filterMaxPrice: "Max price",
+    filterItemLimit: "Item limit",
   },
   ar: {
     title: "بحث منتجات السوق",
@@ -174,6 +176,7 @@ const I18N = {
     filterSortDesc: "السعر: مرتفع > منخفض",
     filterMinPrice: "السعر الأدنى",
     filterMaxPrice: "السعر الأقصى",
+    filterItemLimit: "حد الأصناف",
   },
 };
 
@@ -225,6 +228,7 @@ function applyLanguage() {
   const sortFilter = document.getElementById("sortFilter");
   const minPrice = document.getElementById("minPrice");
   const maxPrice = document.getElementById("maxPrice");
+  const itemLimit = document.getElementById("itemLimit");
   
   if (title) title.textContent = t("title");
   if (subtitle) subtitle.textContent = t("subtitle");
@@ -242,6 +246,7 @@ function applyLanguage() {
   }
   if (minPrice) minPrice.placeholder = t("filterMinPrice");
   if (maxPrice) maxPrice.placeholder = t("filterMaxPrice");
+  if (itemLimit) itemLimit.placeholder = t("filterItemLimit");
 }
 
 function getFilters() {
@@ -249,7 +254,8 @@ function getFilters() {
     market: document.getElementById("marketFilter")?.value || "",
     sort: document.getElementById("sortFilter")?.value || "",
     minPrice: parseFloat(document.getElementById("minPrice")?.value) || null,
-    maxPrice: parseFloat(document.getElementById("maxPrice")?.value) || null
+    maxPrice: parseFloat(document.getElementById("maxPrice")?.value) || null,
+    itemLimit: parseInt(document.getElementById("itemLimit")?.value) || null
   };
 }
 
@@ -278,6 +284,11 @@ function applyFilters(items, filters) {
     filtered = filtered.sort((a, b) => (a.price || 0) - (b.price || 0));
   } else if (filters.sort === "desc") {
     filtered = filtered.sort((a, b) => (b.price || 0) - (a.price || 0));
+  }
+  
+  // Limit number of items
+  if (filters.itemLimit !== null && filters.itemLimit > 0) {
+    filtered = filtered.slice(0, filters.itemLimit);
   }
   
   return filtered;
