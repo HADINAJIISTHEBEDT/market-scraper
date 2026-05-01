@@ -9,7 +9,6 @@ const MARKETS = [
   { key: "fille", label: "Fille" },
   { key: "sok", label: "SOK" },
   { key: "migros", label: "Migros" },
-  { key: "metro", label: "Metro" },
   { key: "tahtakale", label: "Tahtakale" },
   { key: "carrefour", label: "Carrefour" },
 ];
@@ -141,6 +140,15 @@ const I18N = {
     filterMinPrice: "Min fiyat",
     filterMaxPrice: "Max fiyat",
     filterItemLimit: "Urun adedi",
+    markets: {
+      bim: "BIM",
+      a101: "A101",
+      fille: "Fille",
+      sok: "SOK",
+      migros: "Migros",
+      tahtakale: "Tahtakale",
+      carrefour: "Carrefour",
+    },
   },
   en: {
     title: "Market Product Search",
@@ -159,6 +167,15 @@ const I18N = {
     filterMinPrice: "Min price",
     filterMaxPrice: "Max price",
     filterItemLimit: "Item limit",
+    markets: {
+      bim: "BIM",
+      a101: "A101",
+      fille: "Fille",
+      sok: "SOK",
+      migros: "Migros",
+      tahtakale: "Tahtakale",
+      carrefour: "Carrefour",
+    },
   },
   ar: {
     title: "بحث منتجات السوق",
@@ -177,6 +194,15 @@ const I18N = {
     filterMinPrice: "السعر الأدنى",
     filterMaxPrice: "السعر الأقصى",
     filterItemLimit: "حد الأصناف",
+    markets: {
+      bim: "BIM",
+      a101: "A101",
+      fille: "Fille",
+      sok: "SOK",
+      migros: "Migros",
+      tahtakale: "Tahtakale",
+      carrefour: "Carrefour",
+    },
   },
 };
 
@@ -185,6 +211,16 @@ function t(key) {
     ? I18N[currentLang][key]
     : I18N.tr[key]
     || key;
+}
+
+function tMarket(marketKey) {
+  const langBlock = I18N[currentLang] || I18N.tr;
+  const trBlock = I18N.tr;
+  return (
+    (langBlock.markets && langBlock.markets[marketKey]) ||
+    (trBlock.markets && trBlock.markets[marketKey]) ||
+    marketKey
+  );
 }
 
 // Translate English product names to Turkish
@@ -238,6 +274,12 @@ function applyLanguage() {
   // Update filter options
   if (marketFilter) {
     marketFilter.options[0].textContent = t("filterAllMarkets");
+    for (let i = 1; i < marketFilter.options.length; i++) {
+      const opt = marketFilter.options[i];
+      const value = String(opt.value || "");
+      if (!value) continue;
+      opt.textContent = tMarket(value);
+    }
   }
   if (sortFilter) {
     sortFilter.options[0].textContent = t("filterSort");
@@ -255,7 +297,8 @@ function getFilters() {
     sort: document.getElementById("sortFilter")?.value || "",
     minPrice: parseFloat(document.getElementById("minPrice")?.value) || null,
     maxPrice: parseFloat(document.getElementById("maxPrice")?.value) || null,
-    itemLimit: parseInt(document.getElementById("itemLimit")?.value) || null
+    itemLimit: parseInt(document.getElementById("itemLimit")?.value) || null,
+    brand: document.getElementById("brandFilter")?.value || ""
   };
 }
 
@@ -286,6 +329,14 @@ function applyFilters(items, filters) {
     filtered = filtered.sort((a, b) => (b.price || 0) - (a.price || 0));
   }
   
+  // Filter by brand
+  if (filters.brand) {
+    const brandRegex = new RegExp(filters.brand, 'i');
+    filtered = filtered.filter(item => 
+      (item.brand || "").match(brandRegex)
+    );
+  }
+
   // Limit number of items
   if (filters.itemLimit !== null && filters.itemLimit > 0) {
     filtered = filtered.slice(0, filters.itemLimit);
@@ -327,13 +378,13 @@ function renderResults(data) {
   if (filters.market) {
     const marketKey = filters.market;
     const marketObj = MARKETS.find(m => m.key === marketKey);
-    if (marketObj) {
+      if (marketObj) {
       let items = groupedItems[marketKey] || [];
       
       // Apply filters to items
       items = applyFilters(items, filters);
       
-      html += `<section class="panel"><h3>${marketObj.label}</h3>`;
+      html += `<section class="panel"><h3>${tMarket(marketObj.key)}</h3>`;
       if (!items.length) {
         const errorText = escapeHtml(errors[marketKey] || "");
         if (errorText) {
@@ -365,7 +416,7 @@ function renderResults(data) {
       // Apply filters to items
       items = applyFilters(items, filters);
       
-      html += `<section class="panel"><h3>${market.label}</h3>`;
+      html += `<section class="panel"><h3>${tMarket(market.key)}</h3>`;
       if (!items.length) {
         const errorText = escapeHtml(errors[market.key] || "");
         if (errorText) {
