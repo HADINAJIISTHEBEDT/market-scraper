@@ -87,7 +87,7 @@ async function searchWithGemini(query, market = null) {
       Prices should be realistic Turkish grocery prices (1-500 TL range).
       Do not limit the number of results - return ALL available products.` :
       
-      `Search for ALL grocery products related to "${query}" from Turkish markets like Bim, Fille, Sok, Migros, Metro, Tahtakale, Carrefour.
+      `Search for ALL grocery products related to "${query}" from Turkish markets like Bim, Sok, Migros, Tahtakale, Carrefour.
       Return as many products as possible with their names, prices in Turkish Lira, image URLs, and which market they're from.
       Focus on actual grocery items like milk, bread, cheese, vegetables, fruits, etc.
       Exclude non-food items, tickets, catalogs, or company information.
@@ -191,7 +191,7 @@ async function searchMultipleWithGemini(query) {
   logGemini("Multi Search", `Starting multi-market search for "${query}"`);
   
   const results = {};
-  const markets = ['Bim', 'Fille', 'Sok', 'Migros', 'Metro', 'Tahtakale', 'Carrefour'];
+  const markets = ['Bim', 'Sok', 'Migros', 'Tahtakale', 'Carrefour'];
   
   // Search each market
   for (const market of markets) {

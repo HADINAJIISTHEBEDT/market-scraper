@@ -83,7 +83,7 @@ async function searchWithGemini(query, market = null) {
       Format as JSON array with objects containing: name, price, image, market.
       Prices should be realistic Turkish grocery prices (1-500 TL range).` :
       
-      `Search for grocery products related to "${query}" from Turkish markets like Bim, Fille, Sok, Migros, Metro, Tahtakale, Carrefour.
+      `Search for grocery products related to "${query}" from Turkish markets like Bim, Sok, Migros, Metro, Tahtakale, Carrefour.
       Return exactly 7 products with their names, prices in Turkish Lira, image URLs, and which market they're from.
       Focus on actual grocery items like milk, bread, cheese, vegetables, fruits, etc.
       Exclude non-food items, tickets, catalogs, or company information.
@@ -186,7 +186,7 @@ async function searchMultipleWithGemini(query) {
   logGemini("Multi Search", `Starting multi-market search for "${query}"`);
   
   const results = {};
-  const markets = ['Bim', 'Fille', 'Sok', 'Migros', 'Metro', 'Tahtakale', 'Carrefour'];
+  const markets = ['Bim', 'Sok', 'Migros', 'Metro', 'Tahtakale', 'Carrefour'];
   
   // Search each market
   for (const market of markets) {

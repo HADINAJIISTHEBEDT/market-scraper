@@ -29,13 +29,69 @@ try {
 const axios = require('axios');
 const cheerio = require('cheerio');
 
-// Metro removed
-const MARKET_ORDER = ["marketfiyati", "sok"];
+const TAHTAKALE_CATEGORY_URLS = [
+  "https://www.tahtakalespot.com/uzun-omurlu-sutler-1175",
+  "https://www.tahtakalespot.com/gunluk-sutler-1176",
+  "https://www.tahtakalespot.com/organik-sut-1177",
+  "https://www.tahtakalespot.com/ozellikli-aromali-sut-1178",
+  "https://www.tahtakalespot.com/peynirler-1036",
+  "https://www.tahtakalespot.com/yogurtlar-1037",
+  "https://www.tahtakalespot.com/yumurta-1039",
+  "https://www.tahtakalespot.com/kahvaltiliklar-1041",
+  "https://www.tahtakalespot.com/ayran-kefirler-1042",
+  "https://www.tahtakalespot.com/meyve-sebze-1004",
+  "https://www.tahtakalespot.com/temel-gida-1008",
+  "https://www.tahtakalespot.com/atistirmalik-1010",
+];
+
+const TAHTAKALE_QUERY_HINTS = [
+  {
+    tokens: ["sut", "milk", "organik", "organic"],
+    urls: [
+      "https://www.tahtakalespot.com/uzun-omurlu-sutler-1175",
+      "https://www.tahtakalespot.com/gunluk-sutler-1176",
+      "https://www.tahtakalespot.com/organik-sut-1177",
+      "https://www.tahtakalespot.com/ozellikli-aromali-sut-1178",
+    ],
+  },
+  {
+    tokens: ["peynir", "cheese", "kasar"],
+    urls: ["https://www.tahtakalespot.com/peynirler-1036"],
+  },
+  {
+    tokens: ["yogurt", "kefir", "ayran"],
+    urls: [
+      "https://www.tahtakalespot.com/yogurtlar-1037",
+      "https://www.tahtakalespot.com/ayran-kefirler-1042",
+    ],
+  },
+  {
+    tokens: ["yumurta", "egg"],
+    urls: ["https://www.tahtakalespot.com/yumurta-1039"],
+  },
+  {
+    tokens: ["domates", "salatalik", "meyve", "sebze", "elma", "muz"],
+    urls: ["https://www.tahtakalespot.com/meyve-sebze-1004"],
+  },
+];
+
+const TAHTAKALE_DEFAULT_URLS = [
+  "https://www.tahtakalespot.com/uzun-omurlu-sutler-1175",
+  "https://www.tahtakalespot.com/gunluk-sutler-1176",
+  "https://www.tahtakalespot.com/organik-sut-1177",
+  "https://www.tahtakalespot.com/peynirler-1036",
+  "https://www.tahtakalespot.com/yogurtlar-1037",
+  "https://www.tahtakalespot.com/meyve-sebze-1004",
+];
+
+const MARKET_ORDER = ["marketfiyati", "tahtakale", "sok"];
 
 const MARKET_LABELS = {
   marketfiyati: "Market Fiyat─▒",
   sok: "Sok",
 };
+
+MARKET_LABELS.tahtakale = "Tahtakale";
 
 const TERM_ALIASES = {
   milk: ["sut", "süt"],
@@ -204,6 +260,106 @@ function dedupeAndRankItems(query, items) {
     .map(({ _score, ...item }) => item);
 }
 
+function normalizeText(value) {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function parsePriceValue(text) {
+  const str = String(text || "");
+  const match =
+    str.match(/([\d]{1,3}(?:[.,]\d{3})*[.,]\d{1,2})\s*(?:TL|₺)/i) ||
+    str.match(/(?:TL|₺)\s*([\d]{1,3}(?:[.,]\d{3})*[.,]\d{1,2})/i) ||
+    str.match(/([\d]+[.,]\d{2})/);
+  if (!match) return null;
+  const parsed = Number.parseFloat(
+    String(match[1]).replace(/\./g, "").replace(",", "."),
+  );
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function dedupeBasicItems(items) {
+  const map = new Map();
+  for (const item of Array.isArray(items) ? items : []) {
+    const name = normalizeText(item?.name);
+    const price = Number(item?.price);
+    const image = normalizeText(item?.image);
+    if (!name || !Number.isFinite(price) || price <= 0 || price > 50000) continue;
+    const key = `${name.toLowerCase()}|${price.toFixed(2)}`;
+    if (!map.has(key)) map.set(key, { ...item, name, price, image });
+    else if (!map.get(key).image && image) map.set(key, { ...item, name, price, image });
+  }
+  return [...map.values()];
+}
+
+const readerCache = new Map();
+
+async function fetchViaJinaReader(url, timeoutMs = JINA_TIMEOUT_MS) {
+  if (readerCache.has(url)) return readerCache.get(url);
+  const response = await axios.get(`https://r.jina.ai/${url}`, {
+    timeout: timeoutMs,
+    headers: {
+      Accept: "text/plain",
+      "User-Agent": "Mozilla/5.0",
+    },
+    responseType: "text",
+  });
+  const text = String(response.data || "");
+  readerCache.set(url, text);
+  return text;
+}
+
+function getTahtakaleCategoryUrls(query) {
+  const normalizedQuery = normalizeSearchText(query);
+  const matched = new Set();
+  for (const hint of TAHTAKALE_QUERY_HINTS) {
+    if (hint.tokens.some((token) => normalizedQuery.includes(normalizeSearchText(token)))) {
+      for (const url of hint.urls) matched.add(url);
+    }
+  }
+  if (matched.size) return [...matched];
+  return [...TAHTAKALE_DEFAULT_URLS];
+}
+
+function parseTahtakaleCategoryText(text) {
+  const items = [];
+  const lines = String(text || "").split("\n");
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = normalizeText(lines[i]);
+    const imageMatch = line.match(/\[!\[Image \d+:\s*([^\]]+)\]\((https?:\/\/[^)]+)\)/i)
+      || line.match(/!\[([^\]]+)\]\((https?:\/\/[^)]+)\)/i);
+
+    if (imageMatch) {
+      let name = normalizeText(imageMatch[1]);
+      let price = null;
+      const image = normalizeText(imageMatch[2]);
+
+      for (let j = i + 1; j < Math.min(i + 8, lines.length); j++) {
+        price = parsePriceValue(lines[j]);
+        if (price !== null) break;
+      }
+
+      if (price === null) {
+        const priceMatch = line.match(/([\d]+[.,]\d{2})\s*(?:TL|₺)?/i);
+        if (priceMatch) price = Number.parseFloat(priceMatch[1].replace(",", "."));
+      }
+
+      if (price && price > 0 && price < 100000) {
+        items.push({
+          market: "tahtakale",
+          name,
+          price,
+          image,
+          brand: null,
+          unitPrice: null,
+        });
+      }
+    }
+  }
+
+  return dedupeBasicItems(items);
+}
+
 async function withTimeout(label, promise, timeoutMs = SEARCH_TIMEOUT_MS) {
   let timer;
   try {
@@ -359,11 +515,38 @@ async function scrapeSok(query) {
   }
 }
 
+async function scrapeTahtakale(query) {
+  logScrape("Tahtakale", `Starting search for "${query}"`);
+  const categoryUrls = getTahtakaleCategoryUrls(query);
+  const items = [];
+
+  for (const url of categoryUrls) {
+    try {
+      const text = await withTimeout(
+        `Tahtakale category fetch: ${url}`,
+        fetchViaJinaReader(url),
+        JINA_TIMEOUT_MS,
+      );
+      if (/attention required|cloudflare|blocked/i.test(text)) continue;
+      const categoryItems = parseTahtakaleCategoryText(text);
+      if (categoryItems.length) {
+        logScrape("Tahtakale", `Found ${categoryItems.length} items from ${url}`);
+        items.push(...categoryItems);
+      }
+    } catch (error) {
+      logScrape("Tahtakale", `Category fetch failed for ${url}: ${error.message}`);
+    }
+  }
+
+  return dedupeAndRankItems(query, items).slice(0, MARKET_RESULT_LIMIT);
+}
+
 
 
 // Market handlers
 const MARKET_HANDLERS = {
   marketfiyati: scrapeMarketFiyatiWrapper,
+  tahtakale: scrapeTahtakale,
   sok: scrapeSok,
 };
 

@@ -544,7 +544,7 @@ async function searchMultiple(product) {
     });
     if (
       (!Array.isArray(items) || !items.length) &&
-      ["bim", "fille", "metro", "carrefour"].includes(market)
+      ["bim", "metro", "carrefour"].includes(market)
     ) {
       const fallback = await scrapeDuckDuckGoFallback(product, market).catch(
         () => [],

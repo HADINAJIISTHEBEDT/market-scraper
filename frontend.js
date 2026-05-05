@@ -7,7 +7,6 @@ let currentResultsData = null;
 const MARKETS = [
   { key: "bim", label: "BIM" },
   { key: "a101", label: "A101" },
-  { key: "fille", label: "Fille" },
   { key: "sok", label: "SOK" },
   { key: "migros", label: "Migros" },
   { key: "tahtakale", label: "Tahtakale" },
@@ -146,7 +145,6 @@ const I18N = {
     markets: {
       bim: "BIM",
       a101: "A101",
-      fille: "Fille",
       sok: "SOK",
       migros: "Migros",
       tahtakale: "Tahtakale",
@@ -175,7 +173,6 @@ const I18N = {
     markets: {
       bim: "BIM",
       a101: "A101",
-      fille: "Fille",
       sok: "SOK",
       migros: "Migros",
       tahtakale: "Tahtakale",
@@ -203,7 +200,6 @@ const I18N = {
     markets: {
       bim: "BIM",
       a101: "A101",
-      fille: "Fille",
       sok: "SOK",
       migros: "Migros",
       tahtakale: "Tahtakale",

@@ -7,7 +7,6 @@ const CHROME_USER_AGENT =
 
 const MARKET_ORDER = [
   "bim",
-  "fille",
   "sok",  
   "tahtakale",
   "migros",
@@ -16,7 +15,6 @@ const MARKET_ORDER = [
 ];
 const MARKET_LABELS = {
   bim: "Bim",
-  fille: "Fille",
   sok: "Sok",
   migros: "Migros",
   metro: "Metro",
@@ -32,7 +30,7 @@ const MARKET_SOURCES = {
   tahtakaleMilkCategory: "https://www.tahtakalespot.com/sut-ve-sut-urunleri-1175",
 };
 
-const CIMRI_MARKETS = new Set(["bim", "fille", "metro", "tahtakale"]);
+const CIMRI_MARKETS = new Set(["bim", "metro", "tahtakale"]);
 
 function toBaseUnit(value, unit) {
   const amount = Number(value);
@@ -948,7 +946,6 @@ async function scrapeDuckDuckGoFallback(query, marketKey) {
 
 const MARKET_HANDLERS = {
   bim: (query) => scrapeCimriMarket(query, "bim", ["bim a.s", "bim market", "bim aktüel"]),
-  fille: (query) => scrapeCimriMarket(query, "fille", ["file market", "fille market", "fille çarşı"]),
   sok: scrapeSok,
   migros: scrapeMigros,
   metro: (query) =>
@@ -982,7 +979,7 @@ async function searchMultiple(product) {
     });
     if (
       (!Array.isArray(items) || !items.length) &&
-      ["bim", "fille", "metro", "carrefour"].includes(market)
+      ["bim", "metro", "carrefour"].includes(market)
     ) {
       const fallback = await scrapeDuckDuckGoFallback(product, market).catch(
         () => [],
