@@ -142,7 +142,7 @@ const I18N = {
     filterMinPrice: "Min fiyat",
     filterMaxPrice: "Max fiyat",
     filterItemLimit: "Urun adedi",
-    filterAllBrands: "Tum Markalar",
+    filterBrand: "Marka yazin...",
     markets: {
       bim: "BIM",
       a101: "A101",
@@ -171,7 +171,7 @@ const I18N = {
     filterMinPrice: "Min price",
     filterMaxPrice: "Max price",
     filterItemLimit: "Item limit",
-    filterAllBrands: "All Brands",
+    filterBrand: "Type brand...",
     markets: {
       bim: "BIM",
       a101: "A101",
@@ -246,6 +246,16 @@ function escapeHtml(text) {
   return String(text).replace(/[&<>"']/g, m => map[m]);
 }
 
+function normalizeFilterText(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replaceAll("ı", "i")
+    .replaceAll("İ", "i")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
 function formatPrice(price) {
   if (price === null || price === undefined) return "";
   return `${price.toFixed(2).replace('.', ',')} ₺`;
@@ -293,9 +303,7 @@ function applyLanguage() {
     if (sortFilter.options[1]) sortFilter.options[1].textContent = t("filterSortAsc");
     if (sortFilter.options[2]) sortFilter.options[2].textContent = t("filterSortDesc");
   }
-  if (brandFilter && brandFilter.options[0]) {
-    brandFilter.options[0].textContent = t("filterAllBrands");
-  }
+  if (brandFilter) brandFilter.placeholder = t("filterBrand");
   if (minPrice) minPrice.placeholder = t("filterMinPrice");
   if (maxPrice) maxPrice.placeholder = t("filterMaxPrice");
   if (itemLimit) itemLimit.placeholder = t("filterItemLimit");
@@ -344,9 +352,9 @@ function applyFilters(items, filters) {
   
   // Filter by brand
   if (filters.brand) {
-    const brandFilter = filters.brand.toLowerCase();
+    const brandFilter = normalizeFilterText(filters.brand);
     filtered = filtered.filter(item => 
-      String(item.brand || "").toLowerCase() === brandFilter
+      normalizeFilterText(item.brand).includes(brandFilter)
     );
   }
 
@@ -401,30 +409,6 @@ function updateMarketOptions(items) {
   marketFilter.value = marketKeys.includes(selected) ? selected : "";
 }
 
-function updateBrandOptions(items) {
-  const brandFilter = document.getElementById("brandFilter");
-  if (!brandFilter) return;
-  const selected = brandFilter.value;
-  const brands = [
-    ...new Set(
-      items
-        .map((item) => String(item.brand || "").trim())
-        .filter(Boolean),
-    ),
-  ].sort((a, b) => a.localeCompare(b));
-
-  brandFilter.innerHTML = `<option value="">${escapeHtml(t("filterAllBrands"))}</option>`;
-  for (const brand of brands) {
-    brandFilter.insertAdjacentHTML(
-      "beforeend",
-      `<option value="${escapeHtml(brand.toLowerCase())}">${escapeHtml(brand)}</option>`,
-    );
-  }
-  brandFilter.value = brands.some((brand) => brand.toLowerCase() === selected)
-    ? selected
-    : "";
-}
-
 function renderItemCard(item) {
   const imageHtml = item.image
     ? `<img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.name)}" class="item-image" onerror="this.style.display='none'">`
@@ -450,7 +434,6 @@ function renderResults(data) {
 
   const allItems = getAllResultItems(data);
   updateMarketOptions(allItems);
-  updateBrandOptions(allItems);
   const filters = getFilters();
 
   // Group items by market
