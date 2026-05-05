@@ -155,6 +155,8 @@ const I18N = {
     contactComponent: "Component",
     contactSubmit: "Send message",
     contactClose: "Close",
+    replyInfo: "You can read the replied emails there. To send a message press on contact us.",
+    replyInfoLabel: "Email replies",
   },
   en: {
     title: "Market Product Search",
@@ -188,6 +190,8 @@ const I18N = {
     contactComponent: "Component",
     contactSubmit: "Send message",
     contactClose: "Close",
+    replyInfo: "You can read the replied emails there. To send a message press on contact us.",
+    replyInfoLabel: "Email replies",
   },
   ar: {
     title: "بحث منتجات السوق",
@@ -220,6 +224,8 @@ const I18N = {
     contactComponent: "Component",
     contactSubmit: "Send message",
     contactClose: "Close",
+    replyInfo: "You can read the replied emails there. To send a message press on contact us.",
+    replyInfoLabel: "Email replies",
   },
 };
 
@@ -325,6 +331,8 @@ function applyLanguage() {
   const contactComponentLabel = document.getElementById("contactComponentLabel");
   const contactSubmit = document.getElementById("contactSubmit");
   const contactClose = document.getElementById("contactClose");
+  const replyInfo = document.getElementById("replyInfo");
+  const replyInfoToggle = document.getElementById("replyInfoToggle");
 
   if (contactPrompt) contactPrompt.textContent = t("contactPrompt");
   if (contactToggle) contactToggle.textContent = t("contactButton");
@@ -332,6 +340,8 @@ function applyLanguage() {
   if (contactComponentLabel) contactComponentLabel.textContent = t("contactComponent");
   if (contactSubmit) contactSubmit.textContent = t("contactSubmit");
   if (contactClose) contactClose.textContent = t("contactClose");
+  if (replyInfo) replyInfo.textContent = t("replyInfo");
+  if (replyInfoToggle) replyInfoToggle.setAttribute("aria-label", t("replyInfoLabel"));
 }
 
 function getFilters() {
@@ -576,6 +586,8 @@ window.addEventListener("DOMContentLoaded", () => {
   const contactToggle = document.getElementById("contactToggle");
   const contactFormWrap = document.getElementById("contactFormWrap");
   const contactClose = document.getElementById("contactClose");
+  const replyInfoToggle = document.getElementById("replyInfoToggle");
+  const replyInfo = document.getElementById("replyInfo");
   if (contactToggle && contactFormWrap) {
     contactToggle.addEventListener("click", () => {
       const shouldOpen = contactFormWrap.hidden;
@@ -586,6 +598,11 @@ window.addEventListener("DOMContentLoaded", () => {
   if (contactClose && contactFormWrap) {
     contactClose.addEventListener("click", () => {
       contactFormWrap.hidden = true;
+    });
+  }
+  if (replyInfoToggle && replyInfo) {
+    replyInfoToggle.addEventListener("click", () => {
+      replyInfo.hidden = !replyInfo.hidden;
     });
   }
 });

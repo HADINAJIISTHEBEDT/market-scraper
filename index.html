@@ -24,6 +24,14 @@
         padding: 10px 16px;
         cursor: pointer;
       }
+      #langSelect {
+        width: auto;
+        min-width: 86px;
+        max-width: 104px;
+        height: 32px;
+        padding: 4px 8px;
+        font-size: 13px;
+      }
       .filter-row {
         display: grid;
         grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -74,6 +82,12 @@
         margin-top: 32px;
         padding: 18px 0 4px;
       }
+      .contact-top {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
       .contact-link {
         background: none;
         border: 0;
@@ -83,6 +97,23 @@
         font-weight: 700;
         padding: 0;
         text-decoration: underline;
+      }
+      .email-icon-btn {
+        align-items: center;
+        background: #f8fafc;
+        border: 1px solid #cbd5e1;
+        border-radius: 999px;
+        color: #334155;
+        cursor: pointer;
+        display: inline-flex;
+        font-size: 16px;
+        height: 34px;
+        justify-content: center;
+        width: 34px;
+      }
+      .reply-note {
+        color: #475569;
+        margin: 8px 0 0;
       }
       .contact-form {
         display: grid;
@@ -160,7 +191,11 @@
     <p id="status"></p>
     <div id="results"></div>
     <footer class="contact-area">
-      <p><span id="contactPrompt">For any problem </span><button id="contactToggle" class="contact-link" type="button">contact us</button></p>
+      <div class="contact-top">
+        <p><span id="contactPrompt">For any problem </span><button id="contactToggle" class="contact-link" type="button">contact us</button></p>
+        <button id="replyInfoToggle" class="email-icon-btn" type="button" aria-label="Email replies">&#9993;</button>
+      </div>
+      <p id="replyInfo" class="reply-note" hidden>You can read the replied emails there. To send a message press on contact us.</p>
       <div id="contactFormWrap" hidden>
         <form class="contact-form" action="https://formsubmit.co/hadi.naji145@gmail.com" method="POST">
           <input type="hidden" name="_subject" value="Market scraper contact message" />
