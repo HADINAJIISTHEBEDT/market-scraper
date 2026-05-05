@@ -17,7 +17,15 @@
 const https = require("https");
 
 const API_BASE = "https://api.marketfiyati.org.tr";
-const SEARCH_TIMEOUT_MS = Number(process.env.SEARCH_TIMEOUT_MS || 30000);
+
+// Timeout config (seconds-first, ms-backward-compatible)
+const SEARCH_TIMEOUT_S = Number(
+  process.env.SEARCH_TIMEOUT_S ??
+    (process.env.SEARCH_TIMEOUT_MS
+      ? Number(process.env.SEARCH_TIMEOUT_MS) / 1000
+      : 30),
+);
+const SEARCH_TIMEOUT_MS = Math.round(SEARCH_TIMEOUT_S * 1000);
 // Remove limit to get all items - set to a very high number to disable effective limit
 const MARKET_RESULT_LIMIT = Number(process.env.MARKET_RESULT_LIMIT || 1000000);
 

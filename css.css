@@ -992,6 +992,19 @@ html[dir="rtl"] .market-table td {
     margin-bottom: 4px;
 }
 
+.item-brand {
+    display: inline-block;
+    max-width: 100%;
+    margin-bottom: 6px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: rgba(233, 120, 39, 0.12);
+    color: var(--orange-deep);
+    font-size: 0.76rem;
+    font-weight: 800;
+    overflow-wrap: anywhere;
+}
+
 .market-count {
     display: inline-flex;
     align-items: center;

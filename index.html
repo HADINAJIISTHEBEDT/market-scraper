@@ -24,6 +24,14 @@
         padding: 10px 16px;
         cursor: pointer;
       }
+      .filter-row {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+      }
+      .filter-row input,
+      .filter-row select {
+        width: 100%;
+      }
       .panel {
         border: 1px solid #e2e8f0;
         border-radius: 12px;
@@ -61,6 +69,13 @@
       #status {
         min-height: 20px;
       }
+      @media (max-width: 820px) {
+        .search-row,
+        .filter-row {
+          grid-template-columns: 1fr;
+          flex-direction: column;
+        }
+      }
     </style>
   </head>
   <body>
@@ -73,11 +88,11 @@
       </select>
     </div>
     <p id="subtitle">Kayitli urun yok. Sadece urun adini yazip ara.</p>
-<div class="search-row">
+    <div class="search-row">
       <input id="searchInput" type="text" placeholder="Urun adi yazin..." />
       <button id="searchBtn" type="button">Ara</button>
     </div>
-    <div class="search-row">
+    <div class="search-row filter-row">
       <select id="marketFilter">
         <option value="">Tum Marketler</option>
         <option value="bim">BIM</option>
@@ -93,10 +108,12 @@
         <option value="asc">Fiyat: Dusuk > Yuksek</option>
         <option value="desc">Fiyat: Yuksek > Dusuk</option>
       </select>
-      <input id="minPrice" type="number" placeholder="Min fiyat" style="width:80px" />
-      <input id="maxPrice" type="number" placeholder="Max fiyat" style="width:80px" />
-      <input id="itemLimit" type="number" placeholder="Urun adedi" style="width:80px" min="1" max="100" />
-      <input id="brandFilter" type="text" placeholder="Marka yazin..." style="width:120px" />
+      <select id="brandFilter">
+        <option value="">Tum Markalar</option>
+      </select>
+      <input id="minPrice" type="number" placeholder="Min fiyat" />
+      <input id="maxPrice" type="number" placeholder="Max fiyat" />
+      <input id="itemLimit" type="number" placeholder="Urun adedi" min="1" max="100" />
     </div>
     <p id="status"></p>
     <div id="results"></div>

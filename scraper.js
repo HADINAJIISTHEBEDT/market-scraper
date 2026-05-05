@@ -1,5 +1,18 @@
-const SEARCH_TIMEOUT_MS = Number(process.env.SEARCH_TIMEOUT_MS || 30000);
-const JINA_TIMEOUT_MS = Number(process.env.JINA_TIMEOUT_MS || 15000);
+const SEARCH_TIMEOUT_S = Number(
+  process.env.SEARCH_TIMEOUT_S ??
+    (process.env.SEARCH_TIMEOUT_MS
+      ? Number(process.env.SEARCH_TIMEOUT_MS) / 1000
+      : 30),
+);
+const SEARCH_TIMEOUT_MS = Math.round(SEARCH_TIMEOUT_S * 1000);
+
+const JINA_TIMEOUT_S = Number(
+  process.env.JINA_TIMEOUT_S ??
+    (process.env.JINA_TIMEOUT_MS
+      ? Number(process.env.JINA_TIMEOUT_MS) / 1000
+      : 15),
+);
+const JINA_TIMEOUT_MS = Math.round(JINA_TIMEOUT_S * 1000);
 // Remove limit to get all items - set to a high number
 const MARKET_RESULT_LIMIT = Number(process.env.MARKET_RESULT_LIMIT || 500);
 
@@ -12,23 +25,16 @@ try {
   console.log('[Scraper] MarketFiyati module not available:', error.message);
 }
 
-// Dependencies for direct web scraping (Sok, Metro)
+// Dependencies for direct web scraping (Sok)
 const axios = require('axios');
 const cheerio = require('cheerio');
-const puppeteer = require('puppeteer-extra');
-const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-puppeteer.use(StealthPlugin());
 
-const MARKET_ORDER = [
-  "marketfiyati",
-  "sok",
-  "metro",
-];
+// Metro removed
+const MARKET_ORDER = ["marketfiyati", "sok"];
 
 const MARKET_LABELS = {
   marketfiyati: "Market Fiyat─▒",
   sok: "Sok",
-  metro: "Metro",
 };
 
 function logScrape(stage, message) {
@@ -190,223 +196,12 @@ async function scrapeSok(query) {
   }
 }
 
-// ---- METRO HANDLER ----
-// Metro scraper using Puppeteer (required due to anti-bot measures)
-async function scrapeMetro(query) {
-  logScrape("Metro", `Starting search for "${query}" from https://www.metro-tr.com/`);
-  let browser = null;
-  try {
-    // Use Metro's main site search URL
-    const searchUrl = `https://www.metro-tr.com/sonuclar?q=${encodeURIComponent(query)}`;
 
-    // Try to find Chrome executable
-    let executablePath = undefined;
-    const possiblePaths = [
-      'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-      'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
-      'C:\\Program Files\\Chromium\\Application\\chrome.exe',
-      'C:\\Program Files (x86)\\Chromium\\Application\\chrome.exe',
-    ];
-
-    for (const path of possiblePaths) {
-      try {
-        const fs = require('fs');
-        if (fs.existsSync(path)) {
-          executablePath = path;
-          break;
-        }
-      } catch (e) {
-        // Ignore
-      }
-    }
-
-    browser = await puppeteer.launch({
-      headless: 'new',
-      executablePath,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--disable-web-security',
-        '--disable-features=VizDisplayCompositor',
-        '--disable-gpu',
-        '--disable-dev-tools',
-        '--disable-extensions',
-        '--disable-background-timer-throttling',
-        '--disable-backgrounding-occluded-windows',
-        '--disable-renderer-backgrounding',
-        '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-      ]
-    });
-
-    const page = await browser.newPage();
-
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-    await page.setExtraHTTPHeaders({
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-      'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
-    });
-
-    logScrape("Metro", `Loading search URL: ${searchUrl}`);
-
-    await page.goto(searchUrl, { waitUntil: 'networkidle0', timeout: SEARCH_TIMEOUT_MS });
-
-    // Check final URL after redirects
-    const finalUrl = page.url();
-    logScrape("Metro", `Final URL: ${finalUrl}`);
-
-// Wait for the page to be fully loaded - reduced from 5+8=13s to 2s
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    // Check if we're on a product page or if there's content
-    const pageTitle = await page.title();
-    logScrape("Metro", `Page title: ${pageTitle}`);
-
-    // Try dynamic content loading with shorter timeout (5s instead of multiple 5s)
-    await page.waitForSelector('.product-teaser-container, .product-item, .product-card, article', { timeout: 5000 }).catch(() => {});
-
-    const content = await page.content();
-    const $ = cheerio.load(content);
-    const products = [];
-
-    // Metro product selectors
-    const selectors = [
-      '.product-teaser-container',
-      '.product-item',
-      '.product-card',
-      '[data-product-id]',
-    ];
-
-    let productContainers = $();
-
-    for (const selector of selectors) {
-      const elements = $(selector);
-      if (elements.length > 0) {
-        productContainers = productContainers.add(elements);
-        logScrape("Metro", `Found ${elements.length} products with selector "${selector}"`);
-      }
-    }
-
-logScrape("Metro", `Found ${productContainers.length} total product containers`);
-
-    // Fallback: find any element with both price and image patterns
-    if (productContainers.length === 0) {
-      $('div, li, article').each((index, element) => {
-        const $el = $(element);
-        const text = $el.text().trim();
-        if (text.length < 10 || text.length > 500) return;
-        if (!/(\d+[.,]\d{2})/.test(text)) return;
-        if ($el.find('img').length === 0) return;
-        productContainers = productContainers.add($el);
-      });
-      logScrape("Metro", `Fallback found ${productContainers.length} candidates`);
-    }
-
-    productContainers.slice(0, 50).each((index, element) => {
-      const $element = $(element);
-
-      // Extract product name from the title wrapper
-      let name = null;
-      const titleElement = $element.find('.title-wrapper .h4').first();
-      if (titleElement.length) {
-        name = titleElement.text().trim();
-      }
-
-      // If not found, try other selectors
-      if (!name) {
-        const altTitle = $element.find('.product-title, h3, h4, .name').first();
-        if (altTitle.length) {
-          name = altTitle.text().trim();
-        }
-      }
-
-      // Extract price from price position
-      let price = null;
-      const priceElement = $element.find('.price-position .h4.field-price-netto').first();
-      if (priceElement.length) {
-        const priceText = priceElement.text().trim();
-        const priceMatch = priceText.match(/(\d+[.,]\d{2})\s*(?:Γé║|TL)?/i);
-        if (priceMatch) {
-          price = parseFloat(priceMatch[1].replace(',', '.'));
-        }
-      }
-
-      // If not found, try other price selectors
-      if (!price) {
-        const altPrice = $element.find('.price, .product-price, [class*="price"]').first();
-        if (altPrice.length) {
-          const priceText = altPrice.text().trim();
-          const priceMatch = priceText.match(/(\d+[.,]\d{2})\s*(?:Γé║|TL)?/i);
-          if (priceMatch) {
-            price = parseFloat(priceMatch[1].replace(',', '.'));
-          }
-        }
-      }
-
-      // Extract image URL
-      let image = null;
-      const imgElement = $element.find('.field-image img').first();
-      if (imgElement.length) {
-        image = imgElement.attr('src') || imgElement.attr('data-src') || imgElement.attr('data-lazy') || imgElement.attr('data-original');
-        if (image && !image.startsWith('http') && !image.startsWith('//')) {
-          try {
-            image = new URL(image, searchUrl).toString();
-          } catch (e) {
-            // Keep as is
-          }
-        }
-      }
-
-      // Extract product URL
-      let url = null;
-      const linkElement = $element.find('a.product-teaser-link').first();
-      if (linkElement.length && linkElement.attr('href')) {
-        const href = linkElement.attr('href');
-        if (href.startsWith('http')) {
-          url = href;
-        } else if (href.startsWith('/')) {
-          try {
-            url = new URL(href, 'https://www.metro-tr.com').toString();
-          } catch (e) {
-            url = `https://www.metro-tr.com${href}`;
-          }
-        }
-      }
-
-      // Only add product if we have at least a name
-      if (name && name.length > 0) {
-        products.push({
-          name,
-          price: price && !isNaN(price) ? price : null,
-          image: image || null,
-          market: 'metro',
-          unitPrice: null,
-          brand: null,
-          url: url || searchUrl
-        });
-      }
-    });
-
-    logScrape("Metro", `Extracted ${products.length} products`);
-    return products;
-  } catch (error) {
-    logScrape("Metro", `Error: ${error.message}`);
-    return [];
-  } finally {
-    if (browser) {
-      await browser.close();
-    }
-  }
-}
 
 // Market handlers
 const MARKET_HANDLERS = {
   marketfiyati: scrapeMarketFiyatiWrapper,
   sok: scrapeSok,
-  metro: scrapeMetro,
 };
 
 async function searchProduct(product, market) {

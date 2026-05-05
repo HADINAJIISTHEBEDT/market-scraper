@@ -2,6 +2,7 @@
 
 let SCRAPER_API_BASE = "";
 let currentLang = "tr";
+let currentResultsData = null;
 
 const MARKETS = [
   { key: "bim", label: "BIM" },
@@ -11,6 +12,7 @@ const MARKETS = [
   { key: "migros", label: "Migros" },
   { key: "tahtakale", label: "Tahtakale" },
   { key: "carrefour", label: "Carrefour" },
+  { key: "tarim_kredi", label: "Tarim Kredi" },
 ];
 
 // Comprehensive English to Turkish product name translation
@@ -140,6 +142,7 @@ const I18N = {
     filterMinPrice: "Min fiyat",
     filterMaxPrice: "Max fiyat",
     filterItemLimit: "Urun adedi",
+    filterAllBrands: "Tum Markalar",
     markets: {
       bim: "BIM",
       a101: "A101",
@@ -148,6 +151,7 @@ const I18N = {
       migros: "Migros",
       tahtakale: "Tahtakale",
       carrefour: "Carrefour",
+      tarim_kredi: "Tarim Kredi",
     },
   },
   en: {
@@ -167,6 +171,7 @@ const I18N = {
     filterMinPrice: "Min price",
     filterMaxPrice: "Max price",
     filterItemLimit: "Item limit",
+    filterAllBrands: "All Brands",
     markets: {
       bim: "BIM",
       a101: "A101",
@@ -175,6 +180,7 @@ const I18N = {
       migros: "Migros",
       tahtakale: "Tahtakale",
       carrefour: "Carrefour",
+      tarim_kredi: "Tarim Kredi",
     },
   },
   ar: {
@@ -262,6 +268,7 @@ function applyLanguage() {
   const button = document.getElementById("searchBtn");
   const marketFilter = document.getElementById("marketFilter");
   const sortFilter = document.getElementById("sortFilter");
+  const brandFilter = document.getElementById("brandFilter");
   const minPrice = document.getElementById("minPrice");
   const maxPrice = document.getElementById("maxPrice");
   const itemLimit = document.getElementById("itemLimit");
@@ -286,18 +293,24 @@ function applyLanguage() {
     if (sortFilter.options[1]) sortFilter.options[1].textContent = t("filterSortAsc");
     if (sortFilter.options[2]) sortFilter.options[2].textContent = t("filterSortDesc");
   }
+  if (brandFilter && brandFilter.options[0]) {
+    brandFilter.options[0].textContent = t("filterAllBrands");
+  }
   if (minPrice) minPrice.placeholder = t("filterMinPrice");
   if (maxPrice) maxPrice.placeholder = t("filterMaxPrice");
   if (itemLimit) itemLimit.placeholder = t("filterItemLimit");
 }
 
 function getFilters() {
+  const minPriceValue = document.getElementById("minPrice")?.value;
+  const maxPriceValue = document.getElementById("maxPrice")?.value;
+  const itemLimitValue = document.getElementById("itemLimit")?.value;
   return {
     market: document.getElementById("marketFilter")?.value || "",
     sort: document.getElementById("sortFilter")?.value || "",
-    minPrice: parseFloat(document.getElementById("minPrice")?.value) || null,
-    maxPrice: parseFloat(document.getElementById("maxPrice")?.value) || null,
-    itemLimit: parseInt(document.getElementById("itemLimit")?.value) || null,
+    minPrice: minPriceValue === "" ? null : Number(minPriceValue),
+    maxPrice: maxPriceValue === "" ? null : Number(maxPriceValue),
+    itemLimit: itemLimitValue === "" ? null : Number.parseInt(itemLimitValue, 10),
     brand: document.getElementById("brandFilter")?.value || ""
   };
 }
@@ -305,7 +318,7 @@ function getFilters() {
 function applyFilters(items, filters) {
   if (!filters || !Array.isArray(items)) return items;
   
-  let filtered = items;
+  let filtered = [...items];
   
   // Filter by market
   if (filters.market) {
@@ -315,11 +328,11 @@ function applyFilters(items, filters) {
   }
   
   // Filter by price range
-  if (filters.minPrice !== null) {
-    filtered = filtered.filter(item => item.price >= filters.minPrice);
+  if (Number.isFinite(filters.minPrice)) {
+    filtered = filtered.filter(item => Number(item.price) >= filters.minPrice);
   }
-  if (filters.maxPrice !== null) {
-    filtered = filtered.filter(item => item.price <= filters.maxPrice);
+  if (Number.isFinite(filters.maxPrice)) {
+    filtered = filtered.filter(item => Number(item.price) <= filters.maxPrice);
   }
   
   // Sort by price
@@ -331,41 +344,119 @@ function applyFilters(items, filters) {
   
   // Filter by brand
   if (filters.brand) {
-    const brandRegex = new RegExp(filters.brand, 'i');
+    const brandFilter = filters.brand.toLowerCase();
     filtered = filtered.filter(item => 
-      (item.brand || "").match(brandRegex)
+      String(item.brand || "").toLowerCase() === brandFilter
     );
   }
 
   // Limit number of items
-  if (filters.itemLimit !== null && filters.itemLimit > 0) {
+  if (Number.isInteger(filters.itemLimit) && filters.itemLimit > 0) {
     filtered = filtered.slice(0, filters.itemLimit);
   }
   
   return filtered;
 }
 
-function renderResults(data) {
-  const root = document.getElementById("results");
-  if (!root) return;
-  
-  const filters = getFilters();
-  const errors =
-    data && typeof data._errors === "object" && data._errors ? data._errors : {};
+function normalizeMarketKey(value) {
+  return String(value || "unknown").trim().toLowerCase();
+}
 
-  // Get all items from all markets
+function marketLabelForKey(marketKey) {
+  const knownMarket = MARKETS.find((market) => market.key === marketKey);
+  return knownMarket ? tMarket(knownMarket.key) : marketKey;
+}
+
+function getAllResultItems(data) {
   const allItems = [];
-  for (const key in data) {
-    if (key === '_errors') continue;
+  for (const key in data || {}) {
+    if (key === "_errors") continue;
     if (Array.isArray(data[key])) {
       allItems.push(...data[key]);
     }
   }
+  return allItems;
+}
+
+function getMarketOptions(items) {
+  const keys = new Set(MARKETS.map((market) => market.key));
+  for (const item of items) {
+    keys.add(normalizeMarketKey(item.market));
+  }
+  return [...keys].sort((a, b) => marketLabelForKey(a).localeCompare(marketLabelForKey(b)));
+}
+
+function updateMarketOptions(items) {
+  const marketFilter = document.getElementById("marketFilter");
+  if (!marketFilter) return;
+  const selected = marketFilter.value;
+  const marketKeys = getMarketOptions(items);
+  marketFilter.innerHTML = `<option value="">${escapeHtml(t("filterAllMarkets"))}</option>`;
+  for (const marketKey of marketKeys) {
+    marketFilter.insertAdjacentHTML(
+      "beforeend",
+      `<option value="${escapeHtml(marketKey)}">${escapeHtml(marketLabelForKey(marketKey))}</option>`,
+    );
+  }
+  marketFilter.value = marketKeys.includes(selected) ? selected : "";
+}
+
+function updateBrandOptions(items) {
+  const brandFilter = document.getElementById("brandFilter");
+  if (!brandFilter) return;
+  const selected = brandFilter.value;
+  const brands = [
+    ...new Set(
+      items
+        .map((item) => String(item.brand || "").trim())
+        .filter(Boolean),
+    ),
+  ].sort((a, b) => a.localeCompare(b));
+
+  brandFilter.innerHTML = `<option value="">${escapeHtml(t("filterAllBrands"))}</option>`;
+  for (const brand of brands) {
+    brandFilter.insertAdjacentHTML(
+      "beforeend",
+      `<option value="${escapeHtml(brand.toLowerCase())}">${escapeHtml(brand)}</option>`,
+    );
+  }
+  brandFilter.value = brands.some((brand) => brand.toLowerCase() === selected)
+    ? selected
+    : "";
+}
+
+function renderItemCard(item) {
+  const imageHtml = item.image
+    ? `<img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.name)}" class="item-image" onerror="this.style.display='none'">`
+    : "";
+  const brandHtml = item.brand
+    ? `<div class="item-brand">${escapeHtml(item.brand)}</div>`
+    : "";
+  return `<article class="item-card">
+    ${imageHtml}
+    ${brandHtml}
+    <div class="item-name">${escapeHtml(item.name)}</div>
+    <div class="item-price">${formatPrice(item.price)}</div>
+    ${item.unitPrice ? `<div class="item-unit">${escapeHtml(item.unitPrice)}</div>` : ""}
+  </article>`;
+}
+
+function renderResults(data) {
+  const root = document.getElementById("results");
+  if (!root) return;
+  
+  const errors =
+    data && typeof data._errors === "object" && data._errors ? data._errors : {};
+
+  const allItems = getAllResultItems(data);
+  updateMarketOptions(allItems);
+  updateBrandOptions(allItems);
+  const filters = getFilters();
 
   // Group items by market
   const groupedItems = {};
   allItems.forEach(item => {
-    const market = item.market || "unknown";
+    const market = normalizeMarketKey(item.market);
     if (!groupedItems[market]) {
       groupedItems[market] = [];
     }
@@ -376,70 +467,37 @@ function renderResults(data) {
   
   // If a specific market is filtered, only show that market
   if (filters.market) {
-    const marketKey = filters.market;
-    const marketObj = MARKETS.find(m => m.key === marketKey);
-      if (marketObj) {
+    const marketKey = normalizeMarketKey(filters.market);
+    const items = applyFilters(groupedItems[marketKey] || [], filters);
+    html += `<section class="panel"><h3>${escapeHtml(marketLabelForKey(marketKey))} <span class="market-count">${items.length}</span></h3>`;
+    if (!items.length) {
+      const errorText = escapeHtml(errors[marketKey] || "");
+      if (errorText) {
+        html += `<p>${t("noResults")} (${errorText})</p></section>`;
+      } else {
+        html += `<p>${t("noResults")}</p></section>`;
+      }
+    } else {
+      html += `<div class="result-grid">${items.map(renderItemCard).join("")}</div></section>`;
+    }
+  } else {
+    // Show all markets
+    const marketKeys = Object.keys(groupedItems).sort((a, b) =>
+      marketLabelForKey(a).localeCompare(marketLabelForKey(b)),
+    );
+    for (const marketKey of marketKeys) {
       let items = groupedItems[marketKey] || [];
       
       // Apply filters to items
       items = applyFilters(items, filters);
+      if (!items.length) continue;
       
-      html += `<section class="panel"><h3>${tMarket(marketObj.key)}</h3>`;
-      if (!items.length) {
-        const errorText = escapeHtml(errors[marketKey] || "");
-        if (errorText) {
-          html += `<p>${t("noResults")} (${errorText})</p></section>`;
-        } else {
-          html += `<p>${t("noResults")}</p></section>`;
-        }
-      } else {
-        html += `<div class="result-grid">`;
-        for (const item of items) {
-          const imageHtml = item.image ? 
-            `<img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.name)}" class="item-image" onerror="this.style.display='none'">` : 
-            '';
-          html += `<article class="item-card">
-            ${imageHtml}
-            <div class="item-name">${escapeHtml(item.name)}</div>
-            <div class="item-price">${formatPrice(item.price)}</div>
-            ${item.unitPrice ? `<div class="item-unit">${escapeHtml(item.unitPrice)}</div>` : ''}
-          </article>`;
-        }
-        html += `</div></section>`;
-      }
+      html += `<section class="panel"><h3>${escapeHtml(marketLabelForKey(marketKey))} <span class="market-count">${items.length}</span></h3>`;
+      html += `<div class="result-grid">${items.map(renderItemCard).join("")}</div></section>`;
     }
-  } else {
-    // Show all markets
-    for (const market of MARKETS) {
-      let items = groupedItems[market.key] || [];
-      
-      // Apply filters to items
-      items = applyFilters(items, filters);
-      
-      html += `<section class="panel"><h3>${tMarket(market.key)}</h3>`;
-      if (!items.length) {
-        const errorText = escapeHtml(errors[market.key] || "");
-        if (errorText) {
-          html += `<p>${t("noResults")} (${errorText})</p></section>`;
-        } else {
-          html += `<p>${t("noResults")}</p></section>`;
-        }
-        continue;
-      }
-      html += `<div class="result-grid">`;
-      for (const item of items) {
-        const imageHtml = item.image ? 
-          `<img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.name)}" class="item-image" onerror="this.style.display='none'">` : 
-          '';
-        html += `<article class="item-card">
-          ${imageHtml}
-          <div class="item-name">${escapeHtml(item.name)}</div>
-          <div class="item-price">${formatPrice(item.price)}</div>
-          ${item.unitPrice ? `<div class="item-unit">${escapeHtml(item.unitPrice)}</div>` : ''}
-        </article>`;
-      }
-      html += `</div></section>`;
-    }
+  }
+  if (!html) {
+    html = `<section class="panel"><p>${t("noResults")}</p></section>`;
   }
   root.innerHTML = html;
 }
@@ -467,6 +525,7 @@ async function runSearch() {
     });
     if (!response.ok) throw new Error(`API ${response.status}`);
     const data = await response.json();
+    currentResultsData = data;
     renderResults(data);
     setStatus(t("statusDone"));
   } catch (error) {
@@ -483,6 +542,7 @@ window.addEventListener("DOMContentLoaded", () => {
       currentLang = String(event.target.value || "tr");
       localStorage.setItem("app_lang", currentLang);
       applyLanguage();
+      if (currentResultsData) renderResults(currentResultsData);
     });
   }
   applyLanguage();
@@ -492,6 +552,16 @@ window.addEventListener("DOMContentLoaded", () => {
   if (input) {
     input.addEventListener("keydown", (event) => {
       if (event.key === "Enter") runSearch();
+    });
+  }
+  for (const filterId of ["marketFilter", "sortFilter", "minPrice", "maxPrice", "itemLimit", "brandFilter"]) {
+    const filter = document.getElementById(filterId);
+    if (!filter) continue;
+    filter.addEventListener("input", () => {
+      if (currentResultsData) renderResults(currentResultsData);
+    });
+    filter.addEventListener("change", () => {
+      if (currentResultsData) renderResults(currentResultsData);
     });
   }
 });
