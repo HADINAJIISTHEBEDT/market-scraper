@@ -354,7 +354,7 @@ function applyFilters(items, filters) {
   if (filters.brand) {
     const brandFilter = normalizeFilterText(filters.brand);
     filtered = filtered.filter(item => 
-      normalizeFilterText(item.brand).includes(brandFilter)
+      normalizeFilterText(`${item.brand || ""} ${item.name || ""}`).includes(brandFilter)
     );
   }
 

@@ -37,8 +37,171 @@ const MARKET_LABELS = {
   sok: "Sok",
 };
 
+const TERM_ALIASES = {
+  milk: ["sut", "süt"],
+  sut: ["sut", "süt"],
+  süt: ["sut", "süt"],
+  organic: ["organic", "organik"],
+  organik: ["organic", "organik"],
+  icim: ["icim", "içim"],
+  içim: ["icim", "içim"],
+};
+
+const BROAD_PRODUCT_TERMS = new Set([
+  "sut",
+  "süt",
+  "milk",
+  "yogurt",
+  "yoğurt",
+  "peynir",
+  "cheese",
+  "ekmek",
+  "bread",
+  "yumurta",
+  "egg",
+  "cay",
+  "çay",
+  "tea",
+  "kahve",
+  "coffee",
+  "su",
+  "water",
+]);
+
 function logScrape(stage, message) {
   console.log(`[Scraper][${stage}] ${message}`);
+}
+
+function normalizeSearchText(value) {
+  return String(value || "")
+    .toLocaleLowerCase("tr-TR")
+    .replaceAll("ı", "i")
+    .replaceAll("İ", "i")
+    .replaceAll("ğ", "g")
+    .replaceAll("ü", "u")
+    .replaceAll("ş", "s")
+    .replaceAll("ö", "o")
+    .replaceAll("ç", "c")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function uniqueValues(values) {
+  return [...new Set(values.map((value) => String(value || "").trim()).filter(Boolean))];
+}
+
+function expandToken(token) {
+  const normalized = normalizeSearchText(token);
+  const aliases = TERM_ALIASES[token] || TERM_ALIASES[normalized] || [token];
+  return uniqueValues([token, normalized, ...aliases, ...aliases.map(normalizeSearchText)]);
+}
+
+function expandQueryTerms(query) {
+  return String(query || "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .map(expandToken);
+}
+
+function buildSearchQueries(query) {
+  const rawTokens = String(query || "").split(/\s+/).filter(Boolean);
+  const expandedTerms = expandQueryTerms(query);
+  const normalizedFull = expandedTerms.map((terms) => terms[0]).join(" ");
+  const turkishFull = expandedTerms.map((terms) => terms[terms.length - 1]).join(" ");
+  const broadTerms = expandedTerms
+    .flat()
+    .map(normalizeSearchText)
+    .filter((term) => BROAD_PRODUCT_TERMS.has(term));
+
+  return uniqueValues([
+    query,
+    normalizedFull,
+    turkishFull,
+    ...broadTerms,
+    rawTokens.length > 2 ? rawTokens.slice(0, 2).join(" ") : "",
+    rawTokens.length > 2 ? rawTokens.slice(1).join(" ") : "",
+  ]).slice(0, 5);
+}
+
+function levenshteinDistance(a, b) {
+  if (a === b) return 0;
+  if (!a || !b) return Math.max(a.length, b.length);
+  const previous = Array.from({ length: b.length + 1 }, (_, i) => i);
+  const current = Array(b.length + 1);
+  for (let i = 1; i <= a.length; i++) {
+    current[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      current[j] = Math.min(
+        previous[j] + 1,
+        current[j - 1] + 1,
+        previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1),
+      );
+    }
+    for (let j = 0; j <= b.length; j++) previous[j] = current[j];
+  }
+  return previous[b.length];
+}
+
+function termMatchesSearchText(termAliases, searchableTokens, searchableText) {
+  return termAliases.some((alias) => {
+    const normalizedAlias = normalizeSearchText(alias);
+    if (!normalizedAlias) return false;
+    if (searchableText.includes(normalizedAlias)) return true;
+    return searchableTokens.some((token) => {
+      if (token.includes(normalizedAlias) || normalizedAlias.includes(token)) return true;
+      return normalizedAlias.length >= 4 && levenshteinDistance(token, normalizedAlias) <= 1;
+    });
+  });
+}
+
+function scoreItemForQuery(query, item) {
+  const expandedTerms = expandQueryTerms(query).filter((terms) => terms.length);
+  if (!expandedTerms.length) return 1;
+
+  const searchableText = normalizeSearchText(
+    `${item?.brand || ""} ${item?.name || ""} ${item?.market || ""}`,
+  );
+  const searchableTokens = searchableText.split(/\s+/).filter(Boolean);
+  let score = 0;
+  let matchedTerms = 0;
+
+  for (const termAliases of expandedTerms) {
+    if (termMatchesSearchText(termAliases, searchableTokens, searchableText)) {
+      matchedTerms += 1;
+      score += 10;
+    }
+  }
+
+  const brandText = normalizeSearchText(item?.brand);
+  if (brandText && termMatchesSearchText(expandedTerms.flat(), brandText.split(/\s+/), brandText)) {
+    score += 8;
+  }
+  if (Number.isFinite(Number(item?.price))) score += 1;
+
+  return matchedTerms === expandedTerms.length ? score : 0;
+}
+
+function dedupeAndRankItems(query, items) {
+  const bestByKey = new Map();
+  for (const item of Array.isArray(items) ? items : []) {
+    const score = scoreItemForQuery(query, item);
+    if (score <= 0) continue;
+    const key = [
+      normalizeSearchText(item.market),
+      normalizeSearchText(item.brand),
+      normalizeSearchText(item.name),
+      Number(item.price || 0).toFixed(2),
+    ].join("|");
+    const existing = bestByKey.get(key);
+    if (!existing || score > existing._score) {
+      bestByKey.set(key, { ...item, _score: score });
+    }
+  }
+  return [...bestByKey.values()]
+    .sort((a, b) => b._score - a._score || Number(a.price || Infinity) - Number(b.price || Infinity))
+    .map(({ _score, ...item }) => item);
 }
 
 async function withTimeout(label, promise, timeoutMs = SEARCH_TIMEOUT_MS) {
@@ -220,18 +383,27 @@ async function searchProduct(product, market) {
 async function searchMultiple(product) {
   const entries = [];
   const errors = {};
+  const searchQueries = buildSearchQueries(product);
+  logScrape("Smart Search", `Using queries: ${searchQueries.join(" | ")}`);
   
   // Search all configured markets
   for (const market of MARKET_ORDER) {
-    let items = await searchProduct(product, market).catch((error) => {
-      const message = String(error?.message || "unknown error");
-      logScrape(MARKET_LABELS[market], message);
-      errors[market] = message;
-      return [];
-    });
+    const allMarketItems = [];
+    for (const searchQuery of searchQueries) {
+      const items = await searchProduct(searchQuery, market).catch((error) => {
+        const message = String(error?.message || "unknown error");
+        logScrape(MARKET_LABELS[market], `${searchQuery}: ${message}`);
+        errors[market] = message;
+        return [];
+      });
+      if (Array.isArray(items) && items.length) {
+        allMarketItems.push(...items);
+      }
+    }
+    const items = dedupeAndRankItems(product, allMarketItems).slice(0, MARKET_RESULT_LIMIT);
     
-    entries.push([market, Array.isArray(items) ? items : []]);
-    if (!errors[market] && (!Array.isArray(items) || items.length === 0)) {
+    entries.push([market, items]);
+    if (!errors[market] && items.length === 0) {
       errors[market] = "No matched products from source";
     }
   }
