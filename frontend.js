@@ -11,7 +11,6 @@ const MARKETS = [
   { key: "migros", label: "Migros" },
   { key: "tahtakale", label: "Tahtakale" },
   { key: "carrefour", label: "Carrefour" },
-  { key: "tarim_kredi", label: "Tarim Kredi" },
 ];
 
 // Comprehensive English to Turkish product name translation
@@ -149,8 +148,13 @@ const I18N = {
       migros: "Migros",
       tahtakale: "Tahtakale",
       carrefour: "Carrefour",
-      tarim_kredi: "Tarim Kredi",
     },
+    contactPrompt: "For any problem ",
+    contactButton: "contact us",
+    contactTitle: "Title",
+    contactComponent: "Component",
+    contactSubmit: "Send message",
+    contactClose: "Close",
   },
   en: {
     title: "Market Product Search",
@@ -177,8 +181,13 @@ const I18N = {
       migros: "Migros",
       tahtakale: "Tahtakale",
       carrefour: "Carrefour",
-      tarim_kredi: "Tarim Kredi",
     },
+    contactPrompt: "For any problem ",
+    contactButton: "contact us",
+    contactTitle: "Title",
+    contactComponent: "Component",
+    contactSubmit: "Send message",
+    contactClose: "Close",
   },
   ar: {
     title: "بحث منتجات السوق",
@@ -205,6 +214,12 @@ const I18N = {
       tahtakale: "Tahtakale",
       carrefour: "Carrefour",
     },
+    contactPrompt: "For any problem ",
+    contactButton: "contact us",
+    contactTitle: "Title",
+    contactComponent: "Component",
+    contactSubmit: "Send message",
+    contactClose: "Close",
   },
 };
 
@@ -303,6 +318,20 @@ function applyLanguage() {
   if (minPrice) minPrice.placeholder = t("filterMinPrice");
   if (maxPrice) maxPrice.placeholder = t("filterMaxPrice");
   if (itemLimit) itemLimit.placeholder = t("filterItemLimit");
+
+  const contactPrompt = document.getElementById("contactPrompt");
+  const contactToggle = document.getElementById("contactToggle");
+  const contactTitleLabel = document.getElementById("contactTitleLabel");
+  const contactComponentLabel = document.getElementById("contactComponentLabel");
+  const contactSubmit = document.getElementById("contactSubmit");
+  const contactClose = document.getElementById("contactClose");
+
+  if (contactPrompt) contactPrompt.textContent = t("contactPrompt");
+  if (contactToggle) contactToggle.textContent = t("contactButton");
+  if (contactTitleLabel) contactTitleLabel.textContent = t("contactTitle");
+  if (contactComponentLabel) contactComponentLabel.textContent = t("contactComponent");
+  if (contactSubmit) contactSubmit.textContent = t("contactSubmit");
+  if (contactClose) contactClose.textContent = t("contactClose");
 }
 
 function getFilters() {
@@ -541,6 +570,22 @@ window.addEventListener("DOMContentLoaded", () => {
     });
     filter.addEventListener("change", () => {
       if (currentResultsData) renderResults(currentResultsData);
+    });
+  }
+
+  const contactToggle = document.getElementById("contactToggle");
+  const contactFormWrap = document.getElementById("contactFormWrap");
+  const contactClose = document.getElementById("contactClose");
+  if (contactToggle && contactFormWrap) {
+    contactToggle.addEventListener("click", () => {
+      const shouldOpen = contactFormWrap.hidden;
+      contactFormWrap.hidden = !shouldOpen;
+      if (shouldOpen) document.getElementById("contactTitleInput")?.focus();
+    });
+  }
+  if (contactClose && contactFormWrap) {
+    contactClose.addEventListener("click", () => {
+      contactFormWrap.hidden = true;
     });
   }
 });
