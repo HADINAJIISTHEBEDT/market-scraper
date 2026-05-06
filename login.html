@@ -536,14 +536,6 @@
       }
     }
 
-    function isProfileComplete(profile) {
-      return Boolean(
-        String(profile?.name || "").trim() &&
-        String(profile?.phone || "").trim() &&
-        String(profile?.address || "").trim()
-      );
-    }
-
     async function syncUserRecord(user) {
       const userRef = doc(db, "users", user.uid);
       const snap = await getDoc(userRef);
@@ -570,14 +562,25 @@
           return;
         }
 
-        const profile = await syncUserRecord(user);
-        storeUserLocally(user, profile);
+        storeUserLocally(user, {
+          name: user.displayName || user.email || "User",
+          phone: localStorage.getItem("user_phone") || "",
+          address: localStorage.getItem("user_address") || ""
+        });
+
+        try {
+          const profile = await syncUserRecord(user);
+          storeUserLocally(user, profile);
+        } catch (error) {
+          console.error("Profile sync failed", error);
+        }
+
         setStatus("statusSuccess");
         setTimeout(() => {
-          window.location.href = isProfileComplete(profile) ? "index.html" : "profile.html";
-        }, 900);
+          window.location.href = "index.html";
+        }, 700);
       } catch (error) {
-        console.error("Profile sync failed", error);
+        console.error("Login routing failed", error);
         const messageKey = String(error?.code || "").startsWith("permission-")
           ? "errorProfileSave"
           : "errorProfileLoad";
