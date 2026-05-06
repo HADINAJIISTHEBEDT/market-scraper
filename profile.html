@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Profile</title>
+  <link rel="stylesheet" href="css.css" />
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #edf2fb;
+      color: #1f2937;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    }
+    .page {
+      width: min(720px, calc(100vw - 24px));
+      margin: 24px auto;
+    }
+    .top-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .lang-select {
+      min-width: 112px;
+      padding: 8px 10px;
+      border: 1px solid #d7deea;
+      border-radius: 10px;
+      background: #fff;
+      font: inherit;
+    }
+    .back-link {
+      color: #2563eb;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .panel {
+      background: #fff;
+      border: 1px solid #d7deea;
+      border-radius: 24px;
+      padding: 26px;
+      box-shadow: 0 10px 30px rgba(30, 41, 59, 0.06);
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 34px;
+      font-weight: 500;
+    }
+    .subtitle {
+      margin: 0 0 22px;
+      color: #64748b;
+      line-height: 1.5;
+    }
+    .profile-form {
+      display: grid;
+      gap: 14px;
+    }
+    .profile-form label {
+      display: grid;
+      gap: 6px;
+      font-weight: 600;
+    }
+    .profile-form input,
+    .profile-form textarea {
+      width: 100%;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      padding: 12px;
+      font: inherit;
+      background: #fff;
+    }
+    .profile-form textarea {
+      min-height: 110px;
+      resize: vertical;
+    }
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+    .primary-btn,
+    .secondary-btn {
+      border-radius: 10px;
+      padding: 12px 18px;
+      font: inherit;
+      cursor: pointer;
+    }
+    .primary-btn {
+      border: none;
+      background: #2563eb;
+      color: #fff;
+      font-weight: 600;
+    }
+    .secondary-btn {
+      border: 1px solid #cbd5e1;
+      background: #fff;
+      color: #334155;
+    }
+    .status-box {
+      min-height: 22px;
+      margin-top: 16px;
+      color: #64748b;
+    }
+    .status-box.error {
+      color: #b91c1c;
+    }
+    .status-box.success {
+      color: #166534;
+    }
+    @media (max-width: 600px) {
+      .page {
+        width: min(100vw - 12px, 720px);
+        margin-top: 12px;
+      }
+      .panel {
+        padding: 18px;
+        border-radius: 18px;
+      }
+      h1 {
+        font-size: 28px;
+      }
+      .top-row {
+        align-items: flex-start;
+        flex-direction: column-reverse;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="top-row">
+      <a class="back-link" id="backLink" href="index.html">&larr; Back to app</a>
+      <select id="langSelect" class="lang-select">
+        <option value="tr">Turkce</option>
+        <option value="en">English</option>
+        <option value="ar">العربية</option>
+      </select>
+    </div>
+
+    <section class="panel">
+      <h1 id="title">Profil bilgileri</h1>
+      <p id="subtitle" class="subtitle">Devam etmeden once ad, telefon numarasi ve adres bilgilerini doldurun.</p>
+      <form id="profileForm" class="profile-form">
+        <label>
+          <span id="nameLabel">Ad</span>
+          <input id="nameInput" name="name" type="text" required />
+        </label>
+        <label>
+          <span id="emailLabel">Email</span>
+          <input id="emailInput" name="email" type="email" readonly />
+        </label>
+        <label>
+          <span id="phoneLabel">Telefon numarasi</span>
+          <input id="phoneInput" name="phone" type="tel" required />
+        </label>
+        <label>
+          <span id="addressLabel">Adres</span>
+          <textarea id="addressInput" name="address" required></textarea>
+        </label>
+        <div class="actions">
+          <button id="saveButton" class="primary-btn" type="submit">Kaydet ve devam et</button>
+          <button id="logoutButton" class="secondary-btn" type="button">Cikis yap</button>
+        </div>
+      </form>
+      <div id="statusBox" class="status-box"></div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { browserLocalPersistence, getAuth, onAuthStateChanged, setPersistence, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { doc, getDoc, getFirestore, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import firebaseConfig from "./firebase-config.js";
+
+    const I18N = {
+      tr: {
+        title: "Profil bilgileri",
+        subtitle: "Devam etmeden once ad, telefon numarasi ve adres bilgilerini doldurun.",
+        nameLabel: "Ad",
+        emailLabel: "Email",
+        phoneLabel: "Telefon numarasi",
+        addressLabel: "Adres",
+        saveButton: "Kaydet ve devam et",
+        logoutButton: "Cikis yap",
+        backLink: "Back to app",
+        statusLoading: "Profil yukleniyor...",
+        statusSaving: "Profil kaydediliyor...",
+        statusSaved: "Profil kaydedildi. Yonlendiriliyor...",
+        errorLoginRequired: "Devam etmek icin once giris yapin.",
+        errorLoad: "Profil bilgileri yuklenemedi.",
+        errorSave: "Profil kaydedilemedi.",
+        logoutDone: "Cikis yapildi."
+      },
+      en: {
+        title: "Profile details",
+        subtitle: "Before continuing, fill in your name, phone number, and address.",
+        nameLabel: "Name",
+        emailLabel: "Email",
+        phoneLabel: "Phone number",
+        addressLabel: "Address",
+        saveButton: "Save and continue",
+        logoutButton: "Logout",
+        backLink: "Back to app",
+        statusLoading: "Loading profile...",
+        statusSaving: "Saving profile...",
+        statusSaved: "Profile saved. Redirecting...",
+        errorLoginRequired: "Please sign in first.",
+        errorLoad: "The profile data could not be loaded.",
+        errorSave: "The profile data could not be saved.",
+        logoutDone: "Logged out."
+      },
+      ar: {
+        title: "بيانات الملف الشخصي",
+        subtitle: "قبل المتابعة، املأ الاسم ورقم الهاتف والعنوان.",
+        nameLabel: "الاسم",
+        emailLabel: "البريد الإلكتروني",
+        phoneLabel: "رقم الهاتف",
+        addressLabel: "العنوان",
+        saveButton: "احفظ وتابع",
+        logoutButton: "تسجيل الخروج",
+        backLink: "العودة إلى التطبيق",
+        statusLoading: "جار تحميل الملف الشخصي...",
+        statusSaving: "جار حفظ الملف الشخصي...",
+        statusSaved: "تم حفظ الملف الشخصي. جار التحويل...",
+        errorLoginRequired: "يرجى تسجيل الدخول أولاً.",
+        errorLoad: "تعذر تحميل بيانات الملف الشخصي.",
+        errorSave: "تعذر حفظ بيانات الملف الشخصي.",
+        logoutDone: "تم تسجيل الخروج."
+      }
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    let currentLang = localStorage.getItem("app_lang") || "tr";
+    let currentUser = null;
+
+    function t(key) {
+      return (I18N[currentLang] && I18N[currentLang][key]) || I18N.tr[key] || key;
+    }
+
+    function setStatus(keyOrMessage, isError = false, raw = false) {
+      const box = document.getElementById("statusBox");
+      box.textContent = raw ? keyOrMessage : t(keyOrMessage);
+      box.className = "status-box" + (isError ? " error" : " success");
+    }
+
+    function applyLanguage() {
+      document.documentElement.lang = currentLang;
+      document.documentElement.dir = currentLang === "ar" ? "rtl" : "ltr";
+      document.getElementById("langSelect").value = currentLang;
+      document.getElementById("title").textContent = t("title");
+      document.getElementById("subtitle").textContent = t("subtitle");
+      document.getElementById("nameLabel").textContent = t("nameLabel");
+      document.getElementById("emailLabel").textContent = t("emailLabel");
+      document.getElementById("phoneLabel").textContent = t("phoneLabel");
+      document.getElementById("addressLabel").textContent = t("addressLabel");
+      document.getElementById("saveButton").textContent = t("saveButton");
+      document.getElementById("logoutButton").textContent = t("logoutButton");
+      document.getElementById("backLink").innerHTML = "&larr; " + t("backLink");
+    }
+
+    async function loadProfile(user) {
+      setStatus("statusLoading");
+      try {
+        const snap = await getDoc(doc(db, "users", user.uid));
+        const data = snap.exists() ? snap.data() : {};
+        document.getElementById("nameInput").value = data.name || user.displayName || "";
+        document.getElementById("emailInput").value = user.email || data.email || "";
+        document.getElementById("phoneInput").value = data.phone || localStorage.getItem("user_phone") || "";
+        document.getElementById("addressInput").value = data.address || localStorage.getItem("user_address") || "";
+        setStatus("", false, true);
+      } catch (error) {
+        console.error("Profile load failed", error);
+        setStatus(`${t("errorLoad")} (${String(error?.code || error?.message || "unknown")})`, true, true);
+      }
+    }
+
+    async function saveProfile(event) {
+      event.preventDefault();
+      if (!currentUser) {
+        setStatus("errorLoginRequired", true);
+        return;
+      }
+
+      const name = document.getElementById("nameInput").value.trim();
+      const email = document.getElementById("emailInput").value.trim();
+      const phone = document.getElementById("phoneInput").value.trim();
+      const address = document.getElementById("addressInput").value.trim();
+
+      setStatus("statusSaving");
+      try {
+        await setDoc(doc(db, "users", currentUser.uid), {
+          name,
+          email,
+          phone,
+          address,
+          photoURL: currentUser.photoURL || "",
+          lastProfileUpdateAt: new Date().toISOString()
+        }, { merge: true });
+        localStorage.setItem("user_name", name);
+        localStorage.setItem("user_uid", currentUser.uid);
+        localStorage.setItem("user_email", email);
+        localStorage.setItem("user_phone", phone);
+        localStorage.setItem("user_address", address);
+        if (currentUser.photoURL) localStorage.setItem("user_photo", currentUser.photoURL);
+        setStatus("statusSaved");
+        setTimeout(() => {
+          window.location.href = "index.html";
+        }, 700);
+      } catch (error) {
+        console.error("Profile save failed", error);
+        setStatus(`${t("errorSave")} (${String(error?.code || error?.message || "unknown")})`, true, true);
+      }
+    }
+
+    async function logout() {
+      await signOut(auth);
+      localStorage.removeItem("user_name");
+      localStorage.removeItem("user_uid");
+      localStorage.removeItem("user_email");
+      localStorage.removeItem("user_phone");
+      localStorage.removeItem("user_address");
+      localStorage.removeItem("user_photo");
+      setStatus("logoutDone");
+      setTimeout(() => {
+        window.location.href = "login.html";
+      }, 400);
+    }
+
+    document.getElementById("langSelect").addEventListener("change", (event) => {
+      currentLang = String(event.target.value || "tr");
+      localStorage.setItem("app_lang", currentLang);
+      applyLanguage();
+    });
+
+    document.getElementById("profileForm").addEventListener("submit", saveProfile);
+    document.getElementById("logoutButton").addEventListener("click", logout);
+
+    applyLanguage();
+    await setPersistence(auth, browserLocalPersistence);
+    onAuthStateChanged(auth, async (user) => {
+      currentUser = user;
+      if (!user) {
+        setStatus("errorLoginRequired", true);
+        setTimeout(() => {
+          window.location.href = "login.html";
+        }, 700);
+        return;
+      }
+      await loadProfile(user);
+    });
+  </script>
+</body>
+</html>

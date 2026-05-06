@@ -180,12 +180,6 @@
       overflow: hidden;
     }
 
-    .account-avatar img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-
     .account-copy {
       min-width: 0;
       flex: 1 1 auto;
@@ -329,10 +323,10 @@
             <div class="account-box">
               <div class="section-label" id="accountSectionLabel">Gercek Gmail hesabinizi kullanin</div>
               <button id="googleSignInBtn" class="google-button" type="button">
-                <span class="account-avatar" id="accountAvatar">G</span>
+                <span class="account-avatar">G</span>
                 <span class="account-copy">
                   <div class="account-title" id="buttonTitle">Google ile devam et</div>
-                  <div class="account-subtitle" id="buttonSubtitle">Hesap secme ekrani acilacak ve sadece dogrulanmis Google hesabi kabul edilecek.</div>
+                  <div class="account-subtitle" id="buttonSubtitle">Hesap secme ekrani acilacak ve dogrudan Google ile devam edeceksiniz.</div>
                 </span>
               </button>
             </div>
@@ -364,16 +358,19 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import {
+      browserLocalPersistence,
       getAuth,
+      getRedirectResult,
       GoogleAuthProvider,
-      signInWithPopup,
+      onAuthStateChanged,
       setPersistence,
-      browserLocalPersistence
+      signInWithRedirect,
+      signOut
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
     import {
-      getFirestore,
       doc,
       getDoc,
+      getFirestore,
       setDoc
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
     import firebaseConfig from "./firebase-config.js";
@@ -386,7 +383,7 @@
         brandName: "Market Scraper",
         accountSectionLabel: "Gercek Gmail hesabinizi kullanin",
         buttonTitle: "Google ile devam et",
-        buttonSubtitle: "Hesap secme ekrani acilacak ve sadece dogrulanmis Google hesabi kabul edilecek.",
+        buttonSubtitle: "Hesap secimi acilacak ve Google girisi tamamlaninca otomatik devam edecek.",
         policyText: "Bu uygulamayi kullanmadan once",
         privacyLink: "Gizlilik Politikasini",
         andText: "ve",
@@ -396,16 +393,18 @@
         helpLink: "Yardim",
         footerPrivacyLink: "Gizlilik",
         footerTermsLink: "Sartlar",
-        statusStarting: "Google girisi aciliyor...",
+        statusStarting: "Google hesap secimi aciliyor...",
+        statusChecking: "Hesap kontrol ediliyor...",
         statusSuccess: "Giris basarili. Yonlendiriliyor...",
-        errorPopupClosed: "Google girisi iptal edildi.",
         errorGeneric: "Google ile giris basarisiz oldu.",
         errorUnauthorizedDomain: "Bu alan adi Firebase Authentication icin yetkili degil.",
         errorGoogleOnly: "Lutfen Gmail ile bagli bir Google hesabi kullanin.",
         errorPopupBlocked: "Tarayici popup penceresini engelledi. Popup izni verip tekrar deneyin.",
         errorOperationNotAllowed: "Firebase icinde Google giris yontemi etkin degil.",
         errorNetwork: "Ag hatasi var. Internet baglantisini kontrol edip tekrar deneyin.",
-        errorCancelled: "Ayni anda birden fazla giris denemesi yapildi. Tekrar deneyin."
+        errorCancelled: "Ayni anda birden fazla giris denemesi yapildi. Tekrar deneyin.",
+        errorProfileLoad: "Hesap acildi fakat profil verisi okunamadi.",
+        errorProfileSave: "Hesap acildi fakat profil verisi kaydedilemedi."
       },
       en: {
         topLabel: "Sign in with Google",
@@ -414,7 +413,7 @@
         brandName: "Market Scraper",
         accountSectionLabel: "Use your real Gmail account",
         buttonTitle: "Continue with Google",
-        buttonSubtitle: "The Google account chooser will open and only a verified Google account will be accepted.",
+        buttonSubtitle: "The Google account chooser will open, then the app will continue automatically.",
         policyText: "Before using this app, you can review the",
         privacyLink: "Privacy Policy",
         andText: "and",
@@ -424,44 +423,48 @@
         helpLink: "Help",
         footerPrivacyLink: "Privacy",
         footerTermsLink: "Terms",
-        statusStarting: "Opening Google sign-in...",
+        statusStarting: "Opening Google account chooser...",
+        statusChecking: "Checking account...",
         statusSuccess: "Login successful. Redirecting...",
-        errorPopupClosed: "Google sign-in was cancelled.",
         errorGeneric: "Google sign-in failed.",
         errorUnauthorizedDomain: "This domain is not authorized for Firebase Authentication.",
         errorGoogleOnly: "Please use a real Google account with Gmail.",
         errorPopupBlocked: "The browser blocked the popup. Allow popups and try again.",
         errorOperationNotAllowed: "Google sign-in is not enabled in Firebase.",
         errorNetwork: "Network error. Check your connection and try again.",
-        errorCancelled: "Multiple sign-in attempts were started. Try again."
+        errorCancelled: "Multiple sign-in attempts were started. Try again.",
+        errorProfileLoad: "The account signed in, but the profile data could not be loaded.",
+        errorProfileSave: "The account signed in, but the profile data could not be saved."
       },
       ar: {
         topLabel: "تسجيل الدخول باستخدام Google",
         title: "اختر حسابا",
-        subtitlePrefix: "للمتابعة الى ",
+        subtitlePrefix: "للمتابعة إلى ",
         brandName: "Market Scraper",
         accountSectionLabel: "استخدم حساب Gmail الحقيقي الخاص بك",
         buttonTitle: "المتابعة باستخدام Google",
-        buttonSubtitle: "ستفتح نافذة اختيار حساب Google وسيتم قبول حساب Google الحقيقي فقط.",
+        buttonSubtitle: "ستفتح نافذة اختيار الحساب ثم سيتابع التطبيق تلقائيا بعد تسجيل الدخول.",
         policyText: "قبل استخدام هذا التطبيق، يمكنك مراجعة",
         privacyLink: "سياسة الخصوصية",
         andText: "و",
         termsLink: "شروط الخدمة",
         reviewText: ".",
-        backLink: "العودة الى البحث",
+        backLink: "العودة إلى البحث",
         helpLink: "مساعدة",
         footerPrivacyLink: "الخصوصية",
         footerTermsLink: "الشروط",
-        statusStarting: "جار فتح تسجيل الدخول عبر Google...",
+        statusStarting: "جار فتح اختيار حساب Google...",
+        statusChecking: "جار فحص الحساب...",
         statusSuccess: "تم تسجيل الدخول بنجاح. جار التحويل...",
-        errorPopupClosed: "تم الغاء تسجيل الدخول عبر Google.",
         errorGeneric: "فشل تسجيل الدخول عبر Google.",
         errorUnauthorizedDomain: "اسم النطاق هذا غير مصرح به في Firebase Authentication.",
         errorGoogleOnly: "يرجى استخدام حساب Google حقيقي مرتبط بـ Gmail.",
-        errorPopupBlocked: "قام المتصفح بحظر النافذة المنبثقة. اسمح بالنوافذ المنبثقة ثم حاول مرة اخرى.",
+        errorPopupBlocked: "قام المتصفح بحظر النافذة المنبثقة. اسمح بالنوافذ المنبثقة ثم حاول مرة أخرى.",
         errorOperationNotAllowed: "تسجيل الدخول عبر Google غير مفعل في Firebase.",
-        errorNetwork: "يوجد خطأ في الشبكة. تحقق من الاتصال ثم حاول مرة اخرى.",
-        errorCancelled: "تم بدء اكثر من محاولة تسجيل دخول. حاول مرة اخرى."
+        errorNetwork: "يوجد خطأ في الشبكة. تحقق من الاتصال ثم حاول مرة أخرى.",
+        errorCancelled: "تم بدء أكثر من محاولة تسجيل دخول. حاول مرة أخرى.",
+        errorProfileLoad: "تم تسجيل الدخول لكن تعذر تحميل بيانات الملف الشخصي.",
+        errorProfileSave: "تم تسجيل الدخول لكن تعذر حفظ بيانات الملف الشخصي."
       }
     };
 
@@ -495,7 +498,6 @@
       document.getElementById("langSelect").value = currentLang;
       document.getElementById("topLabel").textContent = t("topLabel");
       document.getElementById("title").textContent = t("title");
-      document.getElementById("brandName").textContent = t("brandName");
       document.getElementById("accountSectionLabel").textContent = t("accountSectionLabel");
       document.getElementById("buttonTitle").textContent = t("buttonTitle");
       document.getElementById("buttonSubtitle").textContent = t("buttonSubtitle");
@@ -513,7 +515,6 @@
 
     function getFriendlyError(error) {
       const code = String(error?.code || "");
-      if (code === "auth/popup-closed-by-user") return t("errorPopupClosed");
       if (code === "auth/unauthorized-domain") return t("errorUnauthorizedDomain");
       if (code === "auth/popup-blocked") return t("errorPopupBlocked");
       if (code === "auth/operation-not-allowed") return t("errorOperationNotAllowed");
@@ -522,45 +523,100 @@
       return `${t("errorGeneric")} (${code || "unknown"})`;
     }
 
+    function storeUserLocally(user, profile = {}) {
+      localStorage.setItem("user_name", profile.name || user.displayName || user.email || "User");
+      localStorage.setItem("user_uid", user.uid);
+      localStorage.setItem("user_email", user.email || "");
+      localStorage.setItem("user_phone", profile.phone || "");
+      localStorage.setItem("user_address", profile.address || "");
+      if (user.photoURL) {
+        localStorage.setItem("user_photo", user.photoURL);
+      } else {
+        localStorage.removeItem("user_photo");
+      }
+    }
+
+    function isProfileComplete(profile) {
+      return Boolean(
+        String(profile?.name || "").trim() &&
+        String(profile?.phone || "").trim() &&
+        String(profile?.address || "").trim()
+      );
+    }
+
     async function syncUserRecord(user) {
       const userRef = doc(db, "users", user.uid);
-      const existing = await getDoc(userRef);
-      const existingRole = existing.exists() ? existing.data().role : "user";
-      await setDoc(userRef, {
-        name: user.displayName || user.email || "User",
-        email: user.email || "",
-        photoURL: user.photoURL || "",
-        role: existingRole || "user",
+      const snap = await getDoc(userRef);
+      const existing = snap.exists() ? snap.data() : {};
+      const mergedProfile = {
+        ...existing,
+        name: existing.name || user.displayName || user.email || "User",
+        email: user.email || existing.email || "",
+        photoURL: user.photoURL || existing.photoURL || "",
+        role: existing.role || "user",
         lastLoginAt: new Date().toISOString(),
-        createdAt: existing.exists()
-          ? existing.data().createdAt || new Date().toISOString()
-          : new Date().toISOString()
-      }, { merge: true });
+        createdAt: existing.createdAt || new Date().toISOString()
+      };
+      await setDoc(userRef, mergedProfile, { merge: true });
+      return mergedProfile;
+    }
+
+    async function routeSignedInUser(user) {
+      setStatus("statusChecking");
+      try {
+        if (!user.email || !/@gmail\.com$/i.test(user.email)) {
+          await signOut(auth);
+          setRawStatus(t("errorGoogleOnly"), true);
+          return;
+        }
+
+        const profile = await syncUserRecord(user);
+        storeUserLocally(user, profile);
+        setStatus("statusSuccess");
+        setTimeout(() => {
+          window.location.href = isProfileComplete(profile) ? "index.html" : "profile.html";
+        }, 900);
+      } catch (error) {
+        console.error("Profile sync failed", error);
+        const messageKey = String(error?.code || "").startsWith("permission-")
+          ? "errorProfileSave"
+          : "errorProfileLoad";
+        setRawStatus(`${t(messageKey)} (${String(error?.code || error?.message || "unknown")})`, true);
+      }
     }
 
     async function continueWithGoogle() {
       setStatus("statusStarting");
       try {
         await setPersistence(auth, browserLocalPersistence);
-        const result = await signInWithPopup(auth, provider);
-        const user = result.user;
-        if (!user.email || !/@gmail\.com$/i.test(user.email)) {
-          return setRawStatus(t("errorGoogleOnly"), true);
-        }
-
-        await syncUserRecord(user);
-        localStorage.setItem("user_name", user.displayName || user.email);
-        localStorage.setItem("user_uid", user.uid);
-        localStorage.setItem("user_email", user.email || "");
-        if (user.photoURL) localStorage.setItem("user_photo", user.photoURL);
-        setStatus("statusSuccess");
-        setTimeout(() => {
-          window.location.href = "index.html";
-        }, 900);
+        await signInWithRedirect(auth, provider);
       } catch (error) {
         console.error("Google sign-in failed", error);
         setRawStatus(getFriendlyError(error), true);
       }
+    }
+
+    async function handleAuthReturn() {
+      try {
+        await setPersistence(auth, browserLocalPersistence);
+        const result = await getRedirectResult(auth);
+        if (result?.user) {
+          await routeSignedInUser(result.user);
+          return;
+        }
+      } catch (error) {
+        console.error("Redirect sign-in failed", error);
+        setRawStatus(getFriendlyError(error), true);
+        return;
+      }
+
+      onAuthStateChanged(auth, async (user) => {
+        if (!user) return;
+        const handledUid = sessionStorage.getItem("login_auth_handled");
+        if (handledUid === user.uid) return;
+        sessionStorage.setItem("login_auth_handled", user.uid);
+        await routeSignedInUser(user);
+      });
     }
 
     document.getElementById("langSelect").addEventListener("change", (event) => {
@@ -572,6 +628,7 @@
     document.getElementById("googleSignInBtn").addEventListener("click", continueWithGoogle);
 
     applyLanguage();
+    handleAuthReturn();
   </script>
 </body>
 </html>

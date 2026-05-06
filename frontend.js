@@ -157,6 +157,9 @@ const I18N = {
     contactComponent: "Component",
     contactSubmit: "Send message",
     contactClose: "Close",
+    navProfile: "Profil",
+    navLogin: "Login",
+    navLogout: "Logout",
   },
   en: {
     title: "Market Product Search",
@@ -192,6 +195,9 @@ const I18N = {
     contactComponent: "Component",
     contactSubmit: "Send message",
     contactClose: "Close",
+    navProfile: "Profile",
+    navLogin: "Login",
+    navLogout: "Logout",
   },
   ar: {
     title: "بحث منتجات السوق",
@@ -225,6 +231,9 @@ const I18N = {
     contactComponent: "Component",
     contactSubmit: "Send message",
     contactClose: "Close",
+    navProfile: "الملف الشخصي",
+    navLogin: "Login",
+    navLogout: "Logout",
   },
 };
 
@@ -329,6 +338,9 @@ function applyLanguage() {
   const contactComponentLabel = document.getElementById("contactComponentLabel");
   const contactSubmit = document.getElementById("contactSubmit");
   const contactClose = document.getElementById("contactClose");
+  const navProfileBtn = document.getElementById("navProfileBtn");
+  const navLoginBtn = document.getElementById("navLoginBtn");
+  const navLogoutBtn = document.getElementById("navLogoutBtn");
 
   if (contactPrompt) contactPrompt.textContent = t("contactPrompt");
   if (contactToggle) contactToggle.textContent = t("contactButton");
@@ -337,6 +349,9 @@ function applyLanguage() {
   if (contactComponentLabel) contactComponentLabel.textContent = t("contactComponent");
   if (contactSubmit) contactSubmit.textContent = t("contactSubmit");
   if (contactClose) contactClose.textContent = t("contactClose");
+  if (navProfileBtn) navProfileBtn.textContent = t("navProfile");
+  if (navLoginBtn) navLoginBtn.textContent = t("navLogin");
+  if (navLogoutBtn) navLogoutBtn.textContent = t("navLogout");
 }
 
 function getFilters() {
@@ -503,14 +518,17 @@ function updateNavbar() {
   const navUser = document.getElementById("navUser");
   const navLoginBtn = document.getElementById("navLoginBtn");
   const navLogoutBtn = document.getElementById("navLogoutBtn");
+  const navProfileBtn = document.getElementById("navProfileBtn");
   if (name) {
     if (navUser) navUser.textContent = `👤 ${name}`;
     if (navLoginBtn) navLoginBtn.style.display = "none";
     if (navLogoutBtn) navLogoutBtn.style.display = "";
+    if (navProfileBtn) navProfileBtn.style.display = "";
   } else {
     if (navUser) navUser.textContent = "";
     if (navLoginBtn) navLoginBtn.style.display = "";
     if (navLogoutBtn) navLogoutBtn.style.display = "none";
+    if (navProfileBtn) navProfileBtn.style.display = "none";
   }
 }
 
@@ -518,6 +536,9 @@ window.doLogout = function() {
   localStorage.removeItem("user_name");
   localStorage.removeItem("user_uid");
   localStorage.removeItem("user_email");
+  localStorage.removeItem("user_phone");
+  localStorage.removeItem("user_address");
+  localStorage.removeItem("user_photo");
   updateNavbar();
 };
 
