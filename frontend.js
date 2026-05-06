@@ -141,6 +141,8 @@ const I18N = {
     filterMaxPrice: "Max fiyat",
     filterItemLimit: "Urun adedi",
     filterBrand: "Marka yazin...",
+    cheapestMarket: "En ucuz market",
+    cheapestItemInMarket: "En ucuz urun",
     markets: {
       bim: "BIM",
       a101: "A101",
@@ -175,6 +177,8 @@ const I18N = {
     filterMaxPrice: "Max price",
     filterItemLimit: "Item limit",
     filterBrand: "Type brand...",
+    cheapestMarket: "Cheapest market",
+    cheapestItemInMarket: "Cheapest item",
     markets: {
       bim: "BIM",
       a101: "A101",
@@ -455,6 +459,30 @@ function renderItemCard(item) {
   </article>`;
 }
 
+function getCheapestMarketSummary(groupedItems, filters) {
+  let cheapestSummary = null;
+
+  for (const marketKey of Object.keys(groupedItems || {})) {
+    const visibleItems = applyFilters(groupedItems[marketKey] || [], filters).filter((item) =>
+      Number.isFinite(Number(item.price)),
+    );
+    if (!visibleItems.length) continue;
+
+    const cheapestItem = visibleItems.reduce((best, item) =>
+      Number(item.price) < Number(best.price) ? item : best,
+    );
+
+    if (
+      !cheapestSummary ||
+      Number(cheapestItem.price) < Number(cheapestSummary.item.price)
+    ) {
+      cheapestSummary = { marketKey, item: cheapestItem };
+    }
+  }
+
+  return cheapestSummary;
+}
+
 function renderResults(data) {
   const root = document.getElementById("results");
   if (!root) return;
@@ -477,6 +505,10 @@ function renderResults(data) {
   });
 
   let html = "";
+  const cheapestSummary = getCheapestMarketSummary(groupedItems, filters);
+  if (cheapestSummary) {
+    html += `<section class="panel"><h3>${escapeHtml(t("cheapestMarket"))}: ${escapeHtml(marketLabelForKey(cheapestSummary.marketKey))}</h3><p>${escapeHtml(t("cheapestItemInMarket"))}: ${escapeHtml(cheapestSummary.item.name)} - ${escapeHtml(formatPrice(Number(cheapestSummary.item.price)))}</p></section>`;
+  }
   
   // If a specific market is filtered, only show that market
   if (filters.market) {
