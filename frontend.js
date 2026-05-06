@@ -126,9 +126,10 @@ const I18N = {
   tr: {
     title: "Market Urun Arama",
     subtitle: "Kayitli urun yok. Sadece urun adini yazip ara.",
+    featureNote: "Uygulama marketleri karsilastirir, fiyatlari ve urun kartlarini gosterir; filtreler, sepet, siparisler, profil ve iletisim ozelliklerini destekler.",
     placeholder: "Urun adi yazin...",
     search: "Ara",
-    statusSearching: "Araniyor...",
+    statusSearching: "Araniyor... Tum marketleri kontrol ediyoruz. Daha iyi sonuc icin yaklasik 1 dakika gerekebilir.",
     statusDone: "Arama tamamlandi.",
     statusWriteProduct: "Lutfen urun adi yazin.",
     statusError: "Hata",
@@ -162,9 +163,10 @@ const I18N = {
   en: {
     title: "Market Product Search",
     subtitle: "No saved items. Just type a product and search. Make sure item names are written in Turkish.",
+    featureNote: "The app compares markets, shows prices and product cards, and supports filters, cart, orders, profile, and contact.",
     placeholder: "Type product name...",
     search: "Search",
-    statusSearching: "Searching...",
+    statusSearching: "Searching... We are checking all markets. It may take about 1 minute to give better results.",
     statusDone: "Search completed.",
     statusWriteProduct: "Please enter a product name.",
     statusError: "Error",
@@ -198,9 +200,10 @@ const I18N = {
   ar: {
     title: "بحث منتجات السوق",
     subtitle: "لا توجد عناصر محفوظة. فقط اكتب منتج وابحث. تأكد من كتابة أسماء المنتجات باللغة التركية.",
+    featureNote: "يقارن التطبيق الأسواق ويعرض الأسعار وبطاقات المنتجات، ويدعم الفلاتر والسلة والطلبات والملف الشخصي والتواصل.",
     placeholder: "اكتب اسم المنتج...",
     search: "ابحث",
-    statusSearching: "جار البحث...",
+    statusSearching: "جار البحث... نحن نتحقق من جميع الأسواق. قد نحتاج حوالي دقيقة للحصول على نتائج أفضل.",
     statusDone: "اكتمل البحث.",
     statusWriteProduct: "يرجى إدخال اسم المنتج.",
     statusError: "خطأ",
@@ -295,6 +298,7 @@ function applyLanguage() {
   html.dir = currentLang === "ar" ? "rtl" : "ltr";
   const title = document.getElementById("title");
   const subtitle = document.getElementById("subtitle");
+  const featureNote = document.getElementById("featureNote");
   const input = document.getElementById("searchInput");
   const button = document.getElementById("searchBtn");
   const marketFilter = document.getElementById("marketFilter");
@@ -305,6 +309,7 @@ function applyLanguage() {
   
   if (title) title.textContent = t("title");
   if (subtitle) subtitle.textContent = t("subtitle");
+  if (featureNote) featureNote.textContent = t("featureNote");
   if (input) input.placeholder = t("placeholder");
   if (button) button.textContent = t("search");
   
