@@ -3,175 +3,558 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Login / Register</title>
+  <title>Login</title>
   <link rel="stylesheet" href="css.css" />
   <style>
-    body { max-width: 420px; margin: 60px auto; padding: 24px; }
-    h1 { text-align: center; margin-bottom: 24px; }
-    .tab-row { display: flex; margin-bottom: 20px; }
-    .tab-btn {
-      flex: 1; padding: 10px; border: 1px solid #cbd5e1;
-      background: #f1f5f9; cursor: pointer; font-size: 15px;
+    :root {
+      --page-bg: #edf2fb;
+      --panel-bg: #ffffff;
+      --panel-border: #d7deea;
+      --text-main: #202124;
+      --text-muted: #5f6368;
+      --accent: #1a73e8;
+      --button-bg: #ffffff;
+      --button-hover: #f7faff;
     }
-    .tab-btn.active { background: #2563eb; color: #fff; border-color: #2563eb; }
-    .form-group { display: grid; gap: 6px; margin-bottom: 14px; }
-    .form-group label { font-weight: 600; font-size: 14px; }
-    .form-group input {
-      border: 1px solid #cbd5e1; border-radius: 8px;
-      padding: 10px; font: inherit; width: 100%; box-sizing: border-box;
+
+    * {
+      box-sizing: border-box;
     }
-    .btn-primary {
-      width: 100%; padding: 12px; background: #2563eb; color: #fff;
-      border: none; border-radius: 8px; font-size: 16px; cursor: pointer;
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--page-bg);
+      color: var(--text-main);
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      flex-direction: column;
     }
-    .btn-primary:hover { background: #1d4ed8; }
-    #authError { color: #b91c1c; margin-top: 10px; min-height: 20px; text-align: center; }
-    #authSuccess { color: #065f46; margin-top: 10px; min-height: 20px; text-align: center; }
-    .back-link { display: block; text-align: center; margin-top: 18px; color: #2563eb; }
+
+    .page {
+      width: min(980px, calc(100vw - 24px));
+      margin: 28px auto 16px;
+    }
+
+    .lang-row {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 12px;
+    }
+
+    .lang-select {
+      min-width: 112px;
+      padding: 8px 10px;
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      background: #fff;
+      font: inherit;
+    }
+
+    .shell {
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 28px;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(30, 41, 59, 0.06);
+    }
+
+    .shell-top {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--panel-border);
+      font-size: 15px;
+    }
+
+    .google-mark {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: conic-gradient(#4285f4 0 25%, #34a853 25% 50%, #fbbc05 50% 75%, #ea4335 75% 100%);
+      position: relative;
+      flex: 0 0 auto;
+    }
+
+    .google-mark::after {
+      content: "";
+      position: absolute;
+      inset: 3px;
+      background: #fff;
+      border-radius: 50%;
+    }
+
+    .content {
+      display: grid;
+      grid-template-columns: 1.05fr 1fr;
+      gap: 32px;
+      padding: 34px 36px;
+    }
+
+    .hero {
+      padding-right: 8px;
+    }
+
+    .hero-logo {
+      width: 48px;
+      height: 48px;
+      border: 2px solid #111827;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      font-size: 22px;
+      margin-bottom: 26px;
+    }
+
+    .hero h1 {
+      font-size: 54px;
+      line-height: 1.02;
+      font-weight: 400;
+      margin: 0 0 18px;
+      letter-spacing: -0.02em;
+    }
+
+    .hero p {
+      margin: 0;
+      font-size: 28px;
+      line-height: 1.25;
+      color: var(--text-muted);
+    }
+
+    .hero p strong {
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    .auth-panel {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 360px;
+    }
+
+    .account-box {
+      border-bottom: 1px solid var(--panel-border);
+      padding-bottom: 18px;
+      margin-bottom: 20px;
+    }
+
+    .section-label {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    .google-button {
+      width: 100%;
+      border: 1px solid var(--panel-border);
+      background: var(--button-bg);
+      color: var(--text-main);
+      border-radius: 18px;
+      padding: 18px 18px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      cursor: pointer;
+      text-align: left;
+      transition: background 0.15s ease, border-color 0.15s ease;
+      font: inherit;
+    }
+
+    .google-button:hover {
+      background: var(--button-hover);
+      border-color: #c2cbe0;
+    }
+
+    .account-avatar {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: #d93025;
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      flex: 0 0 auto;
+      overflow: hidden;
+    }
+
+    .account-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .account-copy {
+      min-width: 0;
+      flex: 1 1 auto;
+    }
+
+    .account-title {
+      font-size: 22px;
+      line-height: 1.2;
+      margin-bottom: 4px;
+    }
+
+    .account-subtitle {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.35;
+    }
+
+    .status-box {
+      min-height: 24px;
+      margin: 8px 0 18px;
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    .status-box.error {
+      color: #b91c1c;
+    }
+
+    .status-box.success {
+      color: #166534;
+    }
+
+    .meta-copy {
+      color: var(--text-muted);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .meta-copy a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .footer {
+      width: min(980px, calc(100vw - 24px));
+      margin: 0 auto 18px;
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      color: var(--text-muted);
+      font-size: 14px;
+      padding: 0 6px;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 22px;
+      flex-wrap: wrap;
+    }
+
+    .footer a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    @media (max-width: 860px) {
+      .content {
+        grid-template-columns: 1fr;
+        gap: 24px;
+        padding: 26px 22px;
+      }
+
+      .hero h1 {
+        font-size: 40px;
+      }
+
+      .hero p {
+        font-size: 22px;
+      }
+    }
+
+    @media (max-width: 520px) {
+      .page {
+        width: min(100vw - 12px, 980px);
+        margin-top: 12px;
+      }
+
+      .shell {
+        border-radius: 20px;
+      }
+
+      .shell-top {
+        padding: 14px 16px;
+      }
+
+      .content {
+        padding: 18px 16px 22px;
+      }
+
+      .hero h1 {
+        font-size: 34px;
+      }
+
+      .hero p {
+        font-size: 20px;
+      }
+
+      .footer {
+        width: min(100vw - 12px, 980px);
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
   </style>
 </head>
 <body>
-  <h1>Market App</h1>
+  <main class="page">
+    <div class="lang-row">
+      <select id="langSelect" class="lang-select">
+        <option value="tr">Turkce</option>
+        <option value="en">English</option>
+        <option value="ar">العربية</option>
+      </select>
+    </div>
 
-  <div class="tab-row">
-    <button class="tab-btn active" id="loginTab" onclick="showTab('login')">Login</button>
-    <button class="tab-btn" id="registerTab" onclick="showTab('register')">Register</button>
-  </div>
+    <section class="shell">
+      <div class="shell-top">
+        <span class="google-mark" aria-hidden="true"></span>
+        <span id="topLabel">Google ile giris yap</span>
+      </div>
 
-  <div id="loginForm">
-    <div class="form-group">
-      <label>Email</label>
-      <input type="email" id="loginEmail" placeholder="your@gmail.com" />
-    </div>
-    <div class="form-group">
-      <label>Password</label>
-      <input type="password" id="loginPassword" placeholder="password" />
-    </div>
-    <button class="btn-primary" onclick="doLogin()">Login</button>
-  </div>
+      <div class="content">
+        <section class="hero">
+          <div class="hero-logo" aria-hidden="true">M</div>
+          <h1 id="title">Bir hesap secin</h1>
+          <p id="subtitle">Devam etmek icin <strong id="brandName">Market Scraper</strong></p>
+        </section>
 
-  <div id="registerForm" style="display:none">
-    <div class="form-group">
-      <label>Full Name</label>
-      <input type="text" id="regName" placeholder="Your name" />
-    </div>
-    <div class="form-group">
-      <label>Gmail</label>
-      <input type="email" id="regEmail" placeholder="your@gmail.com" />
-    </div>
-    <div class="form-group">
-      <label>Password</label>
-      <input type="password" id="regPassword" placeholder="min 6 characters" />
-    </div>
-    <button class="btn-primary" onclick="doRegister()">Create Account</button>
-  </div>
+        <section class="auth-panel">
+          <div>
+            <div class="account-box">
+              <div class="section-label" id="accountSectionLabel">Gercek Gmail hesabinizi kullanin</div>
+              <button id="googleSignInBtn" class="google-button" type="button">
+                <span class="account-avatar" id="accountAvatar">G</span>
+                <span class="account-copy">
+                  <div class="account-title" id="buttonTitle">Google ile devam et</div>
+                  <div class="account-subtitle" id="buttonSubtitle">Hesap secme ekrani acilacak ve sadece dogrulanmis Google hesabi kabul edilecek.</div>
+                </span>
+              </button>
+            </div>
 
-  <p id="authError"></p>
-  <p id="authSuccess"></p>
-  <a class="back-link" href="index.html">&larr; Back to Search</a>
+            <div id="authStatus" class="status-box"></div>
+          </div>
+
+          <div class="meta-copy">
+            <span id="policyText">Bu uygulamayi kullanmadan once</span>
+            <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" id="privacyLink">Gizlilik Politikasini</a>
+            <span id="andText">ve</span>
+            <a href="https://policies.google.com/terms" target="_blank" rel="noopener noreferrer" id="termsLink">Hizmet Sartlarini</a>
+            <span id="reviewText">inceleyebilirsiniz.</span>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <a href="index.html" id="backLink">&larr; Aramaya don</a>
+    <div class="footer-links">
+      <a href="https://support.google.com/accounts" target="_blank" rel="noopener noreferrer" id="helpLink">Yardim</a>
+      <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" id="footerPrivacyLink">Gizlilik</a>
+      <a href="https://policies.google.com/terms" target="_blank" rel="noopener noreferrer" id="footerTermsLink">Sartlar</a>
+    </div>
+  </footer>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import {
       getAuth,
-      createUserWithEmailAndPassword,
-      signInWithEmailAndPassword,
-      updateProfile,
-      sendEmailVerification,
-      signOut
+      GoogleAuthProvider,
+      signInWithPopup,
+      setPersistence,
+      browserLocalPersistence
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
     import {
-      getFirestore, doc, setDoc
+      getFirestore,
+      doc,
+      getDoc,
+      setDoc
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
     import firebaseConfig from "./firebase-config.js";
+
+    const I18N = {
+      tr: {
+        topLabel: "Google ile giris yap",
+        title: "Bir hesap secin",
+        subtitlePrefix: "Devam etmek icin ",
+        brandName: "Market Scraper",
+        accountSectionLabel: "Gercek Gmail hesabinizi kullanin",
+        buttonTitle: "Google ile devam et",
+        buttonSubtitle: "Hesap secme ekrani acilacak ve sadece dogrulanmis Google hesabi kabul edilecek.",
+        policyText: "Bu uygulamayi kullanmadan once",
+        privacyLink: "Gizlilik Politikasini",
+        andText: "ve",
+        termsLink: "Hizmet Sartlarini",
+        reviewText: "inceleyebilirsiniz.",
+        backLink: "Aramaya don",
+        helpLink: "Yardim",
+        footerPrivacyLink: "Gizlilik",
+        footerTermsLink: "Sartlar",
+        statusStarting: "Google girisi aciliyor...",
+        statusSuccess: "Giris basarili. Yonlendiriliyor...",
+        errorPopupClosed: "Google girisi iptal edildi.",
+        errorGeneric: "Google ile giris basarisiz oldu.",
+        errorUnauthorizedDomain: "Bu alan adi Firebase Authentication icin yetkili degil.",
+        errorGoogleOnly: "Lutfen Gmail ile bagli bir Google hesabi kullanin."
+      },
+      en: {
+        topLabel: "Sign in with Google",
+        title: "Choose an account",
+        subtitlePrefix: "to continue to ",
+        brandName: "Market Scraper",
+        accountSectionLabel: "Use your real Gmail account",
+        buttonTitle: "Continue with Google",
+        buttonSubtitle: "The Google account chooser will open and only a verified Google account will be accepted.",
+        policyText: "Before using this app, you can review the",
+        privacyLink: "Privacy Policy",
+        andText: "and",
+        termsLink: "Terms of Service",
+        reviewText: ".",
+        backLink: "Back to Search",
+        helpLink: "Help",
+        footerPrivacyLink: "Privacy",
+        footerTermsLink: "Terms",
+        statusStarting: "Opening Google sign-in...",
+        statusSuccess: "Login successful. Redirecting...",
+        errorPopupClosed: "Google sign-in was cancelled.",
+        errorGeneric: "Google sign-in failed.",
+        errorUnauthorizedDomain: "This domain is not authorized for Firebase Authentication.",
+        errorGoogleOnly: "Please use a real Google account with Gmail."
+      },
+      ar: {
+        topLabel: "تسجيل الدخول باستخدام Google",
+        title: "اختر حسابا",
+        subtitlePrefix: "للمتابعة الى ",
+        brandName: "Market Scraper",
+        accountSectionLabel: "استخدم حساب Gmail الحقيقي الخاص بك",
+        buttonTitle: "المتابعة باستخدام Google",
+        buttonSubtitle: "ستفتح نافذة اختيار حساب Google وسيتم قبول حساب Google الحقيقي فقط.",
+        policyText: "قبل استخدام هذا التطبيق، يمكنك مراجعة",
+        privacyLink: "سياسة الخصوصية",
+        andText: "و",
+        termsLink: "شروط الخدمة",
+        reviewText: ".",
+        backLink: "العودة الى البحث",
+        helpLink: "مساعدة",
+        footerPrivacyLink: "الخصوصية",
+        footerTermsLink: "الشروط",
+        statusStarting: "جار فتح تسجيل الدخول عبر Google...",
+        statusSuccess: "تم تسجيل الدخول بنجاح. جار التحويل...",
+        errorPopupClosed: "تم الغاء تسجيل الدخول عبر Google.",
+        errorGeneric: "فشل تسجيل الدخول عبر Google.",
+        errorUnauthorizedDomain: "اسم النطاق هذا غير مصرح به في Firebase Authentication.",
+        errorGoogleOnly: "يرجى استخدام حساب Google حقيقي مرتبط بـ Gmail."
+      }
+    };
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
 
-    function isGmailAddress(email) {
-      return /^[^\s@]+@gmail\.com$/i.test(String(email || "").trim());
+    let currentLang = localStorage.getItem("app_lang") || "tr";
+
+    function t(key) {
+      return (I18N[currentLang] && I18N[currentLang][key]) || I18N.tr[key] || key;
     }
 
-    function friendlyAuthMessage(error) {
+    function setStatus(messageKey, isError = false) {
+      const box = document.getElementById("authStatus");
+      box.textContent = t(messageKey);
+      box.className = "status-box" + (isError ? " error" : " success");
+    }
+
+    function setRawStatus(message, isError = false) {
+      const box = document.getElementById("authStatus");
+      box.textContent = message;
+      box.className = "status-box" + (isError ? " error" : " success");
+    }
+
+    function applyLanguage() {
+      document.documentElement.lang = currentLang;
+      document.documentElement.dir = currentLang === "ar" ? "rtl" : "ltr";
+      document.getElementById("langSelect").value = currentLang;
+      document.getElementById("topLabel").textContent = t("topLabel");
+      document.getElementById("title").textContent = t("title");
+      document.getElementById("brandName").textContent = t("brandName");
+      document.getElementById("accountSectionLabel").textContent = t("accountSectionLabel");
+      document.getElementById("buttonTitle").textContent = t("buttonTitle");
+      document.getElementById("buttonSubtitle").textContent = t("buttonSubtitle");
+      document.getElementById("policyText").textContent = t("policyText") + " ";
+      document.getElementById("privacyLink").textContent = t("privacyLink");
+      document.getElementById("andText").textContent = " " + t("andText") + " ";
+      document.getElementById("termsLink").textContent = t("termsLink");
+      document.getElementById("reviewText").textContent = " " + t("reviewText");
+      document.getElementById("backLink").innerHTML = "&larr; " + t("backLink");
+      document.getElementById("helpLink").textContent = t("helpLink");
+      document.getElementById("footerPrivacyLink").textContent = t("footerPrivacyLink");
+      document.getElementById("footerTermsLink").textContent = t("footerTermsLink");
+      document.getElementById("subtitle").innerHTML = `${t("subtitlePrefix")}<strong id="brandName">${t("brandName")}</strong>`;
+    }
+
+    function getFriendlyError(error) {
       const code = String(error?.code || "");
-      if (code === "auth/email-already-in-use") return "This Gmail already has an account. Please login.";
-      if (code === "auth/invalid-credential") return "Wrong Gmail or password.";
-      if (code === "auth/invalid-email") return "Please enter a valid Gmail address.";
-      if (code === "auth/too-many-requests") return "Too many attempts. Please try again later.";
-      return error?.message || "Authentication failed.";
+      if (code === "auth/popup-closed-by-user") return t("errorPopupClosed");
+      if (code === "auth/unauthorized-domain") return t("errorUnauthorizedDomain");
+      return t("errorGeneric");
     }
 
-    function showError(msg) {
-      document.getElementById("authError").textContent = msg;
-      document.getElementById("authSuccess").textContent = "";
+    async function syncUserRecord(user) {
+      const userRef = doc(db, "users", user.uid);
+      const existing = await getDoc(userRef);
+      const existingRole = existing.exists() ? existing.data().role : "user";
+      await setDoc(userRef, {
+        name: user.displayName || user.email || "User",
+        email: user.email || "",
+        photoURL: user.photoURL || "",
+        role: existingRole || "user",
+        lastLoginAt: new Date().toISOString(),
+        createdAt: existing.exists()
+          ? existing.data().createdAt || new Date().toISOString()
+          : new Date().toISOString()
+      }, { merge: true });
     }
 
-    function showSuccess(msg) {
-      document.getElementById("authSuccess").textContent = msg;
-      document.getElementById("authError").textContent = "";
-    }
-
-    window.showTab = function(tab) {
-      document.getElementById("loginForm").style.display = tab === "login" ? "" : "none";
-      document.getElementById("registerForm").style.display = tab === "register" ? "" : "none";
-      document.getElementById("loginTab").className = "tab-btn" + (tab === "login" ? " active" : "");
-      document.getElementById("registerTab").className = "tab-btn" + (tab === "register" ? " active" : "");
-    };
-
-    window.doLogin = async function() {
-      const email = document.getElementById("loginEmail").value.trim();
-      const password = document.getElementById("loginPassword").value;
-      if (!email || !password) return showError("Please fill in all fields.");
-      if (!isGmailAddress(email)) return showError("Please use a real Gmail address.");
-
+    async function continueWithGoogle() {
+      setStatus("statusStarting");
       try {
-        const cred = await signInWithEmailAndPassword(auth, email, password);
-        if (!cred.user.emailVerified) {
-          await signOut(auth);
-          return showError("Please verify your Gmail from the email message before login.");
+        await setPersistence(auth, browserLocalPersistence);
+        const result = await signInWithPopup(auth, provider);
+        const user = result.user;
+        if (!user.email || !/@gmail\.com$/i.test(user.email)) {
+          return setRawStatus(t("errorGoogleOnly"), true);
         }
 
-        localStorage.setItem("user_name", cred.user.displayName || email);
-        localStorage.setItem("user_uid", cred.user.uid);
-        localStorage.setItem("user_email", cred.user.email);
-        showSuccess("Login successful! Redirecting...");
-        setTimeout(() => { window.location.href = "index.html"; }, 1000);
-      } catch (e) {
-        showError(friendlyAuthMessage(e));
+        await syncUserRecord(user);
+        localStorage.setItem("user_name", user.displayName || user.email);
+        localStorage.setItem("user_uid", user.uid);
+        localStorage.setItem("user_email", user.email || "");
+        if (user.photoURL) localStorage.setItem("user_photo", user.photoURL);
+        setStatus("statusSuccess");
+        setTimeout(() => {
+          window.location.href = "index.html";
+        }, 900);
+      } catch (error) {
+        setRawStatus(getFriendlyError(error), true);
       }
-    };
+    }
 
-    window.doRegister = async function() {
-      const name = document.getElementById("regName").value.trim();
-      const email = document.getElementById("regEmail").value.trim();
-      const password = document.getElementById("regPassword").value;
+    document.getElementById("langSelect").addEventListener("change", (event) => {
+      currentLang = String(event.target.value || "tr");
+      localStorage.setItem("app_lang", currentLang);
+      applyLanguage();
+    });
 
-      if (!name) return showError("Please enter your name.");
-      if (!email) return showError("Please enter your Gmail.");
-      if (!isGmailAddress(email)) return showError("Please use a real Gmail address.");
-      if (password.length < 6) return showError("Password must be at least 6 characters.");
+    document.getElementById("googleSignInBtn").addEventListener("click", continueWithGoogle);
 
-      try {
-        const cred = await createUserWithEmailAndPassword(auth, email, password);
-        await updateProfile(cred.user, { displayName: name });
-        await setDoc(doc(db, "users", cred.user.uid), {
-          name,
-          email,
-          role: "user",
-          createdAt: new Date().toISOString()
-        });
-        await sendEmailVerification(cred.user);
-        await signOut(auth);
-        localStorage.removeItem("user_name");
-        localStorage.removeItem("user_uid");
-        localStorage.removeItem("user_email");
-        showSuccess("Account created. Check your Gmail and verify your email before login.");
-        showTab("login");
-      } catch (e) {
-        showError(friendlyAuthMessage(e));
-      }
-    };
+    applyLanguage();
   </script>
 </body>
 </html>
