@@ -5,6 +5,9 @@ const SEARCH_TIMEOUT_S = Number(
       : 30),
 );
 const SEARCH_TIMEOUT_MS = Math.round(SEARCH_TIMEOUT_S * 1000);
+const SOK_BROWSER_TIMEOUT_MS = Math.min(18000, Math.max(12000, SEARCH_TIMEOUT_MS - 10000));
+const fs = require('fs');
+const path = require('path');
 
 const JINA_TIMEOUT_S = Number(
   process.env.JINA_TIMEOUT_S ??
@@ -28,6 +31,7 @@ try {
 // Dependencies for direct web scraping (Sok)
 const axios = require('axios');
 const cheerio = require('cheerio');
+const puppeteer = require('puppeteer');
 
 const TAHTAKALE_CATEGORY_URLS = [
   "https://www.tahtakalespot.com/uzun-omurlu-sutler-1175",
@@ -291,6 +295,176 @@ function dedupeBasicItems(items) {
   return [...map.values()];
 }
 
+function extractSokProductsFromHtml(html, searchUrl) {
+  const $ = cheerio.load(html || "");
+  const products = [];
+  const productCandidates = [];
+
+  $('div, li, article, section').each((index, element) => {
+    const $el = $(element);
+    const text = $el.text().trim();
+    if (text.length < 10 || text.length > 400) return;
+    if (!/(\d+[.,]\d{2})/.test(text)) return;
+    if ($el.find('img').length === 0) return;
+    productCandidates.push($el);
+  });
+
+  logScrape("Sok", `Found ${productCandidates.length} product candidates`);
+
+  productCandidates.forEach(($element) => {
+    const fullText = $element.text().trim();
+    let price = null;
+    const priceMatches = fullText.match(/(\d+[.,]\d{2})/g);
+    if (priceMatches && priceMatches.length > 0) {
+      for (const priceStr of priceMatches) {
+        const priceValue = parseFloat(priceStr.replace(',', '.'));
+        if (!isNaN(priceValue) && priceValue > 0 && priceValue < 10000) {
+          price = priceValue;
+          break;
+        }
+      }
+    }
+
+    let name = fullText
+      .replace(/(\d+[.,]\d{2})/g, '')
+      .replace(/,(?:\s*)?/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    name = name.replace(/\s+(tl|â‚º|tl\.)$/i, '').trim();
+
+    let image = null;
+    const imgElement = $element.find('img').first();
+    if (imgElement.length) {
+      image =
+        imgElement.attr('src') ||
+        imgElement.attr('data-src') ||
+        imgElement.attr('data-lazy') ||
+        imgElement.attr('data-original');
+      if (image && !image.startsWith('http')) {
+        try {
+          image = new URL(image, searchUrl).toString();
+        } catch (error) {
+          // Keep as-is if URL normalization fails.
+        }
+      }
+    }
+
+    let url = null;
+    const linkElement = $element.find('a').first();
+    if (linkElement.length && linkElement.attr('href')) {
+      const href = linkElement.attr('href');
+      if (href.startsWith('http')) {
+        url = href;
+      } else if (href.startsWith('/')) {
+        url = `https://www.sokmarket.com.tr${href}`;
+      }
+    }
+
+    if (name && name.length > 2 && price) {
+      products.push({
+        name,
+        price,
+        image: image || null,
+        market: 'sok',
+        unitPrice: null,
+        brand: null,
+        url: url || searchUrl,
+      });
+    }
+  });
+
+  return dedupeBasicItems(products);
+}
+
+async function loadSokSearchHtml(searchUrl) {
+  const launchOptions = {
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+  };
+  const executablePath = resolveInstalledChromePath();
+  if (executablePath) {
+    launchOptions.executablePath = executablePath;
+  }
+  const browser = await puppeteer.launch(launchOptions);
+
+  try {
+    const page = await browser.newPage();
+    await page.setViewport({ width: 1365, height: 2200 });
+    await page.setUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    );
+    await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: SOK_BROWSER_TIMEOUT_MS });
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    let stablePasses = 0;
+    let previousHeight = 0;
+    let previousProductCount = 0;
+
+    for (let i = 0; i < 6; i++) {
+      const snapshot = await page.evaluate(() => {
+        const nodes = Array.from(document.querySelectorAll('div, li, article, section'));
+        const productLikeCount = nodes.filter((node) => {
+          const text = (node.textContent || '').trim();
+          return text.length >= 10 && text.length <= 400 && /\d+[.,]\d{2}/.test(text) && node.querySelector('img');
+        }).length;
+        return {
+          productLikeCount,
+          height: Math.max(document.body.scrollHeight, document.documentElement.scrollHeight),
+        };
+      });
+
+      await page.evaluate(() => {
+        window.scrollTo(0, document.body.scrollHeight);
+      });
+      await new Promise((resolve) => setTimeout(resolve, 800));
+
+      const heightUnchanged = snapshot.height <= previousHeight;
+      const countUnchanged = snapshot.productLikeCount <= previousProductCount;
+      stablePasses = heightUnchanged && countUnchanged ? stablePasses + 1 : 0;
+
+      previousHeight = snapshot.height;
+      previousProductCount = snapshot.productLikeCount;
+      logScrape("Sok", `Scroll pass ${i + 1}: ${snapshot.productLikeCount} candidates, height ${snapshot.height}`);
+
+      if (stablePasses >= 2) break;
+    }
+
+    return await page.content();
+  } finally {
+    await browser.close();
+  }
+}
+
+function resolveInstalledChromePath() {
+  const candidates = [
+    path.join(__dirname, '.cache', 'puppeteer', 'chrome'),
+    path.join(process.cwd(), '.cache', 'puppeteer', 'chrome'),
+  ];
+
+  for (const baseDir of candidates) {
+    try {
+      const versions = fs
+        .readdirSync(baseDir, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => entry.name)
+        .sort()
+        .reverse();
+
+      for (const version of versions) {
+        const chromePath = path.join(baseDir, version, 'chrome-win64', 'chrome.exe');
+        if (fs.existsSync(chromePath)) {
+          logScrape("Sok", `Using installed Chrome at ${chromePath}`);
+          return chromePath;
+        }
+      }
+    } catch (error) {
+      // Ignore missing cache directories.
+    }
+  }
+
+  return null;
+}
+
 const readerCache = new Map();
 
 async function fetchViaJinaReader(url, timeoutMs = JINA_TIMEOUT_MS) {
@@ -440,7 +614,7 @@ async function scrapeSok(query) {
     
     logScrape("Sok", `Found ${productCandidates.length} product candidates`);
     
-    productCandidates.slice(0, 50).forEach(($element) => {
+    productCandidates.forEach(($element) => {
       const fullText = $element.text().trim();
       
       // Extract first price found (should be the actual price)
@@ -513,6 +687,23 @@ async function scrapeSok(query) {
     logScrape("Sok", `Error: ${error.message}`);
     return [];
   }
+}
+
+async function scrapeSokV2(query) {
+  logScrape("Sok", `Starting search for "${query}"`);
+  const searchUrl = `https://www.sokmarket.com.tr/arama?q=${encodeURIComponent(query)}`;
+
+  try {
+    const browserHtml = await loadSokSearchHtml(searchUrl);
+    const browserProducts = extractSokProductsFromHtml(browserHtml, searchUrl);
+    logScrape("Sok", `Extracted ${browserProducts.length} products after scrolling`);
+    if (browserProducts.length) return browserProducts;
+    logScrape("Sok", "Browser scrape returned no products, falling back to legacy scraper");
+  } catch (error) {
+    logScrape("Sok", `Browser scrape failed: ${error.message}`);
+  }
+
+  return await scrapeSok(query);
 }
 
 async function scrapeTahtakale(query) {
