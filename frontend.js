@@ -577,19 +577,30 @@ function renderResults(data) {
       html += `<div class="result-grid">${items.map(renderItemCard).join("")}</div></section>`;
     }
   } else {
-    // Show all markets
-    const marketKeys = Object.keys(groupedItems).sort((a, b) =>
+    // Show all known markets, even when a source returns no items.
+    const marketKeys = [...new Set([
+      ...MARKETS.map((market) => market.key),
+      ...Object.keys(groupedItems),
+    ])].sort((a, b) =>
       marketLabelForKey(a).localeCompare(marketLabelForKey(b)),
     );
     for (const marketKey of marketKeys) {
       let items = groupedItems[marketKey] || [];
-      
+
       // Apply filters to items
       items = applyFilters(items, filters);
-      if (!items.length) continue;
-      
+
       html += `<section class="panel"><h3>${escapeHtml(marketLabelForKey(marketKey))} <span class="market-count">${items.length}</span></h3>`;
-      html += `<div class="result-grid">${items.map(renderItemCard).join("")}</div></section>`;
+      if (!items.length) {
+        const errorText = escapeHtml(errors[marketKey] || "");
+        if (errorText) {
+          html += `<p>${t("noResults")} (${errorText})</p></section>`;
+        } else {
+          html += `<p>${t("noResults")}</p></section>`;
+        }
+      } else {
+        html += `<div class="result-grid">${items.map(renderItemCard).join("")}</div></section>`;
+      }
     }
   }
   if (!html) {

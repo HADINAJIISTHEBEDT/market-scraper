@@ -481,7 +481,8 @@
         footerTermsLink: "الشروط",
         statusStarting: "جار فتح تسجيل الدخول عبر Google...",
         statusChecking: "جار فحص الحساب...",
-        statusSuccess: "تم تسجيل الدخول بنجاح. جار التحويل...",
+        statusSuccess: "تم تسجيل الدخول بنجاح. اضغط الزر أدناه للعودة إلى الصفحة الرئيسية.",
+        goHomeBtn: "الذهاب إلى الصفحة الرئيسية",
         errorGeneric: "فشل تسجيل الدخول عبر Google.",
         errorUnauthorizedDomain: "اسم النطاق هذا غير مصرح به في Firebase Authentication.",
         errorGoogleOnly: "يرجى استخدام حساب Google حقيقي مرتبط بـ Gmail.",
@@ -637,7 +638,15 @@
       onAuthStateChanged(auth, async (user) => {
         if (!user) return;
         const handledUid = sessionStorage.getItem("login_auth_handled");
-        if (handledUid === user.uid) return;
+        if (handledUid === user.uid) {
+          storeUserLocally(user, {
+            name: localStorage.getItem("user_name") || user.displayName || user.email || "User",
+            phone: localStorage.getItem("user_phone") || "",
+            address: localStorage.getItem("user_address") || ""
+          });
+          setStatus("statusSuccess");
+          return;
+        }
         sessionStorage.setItem("login_auth_handled", user.uid);
         await routeSignedInUser(user);
       });
