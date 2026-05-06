@@ -140,9 +140,8 @@ const I18N = {
     filterMinPrice: "Min fiyat",
     filterMaxPrice: "Max fiyat",
     filterItemLimit: "Urun adedi",
-    filterBrand: "Marka yazin...",
     cheapestMarket: "En ucuz market",
-    cheapestItemInMarket: "En ucuz urun",
+    cheapestMarketNote: "Ihtiyaciniz olan urunu yazarak en ucuz marketi bulun.",
     markets: {
       bim: "BIM",
       a101: "A101",
@@ -176,9 +175,8 @@ const I18N = {
     filterMinPrice: "Min price",
     filterMaxPrice: "Max price",
     filterItemLimit: "Item limit",
-    filterBrand: "Type brand...",
     cheapestMarket: "Cheapest market",
-    cheapestItemInMarket: "Cheapest item",
+    cheapestMarketNote: "Write the specific item you need to find the cheapest market.",
     markets: {
       bim: "BIM",
       a101: "A101",
@@ -296,7 +294,6 @@ function applyLanguage() {
   const button = document.getElementById("searchBtn");
   const marketFilter = document.getElementById("marketFilter");
   const sortFilter = document.getElementById("sortFilter");
-  const brandFilter = document.getElementById("brandFilter");
   const minPrice = document.getElementById("minPrice");
   const maxPrice = document.getElementById("maxPrice");
   const itemLimit = document.getElementById("itemLimit");
@@ -321,7 +318,6 @@ function applyLanguage() {
     if (sortFilter.options[1]) sortFilter.options[1].textContent = t("filterSortAsc");
     if (sortFilter.options[2]) sortFilter.options[2].textContent = t("filterSortDesc");
   }
-  if (brandFilter) brandFilter.placeholder = t("filterBrand");
   if (minPrice) minPrice.placeholder = t("filterMinPrice");
   if (maxPrice) maxPrice.placeholder = t("filterMaxPrice");
   if (itemLimit) itemLimit.placeholder = t("filterItemLimit");
@@ -352,8 +348,7 @@ function getFilters() {
     sort: document.getElementById("sortFilter")?.value || "",
     minPrice: minPriceValue === "" ? null : Number(minPriceValue),
     maxPrice: maxPriceValue === "" ? null : Number(maxPriceValue),
-    itemLimit: itemLimitValue === "" ? null : Number.parseInt(itemLimitValue, 10),
-    brand: document.getElementById("brandFilter")?.value || ""
+    itemLimit: itemLimitValue === "" ? null : Number.parseInt(itemLimitValue, 10)
   };
 }
 
@@ -384,14 +379,6 @@ function applyFilters(items, filters) {
     filtered = filtered.sort((a, b) => (b.price || 0) - (a.price || 0));
   }
   
-  // Filter by brand
-  if (filters.brand) {
-    const brandFilter = normalizeFilterText(filters.brand);
-    filtered = filtered.filter(item => 
-      normalizeFilterText(`${item.brand || ""} ${item.name || ""}`).includes(brandFilter)
-    );
-  }
-
   // Limit number of items
   if (Number.isInteger(filters.itemLimit) && filters.itemLimit > 0) {
     filtered = filtered.slice(0, filters.itemLimit);
@@ -468,15 +455,16 @@ function getCheapestMarketSummary(groupedItems, filters) {
     );
     if (!visibleItems.length) continue;
 
-    const cheapestItem = visibleItems.reduce((best, item) =>
-      Number(item.price) < Number(best.price) ? item : best,
+    const marketMinPrice = visibleItems.reduce(
+      (best, item) => (Number(item.price) < best ? Number(item.price) : best),
+      Number.POSITIVE_INFINITY,
     );
 
     if (
       !cheapestSummary ||
-      Number(cheapestItem.price) < Number(cheapestSummary.item.price)
+      marketMinPrice < Number(cheapestSummary.price)
     ) {
-      cheapestSummary = { marketKey, item: cheapestItem };
+      cheapestSummary = { marketKey, price: marketMinPrice };
     }
   }
 
@@ -507,7 +495,7 @@ function renderResults(data) {
   let html = "";
   const cheapestSummary = getCheapestMarketSummary(groupedItems, filters);
   if (cheapestSummary) {
-    html += `<section class="panel"><h3>${escapeHtml(t("cheapestMarket"))}: ${escapeHtml(marketLabelForKey(cheapestSummary.marketKey))}</h3><p>${escapeHtml(t("cheapestItemInMarket"))}: ${escapeHtml(cheapestSummary.item.name)} - ${escapeHtml(formatPrice(Number(cheapestSummary.item.price)))}</p></section>`;
+    html += `<section class="panel"><h3>${escapeHtml(t("cheapestMarket"))}: ${escapeHtml(marketLabelForKey(cheapestSummary.marketKey))}</h3><p>${escapeHtml(t("cheapestMarketNote"))}</p></section>`;
   }
   
   // If a specific market is filtered, only show that market
@@ -599,7 +587,7 @@ window.addEventListener("DOMContentLoaded", () => {
       if (event.key === "Enter") runSearch();
     });
   }
-  for (const filterId of ["marketFilter", "sortFilter", "minPrice", "maxPrice", "itemLimit", "brandFilter"]) {
+  for (const filterId of ["marketFilter", "sortFilter", "minPrice", "maxPrice", "itemLimit"]) {
     const filter = document.getElementById(filterId);
     if (!filter) continue;
     filter.addEventListener("input", () => {
