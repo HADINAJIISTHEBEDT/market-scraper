@@ -31,35 +31,33 @@
   </style>
 </head>
 <body>
-  <h1>🛒 Market App</h1>
+  <h1>Market App</h1>
 
   <div class="tab-row">
     <button class="tab-btn active" id="loginTab" onclick="showTab('login')">Login</button>
     <button class="tab-btn" id="registerTab" onclick="showTab('register')">Register</button>
   </div>
 
-  <!-- LOGIN FORM -->
   <div id="loginForm">
     <div class="form-group">
       <label>Email</label>
-      <input type="email" id="loginEmail" placeholder="your@email.com" />
+      <input type="email" id="loginEmail" placeholder="your@gmail.com" />
     </div>
     <div class="form-group">
       <label>Password</label>
-      <input type="password" id="loginPassword" placeholder="••••••••" />
+      <input type="password" id="loginPassword" placeholder="password" />
     </div>
     <button class="btn-primary" onclick="doLogin()">Login</button>
   </div>
 
-  <!-- REGISTER FORM -->
   <div id="registerForm" style="display:none">
     <div class="form-group">
       <label>Full Name</label>
       <input type="text" id="regName" placeholder="Your name" />
     </div>
     <div class="form-group">
-      <label>Email</label>
-      <input type="email" id="regEmail" placeholder="your@email.com" />
+      <label>Gmail</label>
+      <input type="email" id="regEmail" placeholder="your@gmail.com" />
     </div>
     <div class="form-group">
       <label>Password</label>
@@ -70,7 +68,7 @@
 
   <p id="authError"></p>
   <p id="authSuccess"></p>
-  <a class="back-link" href="index.html">← Back to Search</a>
+  <a class="back-link" href="index.html">&larr; Back to Search</a>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -78,7 +76,9 @@
       getAuth,
       createUserWithEmailAndPassword,
       signInWithEmailAndPassword,
-      updateProfile
+      updateProfile,
+      sendEmailVerification,
+      signOut
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
     import {
       getFirestore, doc, setDoc
@@ -89,10 +89,24 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
+    function isGmailAddress(email) {
+      return /^[^\s@]+@gmail\.com$/i.test(String(email || "").trim());
+    }
+
+    function friendlyAuthMessage(error) {
+      const code = String(error?.code || "");
+      if (code === "auth/email-already-in-use") return "This Gmail already has an account. Please login.";
+      if (code === "auth/invalid-credential") return "Wrong Gmail or password.";
+      if (code === "auth/invalid-email") return "Please enter a valid Gmail address.";
+      if (code === "auth/too-many-requests") return "Too many attempts. Please try again later.";
+      return error?.message || "Authentication failed.";
+    }
+
     function showError(msg) {
       document.getElementById("authError").textContent = msg;
       document.getElementById("authSuccess").textContent = "";
     }
+
     function showSuccess(msg) {
       document.getElementById("authSuccess").textContent = msg;
       document.getElementById("authError").textContent = "";
@@ -109,15 +123,22 @@
       const email = document.getElementById("loginEmail").value.trim();
       const password = document.getElementById("loginPassword").value;
       if (!email || !password) return showError("Please fill in all fields.");
+      if (!isGmailAddress(email)) return showError("Please use a real Gmail address.");
+
       try {
         const cred = await signInWithEmailAndPassword(auth, email, password);
+        if (!cred.user.emailVerified) {
+          await signOut(auth);
+          return showError("Please verify your Gmail from the email message before login.");
+        }
+
         localStorage.setItem("user_name", cred.user.displayName || email);
         localStorage.setItem("user_uid", cred.user.uid);
         localStorage.setItem("user_email", cred.user.email);
-        showSuccess("✅ Login successful! Redirecting...");
+        showSuccess("Login successful! Redirecting...");
         setTimeout(() => { window.location.href = "index.html"; }, 1000);
       } catch (e) {
-        showError("❌ " + e.message);
+        showError(friendlyAuthMessage(e));
       }
     };
 
@@ -125,9 +146,12 @@
       const name = document.getElementById("regName").value.trim();
       const email = document.getElementById("regEmail").value.trim();
       const password = document.getElementById("regPassword").value;
+
       if (!name) return showError("Please enter your name.");
-      if (!email) return showError("Please enter your email.");
+      if (!email) return showError("Please enter your Gmail.");
+      if (!isGmailAddress(email)) return showError("Please use a real Gmail address.");
       if (password.length < 6) return showError("Password must be at least 6 characters.");
+
       try {
         const cred = await createUserWithEmailAndPassword(auth, email, password);
         await updateProfile(cred.user, { displayName: name });
@@ -137,13 +161,15 @@
           role: "user",
           createdAt: new Date().toISOString()
         });
-        localStorage.setItem("user_name", name);
-        localStorage.setItem("user_uid", cred.user.uid);
-        localStorage.setItem("user_email", email);
-        showSuccess("✅ Account created! Redirecting...");
-        setTimeout(() => { window.location.href = "index.html"; }, 1000);
+        await sendEmailVerification(cred.user);
+        await signOut(auth);
+        localStorage.removeItem("user_name");
+        localStorage.removeItem("user_uid");
+        localStorage.removeItem("user_email");
+        showSuccess("Account created. Check your Gmail and verify your email before login.");
+        showTab("login");
       } catch (e) {
-        showError("❌ " + e.message);
+        showError(friendlyAuthMessage(e));
       }
     };
   </script>
