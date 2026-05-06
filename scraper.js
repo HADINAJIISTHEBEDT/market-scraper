@@ -182,7 +182,7 @@ function buildSearchQueries(query) {
     ...broadTerms,
     rawTokens.length > 2 ? rawTokens.slice(0, 2).join(" ") : "",
     rawTokens.length > 2 ? rawTokens.slice(1).join(" ") : "",
-  ]).slice(0, 5);
+  ]).slice(0, 3);
 }
 
 function levenshteinDistance(a, b) {
