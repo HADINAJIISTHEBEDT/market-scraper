@@ -360,11 +360,10 @@
     import {
       browserLocalPersistence,
       getAuth,
-      getRedirectResult,
       GoogleAuthProvider,
       onAuthStateChanged,
+      signInWithPopup,
       setPersistence,
-      signInWithRedirect,
       signOut
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
     import {
@@ -393,7 +392,7 @@
         helpLink: "Yardim",
         footerPrivacyLink: "Gizlilik",
         footerTermsLink: "Sartlar",
-        statusStarting: "Google hesap secimi aciliyor...",
+        statusStarting: "Google girisi aciliyor...",
         statusChecking: "Hesap kontrol ediliyor...",
         statusSuccess: "Giris basarili. Yonlendiriliyor...",
         errorGeneric: "Google ile giris basarisiz oldu.",
@@ -423,7 +422,7 @@
         helpLink: "Help",
         footerPrivacyLink: "Privacy",
         footerTermsLink: "Terms",
-        statusStarting: "Opening Google account chooser...",
+        statusStarting: "Opening Google sign-in...",
         statusChecking: "Checking account...",
         statusSuccess: "Login successful. Redirecting...",
         errorGeneric: "Google sign-in failed.",
@@ -453,7 +452,7 @@
         helpLink: "مساعدة",
         footerPrivacyLink: "الخصوصية",
         footerTermsLink: "الشروط",
-        statusStarting: "جار فتح اختيار حساب Google...",
+        statusStarting: "جار فتح تسجيل الدخول عبر Google...",
         statusChecking: "جار فحص الحساب...",
         statusSuccess: "تم تسجيل الدخول بنجاح. جار التحويل...",
         errorGeneric: "فشل تسجيل الدخول عبر Google.",
@@ -592,27 +591,18 @@
       setStatus("statusStarting");
       try {
         await setPersistence(auth, browserLocalPersistence);
-        await signInWithRedirect(auth, provider);
+        const result = await signInWithPopup(auth, provider);
+        if (result?.user) {
+          await routeSignedInUser(result.user);
+        }
       } catch (error) {
         console.error("Google sign-in failed", error);
         setRawStatus(getFriendlyError(error), true);
       }
     }
 
-    async function handleAuthReturn() {
-      try {
-        await setPersistence(auth, browserLocalPersistence);
-        const result = await getRedirectResult(auth);
-        if (result?.user) {
-          await routeSignedInUser(result.user);
-          return;
-        }
-      } catch (error) {
-        console.error("Redirect sign-in failed", error);
-        setRawStatus(getFriendlyError(error), true);
-        return;
-      }
-
+    async function handleExistingSession() {
+      await setPersistence(auth, browserLocalPersistence);
       onAuthStateChanged(auth, async (user) => {
         if (!user) return;
         const handledUid = sessionStorage.getItem("login_auth_handled");
@@ -631,7 +621,7 @@
     document.getElementById("googleSignInBtn").addEventListener("click", continueWithGoogle);
 
     applyLanguage();
-    handleAuthReturn();
+    handleExistingSession();
   </script>
 </body>
 </html>
