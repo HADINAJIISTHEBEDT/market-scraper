@@ -2,10 +2,10 @@ const SEARCH_TIMEOUT_S = Number(
   process.env.SEARCH_TIMEOUT_S ??
     (process.env.SEARCH_TIMEOUT_MS
       ? Number(process.env.SEARCH_TIMEOUT_MS) / 1000
-      : 10),
+      : 30),
 );
 const SEARCH_TIMEOUT_MS = Math.round(SEARCH_TIMEOUT_S * 1000);
-const SOK_BROWSER_TIMEOUT_MS = Math.min(8000, Math.max(5000, SEARCH_TIMEOUT_MS - 2000));
+const SOK_BROWSER_TIMEOUT_MS = Math.min(18000, Math.max(12000, SEARCH_TIMEOUT_MS - 10000));
 const fs = require('fs');
 const path = require('path');
 
@@ -182,7 +182,7 @@ function buildSearchQueries(query) {
     ...broadTerms,
     rawTokens.length > 2 ? rawTokens.slice(0, 2).join(" ") : "",
     rawTokens.length > 2 ? rawTokens.slice(1).join(" ") : "",
-  ]).slice(0, 3);
+  ]).slice(0, 5);
 }
 
 function levenshteinDistance(a, b) {
@@ -760,31 +760,26 @@ async function searchMultiple(product) {
   const searchQueries = buildSearchQueries(product);
   logScrape("Smart Search", `Using queries: ${searchQueries.join(" | ")}`);
 
-  const marketResults = await Promise.all(
-    MARKET_ORDER.map(async (market) => {
-      const queryResults = await Promise.all(
-        searchQueries.map(async (searchQuery) => {
-          try {
-            return await searchProduct(searchQuery, market);
-          } catch (error) {
-            const message = String(error?.message || "unknown error");
-            logScrape(MARKET_LABELS[market], `${searchQuery}: ${message}`);
-            errors[market] = errors[market] || message;
-            return [];
-          }
-        }),
-      );
-
-      const allMarketItems = queryResults.flat().filter(Boolean);
-      const items = dedupeAndRankItems(product, allMarketItems).slice(0, MARKET_RESULT_LIMIT);
-      if (!errors[market] && items.length === 0) {
-        errors[market] = "No matched products from source";
+  for (const market of MARKET_ORDER) {
+    const allMarketItems = [];
+    for (const searchQuery of searchQueries) {
+      const items = await searchProduct(searchQuery, market).catch((error) => {
+        const message = String(error?.message || "unknown error");
+        logScrape(MARKET_LABELS[market], `${searchQuery}: ${message}`);
+        errors[market] = message;
+        return [];
+      });
+      if (Array.isArray(items) && items.length) {
+        allMarketItems.push(...items);
       }
-      return [market, items];
-    }),
-  );
+    }
 
-  entries.push(...marketResults);
+    const items = dedupeAndRankItems(product, allMarketItems).slice(0, MARKET_RESULT_LIMIT);
+    entries.push([market, items]);
+    if (!errors[market] && items.length === 0) {
+      errors[market] = "No matched products from source";
+    }
+  }
   const payload = Object.fromEntries(entries);
   payload._errors = errors;
   return payload;
