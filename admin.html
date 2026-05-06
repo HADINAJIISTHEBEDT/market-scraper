@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Admin Panel</title>
+  <title>Admin</title>
   <link rel="stylesheet" href="css.css" />
   <style>
     body { max-width: 900px; margin: 0 auto; padding: 24px; }
     #adminGuard { display: none; }
-    #accessDenied { text-align: center; margin-top: 80px; color: #b91c1c; }
+    #accessDenied { display: none; text-align: center; margin-top: 80px; color: #b91c1c; }
     .order-card {
       border: 1px solid #e5e7eb; border-radius: 12px;
       padding: 16px; margin-bottom: 16px; background: #fff;
@@ -21,10 +21,10 @@
       display: inline-block; padding: 4px 12px; border-radius: 20px;
       font-size: 13px; font-weight: 600; margin-top: 4px;
     }
-    .status-pending   { background: #fef9c3; color: #854d0e; }
+    .status-pending { background: #fef9c3; color: #854d0e; }
     .status-preparing { background: #dbeafe; color: #1e40af; }
-    .status-on-the-way{ background: #fce7f3; color: #9d174d; }
-    .status-delivered  { background: #dcfce7; color: #166534; }
+    .status-on-the-way { background: #fce7f3; color: #9d174d; }
+    .status-delivered { background: #dcfce7; color: #166534; }
     .order-items { margin: 10px 0; font-size: 14px; color: #374151; }
     .order-item-row { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid #f1f5f9; }
     .status-select {
@@ -38,9 +38,7 @@
     }
     .btn-update:hover { background: #1d4ed8; }
     #loadingMsg { color: #64748b; text-align: center; margin: 40px 0; }
-    .stats-row {
-      display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 24px;
-    }
+    .stats-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; }
     .stat-box {
       flex: 1; min-width: 120px; border: 1px solid #e5e7eb; border-radius: 10px;
       padding: 14px; text-align: center; background: #f8fafc;
@@ -48,35 +46,43 @@
     .stat-num { font-size: 28px; font-weight: 800; color: #2563eb; }
     .stat-label { font-size: 12px; color: #64748b; margin-top: 4px; }
     .nav-bar {
-      display: flex; justify-content: space-between; align-items: center;
+      display: flex; justify-content: space-between; align-items: center; gap: 12px;
       margin-bottom: 24px; padding-bottom: 14px; border-bottom: 1px solid #e5e7eb;
+      flex-wrap: wrap;
     }
     .nav-bar a { color: #2563eb; text-decoration: none; font-weight: 600; }
+    .lang-select {
+      padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff;
+    }
   </style>
 </head>
 <body>
-
   <div id="accessDenied">
-    <h2>🚫 Access Denied</h2>
-    <p>You must be an admin to view this page.</p>
-    <a href="index.html">← Go back</a>
+    <h2 id="deniedTitle">Access Denied</h2>
+    <p id="deniedMessage">You must be an admin to view this page.</p>
+    <a id="deniedBack" href="index.html">Go back</a>
   </div>
 
   <div id="adminGuard">
     <div class="nav-bar">
-      <span style="font-weight:800;font-size:20px;">🧑‍💻 Admin Panel</span>
-      <a href="index.html">← Back to App</a>
+      <span id="adminTitle" style="font-weight:800;font-size:20px;">Admin Panel</span>
+      <a id="backLink" href="index.html">Back to App</a>
+      <select id="langSelect" class="lang-select">
+        <option value="tr">Turkce</option>
+        <option value="en">English</option>
+        <option value="ar">العربية</option>
+      </select>
     </div>
 
     <div class="stats-row" id="statsRow">
-      <div class="stat-box"><div class="stat-num" id="statTotal">-</div><div class="stat-label">Total Orders</div></div>
-      <div class="stat-box"><div class="stat-num" id="statPending">-</div><div class="stat-label">⏳ Pending</div></div>
-      <div class="stat-box"><div class="stat-num" id="statPreparing">-</div><div class="stat-label">👨‍🍳 Preparing</div></div>
-      <div class="stat-box"><div class="stat-num" id="statOnWay">-</div><div class="stat-label">🚴 On the way</div></div>
-      <div class="stat-box"><div class="stat-num" id="statDelivered">-</div><div class="stat-label">✅ Delivered</div></div>
+      <div class="stat-box"><div class="stat-num" id="statTotal">-</div><div class="stat-label" id="statTotalLabel">Total Orders</div></div>
+      <div class="stat-box"><div class="stat-num" id="statPending">-</div><div class="stat-label" id="statPendingLabel">Pending</div></div>
+      <div class="stat-box"><div class="stat-num" id="statPreparing">-</div><div class="stat-label" id="statPreparingLabel">Preparing</div></div>
+      <div class="stat-box"><div class="stat-num" id="statOnWay">-</div><div class="stat-label" id="statOnWayLabel">On the way</div></div>
+      <div class="stat-box"><div class="stat-num" id="statDelivered">-</div><div class="stat-label" id="statDeliveredLabel">Delivered</div></div>
     </div>
 
-    <h2 style="margin-bottom:16px;">All Orders</h2>
+    <h2 id="ordersTitle" style="margin-bottom:16px;">All Orders</h2>
     <p id="loadingMsg">Loading orders...</p>
     <div id="ordersList"></div>
   </div>
@@ -89,12 +95,105 @@
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
     import firebaseConfig from "./firebase-config.js";
 
+    const I18N = {
+      tr: {
+        adminTitle: "Admin Paneli",
+        backLink: "Uygulamaya don",
+        deniedTitle: "Erisim reddedildi",
+        deniedMessage: "Bu sayfayi gormek icin admin olmalisiniz.",
+        deniedBack: "Geri don",
+        totalOrders: "Toplam siparis",
+        allOrders: "Tum siparisler",
+        loading: "Siparisler yukleniyor...",
+        noOrders: "Henuz siparis yok.",
+        pending: "Beklemede",
+        preparing: "Hazirlaniyor",
+        onTheWay: "Yolda",
+        delivered: "Teslim edildi",
+        unknown: "Bilinmiyor",
+        updateStatus: "Durumu guncelle",
+        updated: "Guncellendi",
+        id: "ID"
+      },
+      en: {
+        adminTitle: "Admin Panel",
+        backLink: "Back to App",
+        deniedTitle: "Access Denied",
+        deniedMessage: "You must be an admin to view this page.",
+        deniedBack: "Go back",
+        totalOrders: "Total Orders",
+        allOrders: "All Orders",
+        loading: "Loading orders...",
+        noOrders: "No orders yet.",
+        pending: "Pending",
+        preparing: "Preparing",
+        onTheWay: "On the way",
+        delivered: "Delivered",
+        unknown: "Unknown",
+        updateStatus: "Update Status",
+        updated: "Updated",
+        id: "ID"
+      },
+      ar: {
+        adminTitle: "لوحة الإدارة",
+        backLink: "العودة إلى التطبيق",
+        deniedTitle: "تم رفض الوصول",
+        deniedMessage: "يجب أن تكون مسؤولا لعرض هذه الصفحة.",
+        deniedBack: "رجوع",
+        totalOrders: "إجمالي الطلبات",
+        allOrders: "كل الطلبات",
+        loading: "جار تحميل الطلبات...",
+        noOrders: "لا توجد طلبات بعد.",
+        pending: "قيد الانتظار",
+        preparing: "قيد التحضير",
+        onTheWay: "في الطريق",
+        delivered: "تم التسليم",
+        unknown: "غير معروف",
+        updateStatus: "تحديث الحالة",
+        updated: "تم التحديث",
+        id: "المعرف"
+      }
+    };
+
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
-
     const userUid = localStorage.getItem("user_uid");
+    let currentLang = localStorage.getItem("app_lang") || "tr";
+    let currentOrders = [];
 
-    // ── Check admin role ──────────────────────────────────────
+    function t(key) {
+      return (I18N[currentLang] && I18N[currentLang][key]) || I18N.tr[key] || key;
+    }
+
+    function escapeHtml(text) {
+      return String(text).replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;"
+      }[char]));
+    }
+
+    function applyLanguage() {
+      document.documentElement.lang = currentLang;
+      document.documentElement.dir = currentLang === "ar" ? "rtl" : "ltr";
+      document.getElementById("langSelect").value = currentLang;
+      document.getElementById("adminTitle").textContent = t("adminTitle");
+      document.getElementById("backLink").textContent = t("backLink");
+      document.getElementById("deniedTitle").textContent = t("deniedTitle");
+      document.getElementById("deniedMessage").textContent = t("deniedMessage");
+      document.getElementById("deniedBack").textContent = t("deniedBack");
+      document.getElementById("statTotalLabel").textContent = t("totalOrders");
+      document.getElementById("statPendingLabel").textContent = t("pending");
+      document.getElementById("statPreparingLabel").textContent = t("preparing");
+      document.getElementById("statOnWayLabel").textContent = t("onTheWay");
+      document.getElementById("statDeliveredLabel").textContent = t("delivered");
+      document.getElementById("ordersTitle").textContent = t("allOrders");
+      document.getElementById("loadingMsg").textContent = t("loading");
+      document.title = t("adminTitle");
+    }
+
     async function checkAdmin() {
       if (!userUid) return false;
       try {
@@ -105,36 +204,31 @@
       }
     }
 
-    const isAdmin = await checkAdmin();
-    if (!isAdmin) {
-      document.getElementById("accessDenied").style.display = "block";
-    } else {
-      document.getElementById("adminGuard").style.display = "block";
-      loadOrders();
-    }
-
-    // ── Helpers ───────────────────────────────────────────────
     const STATUSES = ["pending", "preparing", "on-the-way", "delivered"];
-    const STATUS_LABELS = {
-      "pending":    "⏳ Pending",
-      "preparing":  "👨‍🍳 Preparing",
-      "on-the-way": "🚴 On the way",
-      "delivered":  "✅ Delivered"
-    };
+
+    function statusLabel(status) {
+      return {
+        pending: t("pending"),
+        preparing: t("preparing"),
+        "on-the-way": t("onTheWay"),
+        delivered: t("delivered")
+      }[status] || status;
+    }
 
     function formatPrice(price) {
-      return `${Number(price || 0).toFixed(2).replace(".", ",")} ₺`;
+      return `${Number(price || 0).toFixed(2).replace(".", ",")} TL`;
     }
+
     function formatDate(iso) {
       if (!iso) return "";
       const d = new Date(iso);
       return d.toLocaleDateString("tr-TR") + " " + d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
     }
+
     function statusClass(s) {
       return "status-" + (s || "pending").replace(" ", "-");
     }
 
-    // ── Update stats ──────────────────────────────────────────
     function updateStats(orders) {
       document.getElementById("statTotal").textContent = orders.length;
       document.getElementById("statPending").textContent = orders.filter(o => o.status === "pending").length;
@@ -143,14 +237,14 @@
       document.getElementById("statDelivered").textContent = orders.filter(o => o.status === "delivered").length;
     }
 
-    // ── Render orders ─────────────────────────────────────────
     function renderOrders(orders) {
+      currentOrders = orders;
       updateStats(orders);
       const root = document.getElementById("ordersList");
       document.getElementById("loadingMsg").style.display = "none";
 
       if (!orders.length) {
-        root.innerHTML = `<p style="color:#64748b;text-align:center;">No orders yet.</p>`;
+        root.innerHTML = `<p style="color:#64748b;text-align:center;">${escapeHtml(t("noOrders"))}</p>`;
         return;
       }
 
@@ -158,55 +252,63 @@
         const items = Array.isArray(order.items) ? order.items : [];
         const itemsHtml = items.map(item =>
           `<div class="order-item-row">
-            <span>${item.name} × ${item.qty || 1} <small style="color:#64748b">(${item.market || ""})</small></span>
+            <span>${escapeHtml(item.name)} x ${item.qty || 1} <small style="color:#64748b">(${escapeHtml(item.market || "")})</small></span>
             <span>${formatPrice((item.price || 0) * (item.qty || 1))}</span>
           </div>`
         ).join("");
 
         const statusOptions = STATUSES.map(s =>
-          `<option value="${s}" ${order.status === s ? "selected" : ""}>${STATUS_LABELS[s]}</option>`
+          `<option value="${s}" ${order.status === s ? "selected" : ""}>${escapeHtml(statusLabel(s))}</option>`
         ).join("");
 
         return `<div class="order-card" id="card-${order.id}">
           <div class="order-header">
             <div>
-              <div class="order-user">👤 ${order.userName || "Unknown"}</div>
-              <div class="order-meta">${formatDate(order.createdAt)} · ID: ${order.id.slice(0, 8)}...</div>
-              <span class="status-badge ${statusClass(order.status)}">${STATUS_LABELS[order.status] || order.status}</span>
+              <div class="order-user">${escapeHtml(order.userName || t("unknown"))}</div>
+              <div class="order-meta">${escapeHtml(formatDate(order.createdAt))} - ${escapeHtml(t("id"))}: ${escapeHtml(String(order.id).slice(0, 8))}</div>
+              <span class="status-badge ${statusClass(order.status)}">${escapeHtml(statusLabel(order.status))}</span>
             </div>
             <div class="order-total">${formatPrice(order.totalPrice)}</div>
           </div>
           <div class="order-items">${itemsHtml}</div>
-          <div style="display:flex;align-items:center;gap:8px;margin-top:10px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap;">
             <select class="status-select" id="sel-${order.id}">${statusOptions}</select>
-            <button class="btn-update" onclick="updateStatus('${order.id}')">Update Status</button>
+            <button class="btn-update" onclick="updateStatus('${order.id}')">${escapeHtml(t("updateStatus"))}</button>
             <span id="msg-${order.id}" style="font-size:13px;color:#16a34a;"></span>
           </div>
         </div>`;
       }).join("");
     }
 
-    // ── Update order status ───────────────────────────────────
     window.updateStatus = async function(orderId) {
       const sel = document.getElementById(`sel-${orderId}`);
-      const newStatus = sel.value;
       const msgEl = document.getElementById(`msg-${orderId}`);
       try {
-        await updateDoc(doc(db, "orders", orderId), { status: newStatus });
-        msgEl.textContent = "✅ Updated!";
+        await updateDoc(doc(db, "orders", orderId), { status: sel.value });
+        msgEl.textContent = t("updated");
         setTimeout(() => { msgEl.textContent = ""; }, 2000);
       } catch (e) {
         msgEl.style.color = "#b91c1c";
-        msgEl.textContent = "❌ " + e.message;
+        msgEl.textContent = e.message;
       }
     };
 
-    // ── Real-time orders listener ─────────────────────────────
-    function loadOrders() {
+    document.getElementById("langSelect").addEventListener("change", (event) => {
+      currentLang = String(event.target.value || "tr");
+      localStorage.setItem("app_lang", currentLang);
+      applyLanguage();
+      renderOrders(currentOrders);
+    });
+
+    applyLanguage();
+    const isAdmin = await checkAdmin();
+    if (!isAdmin) {
+      document.getElementById("accessDenied").style.display = "block";
+    } else {
+      document.getElementById("adminGuard").style.display = "block";
       const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
       onSnapshot(q, (snapshot) => {
-        const orders = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-        renderOrders(orders);
+        renderOrders(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
       });
     }
   </script>

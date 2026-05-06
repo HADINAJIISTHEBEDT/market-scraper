@@ -148,16 +148,21 @@ const I18N = {
       tahtakale: "Tahtakale",
       carrefour: "Carrefour",
     },
-    contactPrompt: "For any problem ",
-    contactButton: "contact us",
-    contactEmail: "Email",
-    contactTitle: "Title",
-    contactComponent: "Component",
-    contactSubmit: "Send message",
-    contactClose: "Close",
+    contactPrompt: "Herhangi bir sorun icin ",
+    contactButton: "bize ulasin",
+    contactEmail: "E-posta",
+    contactTitle: "Baslik",
+    contactComponent: "Mesaj",
+    contactSubmit: "Mesaj gonder",
+    contactClose: "Kapat",
+    navBrand: "Market Uygulamasi",
+    navCart: "Sepet",
+    navOrders: "Siparisler",
     navProfile: "Profil",
-    navLogin: "Login",
-    navLogout: "Logout",
+    navLogin: "Giris",
+    navLogout: "Cikis",
+    addToCart: "Sepete ekle",
+    addedToCart: "Eklendi!",
   },
   en: {
     title: "Market Product Search",
@@ -188,12 +193,17 @@ const I18N = {
     contactButton: "contact us",
     contactEmail: "Email",
     contactTitle: "Title",
-    contactComponent: "Component",
+    contactComponent: "Message",
     contactSubmit: "Send message",
     contactClose: "Close",
+    navBrand: "Market App",
+    navCart: "Cart",
+    navOrders: "Orders",
     navProfile: "Profile",
     navLogin: "Login",
     navLogout: "Logout",
+    addToCart: "Add to Cart",
+    addedToCart: "Added!",
   },
   ar: {
     title: "بحث منتجات السوق",
@@ -220,16 +230,21 @@ const I18N = {
       tahtakale: "Tahtakale",
       carrefour: "Carrefour",
     },
-    contactPrompt: "For any problem ",
-    contactButton: "contact us",
-    contactEmail: "Email",
-    contactTitle: "Title",
-    contactComponent: "Component",
-    contactSubmit: "Send message",
-    contactClose: "Close",
+    contactPrompt: "لأي مشكلة ",
+    contactButton: "تواصل معنا",
+    contactEmail: "البريد الإلكتروني",
+    contactTitle: "العنوان",
+    contactComponent: "الرسالة",
+    contactSubmit: "إرسال الرسالة",
+    contactClose: "إغلاق",
+    navBrand: "تطبيق السوق",
+    navCart: "السلة",
+    navOrders: "الطلبات",
     navProfile: "الملف الشخصي",
-    navLogin: "Login",
-    navLogout: "Logout",
+    navLogin: "تسجيل الدخول",
+    navLogout: "تسجيل الخروج",
+    addToCart: "أضف إلى السلة",
+    addedToCart: "تمت الإضافة!",
   },
 };
 
@@ -304,6 +319,7 @@ function applyLanguage() {
   const itemLimit = document.getElementById("itemLimit");
   
   if (title) title.textContent = t("title");
+  document.title = t("title");
   if (subtitle) subtitle.textContent = t("subtitle");
   if (input) input.placeholder = t("placeholder");
   if (button) button.textContent = t("search");
@@ -334,6 +350,9 @@ function applyLanguage() {
   const contactComponentLabel = document.getElementById("contactComponentLabel");
   const contactSubmit = document.getElementById("contactSubmit");
   const contactClose = document.getElementById("contactClose");
+  const navBrand = document.getElementById("navBrand");
+  const navCartBtn = document.getElementById("navCartBtn");
+  const navOrdersBtn = document.getElementById("navOrdersBtn");
   const navProfileBtn = document.getElementById("navProfileBtn");
   const navLoginBtn = document.getElementById("navLoginBtn");
   const navLogoutBtn = document.getElementById("navLogoutBtn");
@@ -345,6 +364,9 @@ function applyLanguage() {
   if (contactComponentLabel) contactComponentLabel.textContent = t("contactComponent");
   if (contactSubmit) contactSubmit.textContent = t("contactSubmit");
   if (contactClose) contactClose.textContent = t("contactClose");
+  if (navBrand) navBrand.textContent = t("navBrand");
+  if (navCartBtn) navCartBtn.innerHTML = `${escapeHtml(t("navCart"))} (<span id="cartCount">${escapeHtml(document.getElementById("cartCount")?.textContent || "0")}</span>)`;
+  if (navOrdersBtn) navOrdersBtn.textContent = t("navOrders");
   if (navProfileBtn) navProfileBtn.textContent = t("navProfile");
   if (navLoginBtn) navLoginBtn.textContent = t("navLogin");
   if (navLogoutBtn) navLogoutBtn.textContent = t("navLogout");
@@ -465,7 +487,7 @@ function renderItemCard(item) {
     <button
       onclick="addToCart(${itemData})"
       style="margin-top:8px;width:100%;padding:7px;background:#2563eb;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:13px;font-weight:600;"
-    >🛒 Add to Cart</button>
+    >${escapeHtml(t("addToCart"))}</button>
   </article>`;
 }
 
@@ -499,7 +521,7 @@ window.addToCart = function(item) {
   const btn = event && event.target;
   if (btn) {
     const orig = btn.textContent;
-    btn.textContent = "✅ Added!";
+    btn.textContent = t("addedToCart");
     btn.style.background = "#16a34a";
     setTimeout(() => {
       btn.textContent = orig;

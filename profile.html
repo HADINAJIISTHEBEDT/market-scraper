@@ -181,12 +181,12 @@
         title: "Profil bilgileri",
         subtitle: "Devam etmeden once ad, telefon numarasi ve adres bilgilerini doldurun.",
         nameLabel: "Ad",
-        emailLabel: "Email",
+        emailLabel: "E-posta",
         phoneLabel: "Telefon numarasi",
         addressLabel: "Adres",
         saveButton: "Kaydet ve devam et",
         logoutButton: "Cikis yap",
-        backLink: "Back to app",
+        backLink: "Uygulamaya don",
         statusLoading: "Profil yukleniyor...",
         statusSaving: "Profil kaydediliyor...",
         statusSaved: "Profil kaydedildi. Yonlendiriliyor...",
@@ -262,6 +262,7 @@
       document.getElementById("saveButton").textContent = t("saveButton");
       document.getElementById("logoutButton").textContent = t("logoutButton");
       document.getElementById("backLink").innerHTML = "&larr; " + t("backLink");
+      document.title = t("title");
     }
 
     async function loadProfile(user) {

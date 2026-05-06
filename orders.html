@@ -3,30 +3,34 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>My Orders</title>
+  <title>Orders</title>
   <link rel="stylesheet" href="css.css" />
   <style>
     body { max-width: 750px; margin: 0 auto; padding: 24px; }
     .nav-bar {
-      display: flex; justify-content: space-between; align-items: center;
+      display: flex; justify-content: space-between; align-items: center; gap: 12px;
       margin-bottom: 24px; padding-bottom: 14px; border-bottom: 1px solid #e5e7eb;
+      flex-wrap: wrap;
     }
     .nav-bar a { color: #2563eb; text-decoration: none; font-weight: 600; }
+    .lang-select {
+      padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff;
+    }
     .order-card {
       border: 1px solid #e5e7eb; border-radius: 12px;
       padding: 16px; margin-bottom: 16px; background: #fff;
     }
-    .order-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .order-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 10px; }
     .order-date { font-size: 13px; color: #64748b; }
     .order-total { font-weight: 700; color: #1e293b; font-size: 16px; }
     .status-badge {
       display: inline-block; padding: 4px 12px; border-radius: 20px;
       font-size: 13px; font-weight: 600;
     }
-    .status-pending   { background: #fef9c3; color: #854d0e; }
+    .status-pending { background: #fef9c3; color: #854d0e; }
     .status-preparing { background: #dbeafe; color: #1e40af; }
-    .status-on-the-way{ background: #fce7f3; color: #9d174d; }
-    .status-delivered  { background: #dcfce7; color: #166534; }
+    .status-on-the-way { background: #fce7f3; color: #9d174d; }
+    .status-delivered { background: #dcfce7; color: #166534; }
     .order-items { margin-top: 10px; }
     .order-item-row { display: flex; justify-content: space-between; font-size: 14px; padding: 3px 0; border-bottom: 1px solid #f1f5f9; }
     .status-track { display: flex; gap: 0; margin-top: 14px; }
@@ -41,12 +45,17 @@
 </head>
 <body>
   <div class="nav-bar">
-    <a href="index.html">← Search</a>
+    <a id="searchLink" href="index.html">Search</a>
     <span id="userGreet" style="color:#334155;font-size:14px;"></span>
-    <a href="cart.html">🛒 Cart</a>
+    <a id="cartLink" href="cart.html">Cart</a>
+    <select id="langSelect" class="lang-select">
+      <option value="tr">Turkce</option>
+      <option value="en">English</option>
+      <option value="ar">العربية</option>
+    </select>
   </div>
 
-  <h1>📦 My Orders</h1>
+  <h1 id="pageTitle">My Orders</h1>
   <div id="ordersList"></div>
 
   <script type="module">
@@ -56,31 +65,95 @@
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
     import firebaseConfig from "./firebase-config.js";
 
+    const I18N = {
+      tr: {
+        pageTitle: "Siparislerim",
+        searchLink: "Arama",
+        cartLink: "Sepet",
+        noOrders: "Henuz siparis yok.",
+        startShopping: "Alisverise basla",
+        pending: "Beklemede",
+        preparing: "Hazirlaniyor",
+        onTheWay: "Yolda",
+        delivered: "Teslim edildi"
+      },
+      en: {
+        pageTitle: "My Orders",
+        searchLink: "Search",
+        cartLink: "Cart",
+        noOrders: "No orders yet.",
+        startShopping: "Start shopping",
+        pending: "Pending",
+        preparing: "Preparing",
+        onTheWay: "On the way",
+        delivered: "Delivered"
+      },
+      ar: {
+        pageTitle: "طلباتي",
+        searchLink: "البحث",
+        cartLink: "السلة",
+        noOrders: "لا توجد طلبات بعد.",
+        startShopping: "ابدأ التسوق",
+        pending: "قيد الانتظار",
+        preparing: "قيد التحضير",
+        onTheWay: "في الطريق",
+        delivered: "تم التسليم"
+      }
+    };
+
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
-
     const userName = localStorage.getItem("user_name");
     const userUid = localStorage.getItem("user_uid");
+    let currentLang = localStorage.getItem("app_lang") || "tr";
+    let currentOrders = [];
 
     if (!userUid) {
       window.location.href = "login.html";
     }
-    if (userName) document.getElementById("userGreet").textContent = `👤 ${userName}`;
+
+    function t(key) {
+      return (I18N[currentLang] && I18N[currentLang][key]) || I18N.tr[key] || key;
+    }
+
+    function escapeHtml(text) {
+      return String(text).replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;"
+      }[char]));
+    }
+
+    function applyLanguage() {
+      document.documentElement.lang = currentLang;
+      document.documentElement.dir = currentLang === "ar" ? "rtl" : "ltr";
+      document.getElementById("langSelect").value = currentLang;
+      document.getElementById("pageTitle").textContent = t("pageTitle");
+      document.getElementById("searchLink").textContent = t("searchLink");
+      document.getElementById("cartLink").textContent = t("cartLink");
+      document.title = t("pageTitle");
+      if (userName) document.getElementById("userGreet").textContent = userName;
+    }
 
     const STATUSES = ["pending", "preparing", "on-the-way", "delivered"];
-    const STATUS_LABELS = {
-      "pending":    "⏳ Pending",
-      "preparing":  "👨‍🍳 Preparing",
-      "on-the-way": "🚴 On the way",
-      "delivered":  "✅ Delivered"
-    };
+
+    function statusLabel(status) {
+      return {
+        pending: t("pending"),
+        preparing: t("preparing"),
+        "on-the-way": t("onTheWay"),
+        delivered: t("delivered")
+      }[status] || status;
+    }
 
     function statusClass(status) {
       return "status-" + (status || "pending").replace(" ", "-");
     }
 
     function formatPrice(price) {
-      return `${Number(price || 0).toFixed(2).replace(".", ",")} ₺`;
+      return `${Number(price || 0).toFixed(2).replace(".", ",")} TL`;
     }
 
     function formatDate(iso) {
@@ -93,22 +166,24 @@
       const current = STATUSES.indexOf(status);
       return `<div class="status-track">` +
         STATUSES.map((s, i) =>
-          `<div class="track-step ${i < current ? "done" : i === current ? "active" : ""}">${STATUS_LABELS[s]}</div>`
+          `<div class="track-step ${i < current ? "done" : i === current ? "active" : ""}">${escapeHtml(statusLabel(s))}</div>`
         ).join("") +
         `</div>`;
     }
 
     function renderOrders(orders) {
+      currentOrders = orders;
       const root = document.getElementById("ordersList");
       if (!orders.length) {
-        root.innerHTML = `<p class="empty-msg">No orders yet.<br><a href="index.html">Start shopping →</a></p>`;
+        root.innerHTML = `<p class="empty-msg">${escapeHtml(t("noOrders"))}<br><a href="index.html">${escapeHtml(t("startShopping"))}</a></p>`;
         return;
       }
+
       root.innerHTML = orders.map(order => {
         const items = Array.isArray(order.items) ? order.items : [];
         const itemsHtml = items.map(item =>
           `<div class="order-item-row">
-            <span>${item.name} × ${item.qty || 1}</span>
+            <span>${escapeHtml(item.name)} x ${item.qty || 1}</span>
             <span>${formatPrice((item.price || 0) * (item.qty || 1))}</span>
           </div>`
         ).join("");
@@ -116,8 +191,8 @@
         return `<div class="order-card">
           <div class="order-header">
             <div>
-              <div class="order-date">${formatDate(order.createdAt)}</div>
-              <span class="status-badge ${statusClass(order.status)}">${STATUS_LABELS[order.status] || order.status}</span>
+              <div class="order-date">${escapeHtml(formatDate(order.createdAt))}</div>
+              <span class="status-badge ${statusClass(order.status)}">${escapeHtml(statusLabel(order.status))}</span>
             </div>
             <div class="order-total">${formatPrice(order.totalPrice)}</div>
           </div>
@@ -127,7 +202,15 @@
       }).join("");
     }
 
-    // Real-time listener — updates automatically when admin changes status
+    document.getElementById("langSelect").addEventListener("change", (event) => {
+      currentLang = String(event.target.value || "tr");
+      localStorage.setItem("app_lang", currentLang);
+      applyLanguage();
+      renderOrders(currentOrders);
+    });
+
+    applyLanguage();
+
     const q = query(
       collection(db, "orders"),
       where("userId", "==", userUid),
@@ -135,8 +218,7 @@
     );
 
     onSnapshot(q, (snapshot) => {
-      const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      renderOrders(orders);
+      renderOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
   </script>
 </body>
