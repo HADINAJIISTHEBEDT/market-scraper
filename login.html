@@ -401,7 +401,11 @@
         errorPopupClosed: "Google girisi iptal edildi.",
         errorGeneric: "Google ile giris basarisiz oldu.",
         errorUnauthorizedDomain: "Bu alan adi Firebase Authentication icin yetkili degil.",
-        errorGoogleOnly: "Lutfen Gmail ile bagli bir Google hesabi kullanin."
+        errorGoogleOnly: "Lutfen Gmail ile bagli bir Google hesabi kullanin.",
+        errorPopupBlocked: "Tarayici popup penceresini engelledi. Popup izni verip tekrar deneyin.",
+        errorOperationNotAllowed: "Firebase icinde Google giris yontemi etkin degil.",
+        errorNetwork: "Ag hatasi var. Internet baglantisini kontrol edip tekrar deneyin.",
+        errorCancelled: "Ayni anda birden fazla giris denemesi yapildi. Tekrar deneyin."
       },
       en: {
         topLabel: "Sign in with Google",
@@ -425,7 +429,11 @@
         errorPopupClosed: "Google sign-in was cancelled.",
         errorGeneric: "Google sign-in failed.",
         errorUnauthorizedDomain: "This domain is not authorized for Firebase Authentication.",
-        errorGoogleOnly: "Please use a real Google account with Gmail."
+        errorGoogleOnly: "Please use a real Google account with Gmail.",
+        errorPopupBlocked: "The browser blocked the popup. Allow popups and try again.",
+        errorOperationNotAllowed: "Google sign-in is not enabled in Firebase.",
+        errorNetwork: "Network error. Check your connection and try again.",
+        errorCancelled: "Multiple sign-in attempts were started. Try again."
       },
       ar: {
         topLabel: "تسجيل الدخول باستخدام Google",
@@ -449,7 +457,11 @@
         errorPopupClosed: "تم الغاء تسجيل الدخول عبر Google.",
         errorGeneric: "فشل تسجيل الدخول عبر Google.",
         errorUnauthorizedDomain: "اسم النطاق هذا غير مصرح به في Firebase Authentication.",
-        errorGoogleOnly: "يرجى استخدام حساب Google حقيقي مرتبط بـ Gmail."
+        errorGoogleOnly: "يرجى استخدام حساب Google حقيقي مرتبط بـ Gmail.",
+        errorPopupBlocked: "قام المتصفح بحظر النافذة المنبثقة. اسمح بالنوافذ المنبثقة ثم حاول مرة اخرى.",
+        errorOperationNotAllowed: "تسجيل الدخول عبر Google غير مفعل في Firebase.",
+        errorNetwork: "يوجد خطأ في الشبكة. تحقق من الاتصال ثم حاول مرة اخرى.",
+        errorCancelled: "تم بدء اكثر من محاولة تسجيل دخول. حاول مرة اخرى."
       }
     };
 
@@ -503,7 +515,11 @@
       const code = String(error?.code || "");
       if (code === "auth/popup-closed-by-user") return t("errorPopupClosed");
       if (code === "auth/unauthorized-domain") return t("errorUnauthorizedDomain");
-      return t("errorGeneric");
+      if (code === "auth/popup-blocked") return t("errorPopupBlocked");
+      if (code === "auth/operation-not-allowed") return t("errorOperationNotAllowed");
+      if (code === "auth/network-request-failed") return t("errorNetwork");
+      if (code === "auth/cancelled-popup-request") return t("errorCancelled");
+      return `${t("errorGeneric")} (${code || "unknown"})`;
     }
 
     async function syncUserRecord(user) {
@@ -542,6 +558,7 @@
           window.location.href = "index.html";
         }, 900);
       } catch (error) {
+        console.error("Google sign-in failed", error);
         setRawStatus(getFriendlyError(error), true);
       }
     }
