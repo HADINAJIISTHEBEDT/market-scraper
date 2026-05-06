@@ -1,0 +1,91 @@
+{
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**",
+      "server.js",
+      "server-simple.js",
+      "api-handler.js",
+      "scraper.js",
+      "scraper_*.js",
+      "push-service.js",
+      "gemini_service*.js",
+      "analyze_sok*.js",
+      "test*.js",
+      "install*.js",
+      "uninstall*.js",
+      "service.js",
+      "main.js",
+      "daemon/**",
+      "netlify/**",
+      "android-app/**",
+      "serviceAccountKey.json",
+      "*.bat",
+      "*.ps1",
+      "*.exe",
+      "*.key",
+      "*.crt",
+      "*.cer",
+      "*.log",
+      "package-lock.json",
+      "render.yaml",
+      "netlify.toml",
+      "deploy-cloud.txt",
+      "TODO.md",
+      "README.md"
+    ],
+    "rewrites": [
+      {
+        "source": "/admin",
+        "destination": "/admin.html"
+      },
+      {
+        "source": "/cart",
+        "destination": "/cart.html"
+      },
+      {
+        "source": "/orders",
+        "destination": "/orders.html"
+      },
+      {
+        "source": "/login",
+        "destination": "/login.html"
+      }
+    ],
+    "headers": [
+      {
+        "source": "**/*.@(js|css)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=604800, stale-while-revalidate=86400"
+          }
+        ]
+      },
+      {
+        "source": "**/*.html",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      },
+      {
+        "source": "**",
+        "headers": [
+          {
+            "key": "X-Frame-Options",
+            "value": "DENY"
+          },
+          {
+            "key": "X-Content-Type-Options",
+            "value": "nosniff"
+          }
+        ]
+      }
+    ]
+  }
+}

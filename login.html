@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login / Register</title>
+  <link rel="stylesheet" href="css.css" />
+  <style>
+    body { max-width: 420px; margin: 60px auto; padding: 24px; }
+    h1 { text-align: center; margin-bottom: 24px; }
+    .tab-row { display: flex; margin-bottom: 20px; }
+    .tab-btn {
+      flex: 1; padding: 10px; border: 1px solid #cbd5e1;
+      background: #f1f5f9; cursor: pointer; font-size: 15px;
+    }
+    .tab-btn.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+    .form-group { display: grid; gap: 6px; margin-bottom: 14px; }
+    .form-group label { font-weight: 600; font-size: 14px; }
+    .form-group input {
+      border: 1px solid #cbd5e1; border-radius: 8px;
+      padding: 10px; font: inherit; width: 100%; box-sizing: border-box;
+    }
+    .btn-primary {
+      width: 100%; padding: 12px; background: #2563eb; color: #fff;
+      border: none; border-radius: 8px; font-size: 16px; cursor: pointer;
+    }
+    .btn-primary:hover { background: #1d4ed8; }
+    #authError { color: #b91c1c; margin-top: 10px; min-height: 20px; text-align: center; }
+    #authSuccess { color: #065f46; margin-top: 10px; min-height: 20px; text-align: center; }
+    .back-link { display: block; text-align: center; margin-top: 18px; color: #2563eb; }
+  </style>
+</head>
+<body>
+  <h1>🛒 Market App</h1>
+
+  <div class="tab-row">
+    <button class="tab-btn active" id="loginTab" onclick="showTab('login')">Login</button>
+    <button class="tab-btn" id="registerTab" onclick="showTab('register')">Register</button>
+  </div>
+
+  <!-- LOGIN FORM -->
+  <div id="loginForm">
+    <div class="form-group">
+      <label>Email</label>
+      <input type="email" id="loginEmail" placeholder="your@email.com" />
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="loginPassword" placeholder="••••••••" />
+    </div>
+    <button class="btn-primary" onclick="doLogin()">Login</button>
+  </div>
+
+  <!-- REGISTER FORM -->
+  <div id="registerForm" style="display:none">
+    <div class="form-group">
+      <label>Full Name</label>
+      <input type="text" id="regName" placeholder="Your name" />
+    </div>
+    <div class="form-group">
+      <label>Email</label>
+      <input type="email" id="regEmail" placeholder="your@email.com" />
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="regPassword" placeholder="min 6 characters" />
+    </div>
+    <button class="btn-primary" onclick="doRegister()">Create Account</button>
+  </div>
+
+  <p id="authError"></p>
+  <p id="authSuccess"></p>
+  <a class="back-link" href="index.html">← Back to Search</a>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import {
+      getAuth,
+      createUserWithEmailAndPassword,
+      signInWithEmailAndPassword,
+      updateProfile
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import {
+      getFirestore, doc, setDoc
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import firebaseConfig from "./firebase-config.js";
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    function showError(msg) {
+      document.getElementById("authError").textContent = msg;
+      document.getElementById("authSuccess").textContent = "";
+    }
+    function showSuccess(msg) {
+      document.getElementById("authSuccess").textContent = msg;
+      document.getElementById("authError").textContent = "";
+    }
+
+    window.showTab = function(tab) {
+      document.getElementById("loginForm").style.display = tab === "login" ? "" : "none";
+      document.getElementById("registerForm").style.display = tab === "register" ? "" : "none";
+      document.getElementById("loginTab").className = "tab-btn" + (tab === "login" ? " active" : "");
+      document.getElementById("registerTab").className = "tab-btn" + (tab === "register" ? " active" : "");
+    };
+
+    window.doLogin = async function() {
+      const email = document.getElementById("loginEmail").value.trim();
+      const password = document.getElementById("loginPassword").value;
+      if (!email || !password) return showError("Please fill in all fields.");
+      try {
+        const cred = await signInWithEmailAndPassword(auth, email, password);
+        localStorage.setItem("user_name", cred.user.displayName || email);
+        localStorage.setItem("user_uid", cred.user.uid);
+        localStorage.setItem("user_email", cred.user.email);
+        showSuccess("✅ Login successful! Redirecting...");
+        setTimeout(() => { window.location.href = "index.html"; }, 1000);
+      } catch (e) {
+        showError("❌ " + e.message);
+      }
+    };
+
+    window.doRegister = async function() {
+      const name = document.getElementById("regName").value.trim();
+      const email = document.getElementById("regEmail").value.trim();
+      const password = document.getElementById("regPassword").value;
+      if (!name) return showError("Please enter your name.");
+      if (!email) return showError("Please enter your email.");
+      if (password.length < 6) return showError("Password must be at least 6 characters.");
+      try {
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        await updateProfile(cred.user, { displayName: name });
+        await setDoc(doc(db, "users", cred.user.uid), {
+          name,
+          email,
+          role: "user",
+          createdAt: new Date().toISOString()
+        });
+        localStorage.setItem("user_name", name);
+        localStorage.setItem("user_uid", cred.user.uid);
+        localStorage.setItem("user_email", email);
+        showSuccess("✅ Account created! Redirecting...");
+        setTimeout(() => { window.location.href = "index.html"; }, 1000);
+      } catch (e) {
+        showError("❌ " + e.message);
+      }
+    };
+  </script>
+</body>
+</html>

@@ -437,14 +437,89 @@ function renderItemCard(item) {
   const brandHtml = item.brand
     ? `<div class="item-brand">${escapeHtml(item.brand)}</div>`
     : "";
+  // Encode item data safely for the onclick handler
+  const itemData = escapeHtml(JSON.stringify({
+    name: item.name,
+    price: item.price,
+    image: item.image || "",
+    market: item.market || "",
+    brand: item.brand || ""
+  }));
   return `<article class="item-card">
     ${imageHtml}
     ${brandHtml}
     <div class="item-name">${escapeHtml(item.name)}</div>
     <div class="item-price">${formatPrice(item.price)}</div>
     ${item.unitPrice ? `<div class="item-unit">${escapeHtml(item.unitPrice)}</div>` : ""}
+    <button
+      onclick="addToCart(${itemData})"
+      style="margin-top:8px;width:100%;padding:7px;background:#2563eb;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:13px;font-weight:600;"
+    >🛒 Add to Cart</button>
   </article>`;
 }
+
+// ── Cart helpers ──────────────────────────────────────────────
+function getCart() {
+  return JSON.parse(localStorage.getItem("cart") || "[]");
+}
+function saveCart(cart) {
+  localStorage.setItem("cart", JSON.stringify(cart));
+}
+function updateCartCount() {
+  const cart = getCart();
+  const total = cart.reduce((sum, i) => sum + (i.qty || 1), 0);
+  const el = document.getElementById("cartCount");
+  if (el) el.textContent = total;
+}
+
+window.addToCart = function(item) {
+  const cart = getCart();
+  const existing = cart.find(
+    c => c.name === item.name && c.market === item.market
+  );
+  if (existing) {
+    existing.qty = (existing.qty || 1) + 1;
+  } else {
+    cart.push({ ...item, qty: 1 });
+  }
+  saveCart(cart);
+  updateCartCount();
+  // Brief visual feedback
+  const btn = event && event.target;
+  if (btn) {
+    const orig = btn.textContent;
+    btn.textContent = "✅ Added!";
+    btn.style.background = "#16a34a";
+    setTimeout(() => {
+      btn.textContent = orig;
+      btn.style.background = "#2563eb";
+    }, 900);
+  }
+};
+
+// ── Navbar auth helpers ───────────────────────────────────────
+function updateNavbar() {
+  const name = localStorage.getItem("user_name");
+  const navUser = document.getElementById("navUser");
+  const navLoginBtn = document.getElementById("navLoginBtn");
+  const navLogoutBtn = document.getElementById("navLogoutBtn");
+  if (name) {
+    if (navUser) navUser.textContent = `👤 ${name}`;
+    if (navLoginBtn) navLoginBtn.style.display = "none";
+    if (navLogoutBtn) navLogoutBtn.style.display = "";
+  } else {
+    if (navUser) navUser.textContent = "";
+    if (navLoginBtn) navLoginBtn.style.display = "";
+    if (navLogoutBtn) navLogoutBtn.style.display = "none";
+  }
+}
+
+window.doLogout = function() {
+  localStorage.removeItem("user_name");
+  localStorage.removeItem("user_uid");
+  localStorage.removeItem("user_email");
+  updateNavbar();
+};
 
 function getCheapestMarketSummary(groupedItems, filters) {
   let cheapestSummary = null;
@@ -567,6 +642,8 @@ async function runSearch() {
 }
 
 window.addEventListener("DOMContentLoaded", () => {
+  updateNavbar();
+  updateCartCount();
   currentLang = localStorage.getItem("app_lang") || "tr";
   const langSelect = document.getElementById("langSelect");
   if (langSelect) {

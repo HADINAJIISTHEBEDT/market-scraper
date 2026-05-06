@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Cart</title>
+  <link rel="stylesheet" href="css.css" />
+  <style>
+    body { max-width: 700px; margin: 0 auto; padding: 24px; }
+    h1 { margin-bottom: 20px; }
+    .cart-item {
+      display: flex; align-items: center; gap: 14px;
+      border: 1px solid #e5e7eb; border-radius: 10px;
+      padding: 12px; margin-bottom: 10px; background: #fff;
+    }
+    .cart-item img { width: 60px; height: 60px; object-fit: cover; border-radius: 6px; }
+    .cart-item-info { flex: 1; }
+    .cart-item-name { font-weight: 600; font-size: 15px; }
+    .cart-item-market { font-size: 12px; color: #64748b; }
+    .cart-item-price { color: #065f46; font-weight: 600; }
+    .qty-controls { display: flex; align-items: center; gap: 8px; }
+    .qty-btn {
+      width: 30px; height: 30px; border: 1px solid #cbd5e1;
+      border-radius: 6px; background: #f1f5f9; cursor: pointer; font-size: 18px;
+    }
+    .qty-num { font-weight: 700; min-width: 24px; text-align: center; }
+    .remove-btn {
+      background: none; border: none; color: #b91c1c;
+      cursor: pointer; font-size: 20px; padding: 4px;
+    }
+    .cart-summary {
+      border-top: 2px solid #e5e7eb; margin-top: 20px;
+      padding-top: 16px; text-align: right;
+    }
+    .cart-total { font-size: 22px; font-weight: 700; color: #1e293b; }
+    .btn-order {
+      margin-top: 14px; padding: 14px 32px;
+      background: #16a34a; color: #fff; border: none;
+      border-radius: 10px; font-size: 17px; cursor: pointer; width: 100%;
+    }
+    .btn-order:hover { background: #15803d; }
+    .empty-msg { text-align: center; color: #64748b; margin-top: 60px; font-size: 18px; }
+    .nav-bar {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 24px; padding-bottom: 14px; border-bottom: 1px solid #e5e7eb;
+    }
+    .nav-bar a { color: #2563eb; text-decoration: none; font-weight: 600; }
+    #orderMsg { text-align: center; margin-top: 16px; font-size: 16px; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="nav-bar">
+    <a href="index.html">← Back to Search</a>
+    <span id="userGreet" style="color:#334155;font-size:14px;"></span>
+    <a href="orders.html">My Orders 📦</a>
+  </div>
+
+  <h1>🛒 My Cart</h1>
+  <div id="cartList"></div>
+  <div id="orderMsg"></div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import firebaseConfig from "./firebase-config.js";
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const userName = localStorage.getItem("user_name");
+    const userUid = localStorage.getItem("user_uid");
+    if (userName) document.getElementById("userGreet").textContent = `👤 ${userName}`;
+
+    function getCart() {
+      return JSON.parse(localStorage.getItem("cart") || "[]");
+    }
+    function saveCart(cart) {
+      localStorage.setItem("cart", JSON.stringify(cart));
+    }
+
+    function formatPrice(price) {
+      if (!price && price !== 0) return "";
+      return `${Number(price).toFixed(2).replace(".", ",")} ₺`;
+    }
+
+    function renderCart() {
+      const cart = getCart();
+      const root = document.getElementById("cartList");
+      if (!cart.length) {
+        root.innerHTML = `<p class="empty-msg">Your cart is empty.<br><a href="index.html">Search for products →</a></p>`;
+        return;
+      }
+
+      let total = 0;
+      let html = "";
+      cart.forEach((item, idx) => {
+        const subtotal = (item.price || 0) * (item.qty || 1);
+        total += subtotal;
+        html += `
+          <div class="cart-item">
+            ${item.image ? `<img src="${item.image}" alt="${item.name}" onerror="this.style.display='none'">` : ""}
+            <div class="cart-item-info">
+              <div class="cart-item-name">${item.name}</div>
+              <div class="cart-item-market">${item.market || ""}</div>
+              <div class="cart-item-price">${formatPrice(item.price)} each</div>
+            </div>
+            <div class="qty-controls">
+              <button class="qty-btn" onclick="changeQty(${idx}, -1)">−</button>
+              <span class="qty-num">${item.qty || 1}</span>
+              <button class="qty-btn" onclick="changeQty(${idx}, 1)">+</button>
+            </div>
+            <div class="cart-item-price">${formatPrice(subtotal)}</div>
+            <button class="remove-btn" onclick="removeItem(${idx})" title="Remove">🗑</button>
+          </div>`;
+      });
+
+      html += `
+        <div class="cart-summary">
+          <div class="cart-total">Total: ${formatPrice(total)}</div>
+          <button class="btn-order" onclick="placeOrder()">✅ Place Order</button>
+        </div>`;
+      root.innerHTML = html;
+    }
+
+    window.changeQty = function(idx, delta) {
+      const cart = getCart();
+      cart[idx].qty = Math.max(1, (cart[idx].qty || 1) + delta);
+      saveCart(cart);
+      renderCart();
+    };
+
+    window.removeItem = function(idx) {
+      const cart = getCart();
+      cart.splice(idx, 1);
+      saveCart(cart);
+      renderCart();
+    };
+
+    window.placeOrder = async function() {
+      if (!userUid) {
+        window.location.href = "login.html";
+        return;
+      }
+      const cart = getCart();
+      if (!cart.length) return;
+
+      const total = cart.reduce((sum, item) => sum + (item.price || 0) * (item.qty || 1), 0);
+
+      try {
+        const orderRef = await addDoc(collection(db, "orders"), {
+          userId: userUid,
+          userName: userName || "Unknown",
+          items: cart,
+          totalPrice: total,
+          status: "pending",
+          createdAt: new Date().toISOString()
+        });
+
+        localStorage.removeItem("cart");
+        document.getElementById("orderMsg").innerHTML =
+          `<span style="color:#16a34a">✅ Order placed! <a href="orders.html">View your orders →</a></span>`;
+        document.getElementById("cartList").innerHTML = "";
+      } catch (e) {
+        document.getElementById("orderMsg").innerHTML =
+          `<span style="color:#b91c1c">❌ Error: ${e.message}</span>`;
+      }
+    };
+
+    renderCart();
+  </script>
+</body>
+</html>

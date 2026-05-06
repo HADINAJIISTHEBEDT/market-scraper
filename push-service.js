@@ -5,12 +5,12 @@ const path = require("path");
 const admin = require("firebase-admin");
 
 const FIREBASE_CONFIG_FALLBACK = {
-  apiKey: "AIzaSyDQSPs6oly79c18Nyi-SP_WJlp52l9Ja7g",
-  authDomain: "hookahtalya-b865f.firebaseapp.com",
-  projectId: "hookahtalya-b865f",
-  storageBucket: "hookahtalya-b865f.firebasestorage.app",
-  messagingSenderId: "635656922703",
-  appId: "1:635656922703:web:a27e2c407484ed641b2c3a",
+  apiKey: "AIzaSyA4ZmYg5sTs4gU1Nm25s7of6oqJ4xGpR28",
+  authDomain: "st-business-86a9b.firebaseapp.com",
+  projectId: "st-business-86a9b",
+  storageBucket: "st-business-86a9b.firebasestorage.app",
+  messagingSenderId: "472603409840",
+  appId: "1:472603409840:web:30127c81e74c3b3c4e2a75",
 };
 
 const COLLECTION_NAME = "scheduled_notifications";

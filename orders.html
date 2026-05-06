@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Orders</title>
+  <link rel="stylesheet" href="css.css" />
+  <style>
+    body { max-width: 750px; margin: 0 auto; padding: 24px; }
+    .nav-bar {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 24px; padding-bottom: 14px; border-bottom: 1px solid #e5e7eb;
+    }
+    .nav-bar a { color: #2563eb; text-decoration: none; font-weight: 600; }
+    .order-card {
+      border: 1px solid #e5e7eb; border-radius: 12px;
+      padding: 16px; margin-bottom: 16px; background: #fff;
+    }
+    .order-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .order-date { font-size: 13px; color: #64748b; }
+    .order-total { font-weight: 700; color: #1e293b; font-size: 16px; }
+    .status-badge {
+      display: inline-block; padding: 4px 12px; border-radius: 20px;
+      font-size: 13px; font-weight: 600;
+    }
+    .status-pending   { background: #fef9c3; color: #854d0e; }
+    .status-preparing { background: #dbeafe; color: #1e40af; }
+    .status-on-the-way{ background: #fce7f3; color: #9d174d; }
+    .status-delivered  { background: #dcfce7; color: #166534; }
+    .order-items { margin-top: 10px; }
+    .order-item-row { display: flex; justify-content: space-between; font-size: 14px; padding: 3px 0; border-bottom: 1px solid #f1f5f9; }
+    .status-track { display: flex; gap: 0; margin-top: 14px; }
+    .track-step {
+      flex: 1; text-align: center; padding: 6px 4px; font-size: 12px;
+      background: #f1f5f9; border: 1px solid #e2e8f0;
+    }
+    .track-step.done { background: #16a34a; color: #fff; border-color: #16a34a; }
+    .track-step.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+    .empty-msg { text-align: center; color: #64748b; margin-top: 60px; font-size: 18px; }
+  </style>
+</head>
+<body>
+  <div class="nav-bar">
+    <a href="index.html">← Search</a>
+    <span id="userGreet" style="color:#334155;font-size:14px;"></span>
+    <a href="cart.html">🛒 Cart</a>
+  </div>
+
+  <h1>📦 My Orders</h1>
+  <div id="ordersList"></div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import {
+      getFirestore, collection, query, where, orderBy, onSnapshot
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import firebaseConfig from "./firebase-config.js";
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const userName = localStorage.getItem("user_name");
+    const userUid = localStorage.getItem("user_uid");
+
+    if (!userUid) {
+      window.location.href = "login.html";
+    }
+    if (userName) document.getElementById("userGreet").textContent = `👤 ${userName}`;
+
+    const STATUSES = ["pending", "preparing", "on-the-way", "delivered"];
+    const STATUS_LABELS = {
+      "pending":    "⏳ Pending",
+      "preparing":  "👨‍🍳 Preparing",
+      "on-the-way": "🚴 On the way",
+      "delivered":  "✅ Delivered"
+    };
+
+    function statusClass(status) {
+      return "status-" + (status || "pending").replace(" ", "-");
+    }
+
+    function formatPrice(price) {
+      return `${Number(price || 0).toFixed(2).replace(".", ",")} ₺`;
+    }
+
+    function formatDate(iso) {
+      if (!iso) return "";
+      const d = new Date(iso);
+      return d.toLocaleDateString("tr-TR") + " " + d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+    }
+
+    function renderTrack(status) {
+      const current = STATUSES.indexOf(status);
+      return `<div class="status-track">` +
+        STATUSES.map((s, i) =>
+          `<div class="track-step ${i < current ? "done" : i === current ? "active" : ""}">${STATUS_LABELS[s]}</div>`
+        ).join("") +
+        `</div>`;
+    }
+
+    function renderOrders(orders) {
+      const root = document.getElementById("ordersList");
+      if (!orders.length) {
+        root.innerHTML = `<p class="empty-msg">No orders yet.<br><a href="index.html">Start shopping →</a></p>`;
+        return;
+      }
+      root.innerHTML = orders.map(order => {
+        const items = Array.isArray(order.items) ? order.items : [];
+        const itemsHtml = items.map(item =>
+          `<div class="order-item-row">
+            <span>${item.name} × ${item.qty || 1}</span>
+            <span>${formatPrice((item.price || 0) * (item.qty || 1))}</span>
+          </div>`
+        ).join("");
+
+        return `<div class="order-card">
+          <div class="order-header">
+            <div>
+              <div class="order-date">${formatDate(order.createdAt)}</div>
+              <span class="status-badge ${statusClass(order.status)}">${STATUS_LABELS[order.status] || order.status}</span>
+            </div>
+            <div class="order-total">${formatPrice(order.totalPrice)}</div>
+          </div>
+          <div class="order-items">${itemsHtml}</div>
+          ${renderTrack(order.status)}
+        </div>`;
+      }).join("");
+    }
+
+    // Real-time listener — updates automatically when admin changes status
+    const q = query(
+      collection(db, "orders"),
+      where("userId", "==", userUid),
+      orderBy("createdAt", "desc")
+    );
+
+    onSnapshot(q, (snapshot) => {
+      const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      renderOrders(orders);
+    });
+  </script>
+</body>
+</html>

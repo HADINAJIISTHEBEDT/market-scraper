@@ -4,6 +4,7 @@ node_modules/
 .DS_Store
 *.log
 serviceAccountKey.json
+.firebase/
 "START HERE - Dessert Cafe Manager.exe" 
 *.exe
 *.cer
