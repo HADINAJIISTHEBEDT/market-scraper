@@ -140,8 +140,6 @@ const I18N = {
     filterMinPrice: "Min fiyat",
     filterMaxPrice: "Max fiyat",
     filterItemLimit: "Urun adedi",
-    cheapestMarket: "En ucuz market",
-    cheapestMarketNote: "Ihtiyaciniz olan urunu yazarak en ucuz marketi bulun.",
     markets: {
       bim: "BIM",
       a101: "A101",
@@ -178,8 +176,6 @@ const I18N = {
     filterMinPrice: "Min price",
     filterMaxPrice: "Max price",
     filterItemLimit: "Item limit",
-    cheapestMarket: "Cheapest market",
-    cheapestMarketNote: "Write the specific item you need to find the cheapest market.",
     markets: {
       bim: "BIM",
       a101: "A101",
@@ -542,31 +538,6 @@ window.doLogout = function() {
   updateNavbar();
 };
 
-function getCheapestMarketSummary(groupedItems, filters) {
-  let cheapestSummary = null;
-
-  for (const marketKey of Object.keys(groupedItems || {})) {
-    const visibleItems = applyFilters(groupedItems[marketKey] || [], filters).filter((item) =>
-      Number.isFinite(Number(item.price)),
-    );
-    if (!visibleItems.length) continue;
-
-    const marketMinPrice = visibleItems.reduce(
-      (best, item) => (Number(item.price) < best ? Number(item.price) : best),
-      Number.POSITIVE_INFINITY,
-    );
-
-    if (
-      !cheapestSummary ||
-      marketMinPrice < Number(cheapestSummary.price)
-    ) {
-      cheapestSummary = { marketKey, price: marketMinPrice };
-    }
-  }
-
-  return cheapestSummary;
-}
-
 function renderResults(data) {
   const root = document.getElementById("results");
   if (!root) return;
@@ -589,10 +560,6 @@ function renderResults(data) {
   });
 
   let html = "";
-  const cheapestSummary = getCheapestMarketSummary(groupedItems, filters);
-  if (cheapestSummary) {
-    html += `<section class="panel"><h3>${escapeHtml(t("cheapestMarket"))}: ${escapeHtml(marketLabelForKey(cheapestSummary.marketKey))}</h3><p>${escapeHtml(t("cheapestMarketNote"))}</p></section>`;
-  }
   
   // If a specific market is filtered, only show that market
   if (filters.market) {
