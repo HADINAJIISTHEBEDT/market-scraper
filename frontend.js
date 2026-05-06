@@ -159,7 +159,7 @@ const I18N = {
   },
   en: {
     title: "Market Product Search",
-    subtitle: "No saved items. Just type a product and search.",
+    subtitle: "No saved items. Just type a product and search. Make sure item names are written in Turkish.",
     placeholder: "Type product name...",
     search: "Search",
     statusSearching: "Searching...",
@@ -193,7 +193,7 @@ const I18N = {
   },
   ar: {
     title: "بحث منتجات السوق",
-    subtitle: "لا توجد عناصر محفوظة. فقط اكتب منتج وابحث.",
+    subtitle: "لا توجد عناصر محفوظة. فقط اكتب منتج وابحث. تأكد من كتابة أسماء المنتجات باللغة التركية.",
     placeholder: "اكتب اسم المنتج...",
     search: "ابحث",
     statusSearching: "جار البحث...",
