@@ -176,14 +176,24 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     const userUid = localStorage.getItem("user_uid");
-    const userEmail = String(localStorage.getItem("user_email") || "").toLowerCase();
-    const ownerAccess = localStorage.getItem("owner_access") === "true" && localStorage.getItem("owner_email") === "hadi.naji145@gmail.com";
+    const OWNER_EMAIL = "hadi.naji145@gmail.com";
+    const userEmail = localStorage.getItem("user_email");
+    const ownerAccess = localStorage.getItem("owner_access") === "true" && normalizeGmail(localStorage.getItem("owner_email")) === normalizeGmail(OWNER_EMAIL);
     let currentLang = localStorage.getItem("app_lang") || "tr";
     let currentOrders = [];
     let currentUsers = [];
 
     function t(key) {
       return (I18N[currentLang] && I18N[currentLang][key]) || I18N.tr[key] || key;
+    }
+
+    function normalizeGmail(email) {
+      const value = String(email || "").trim().toLowerCase();
+      const [local, domain] = value.split("@");
+      if (domain === "gmail.com" || domain === "googlemail.com") {
+        return `${local.replace(/\./g, "")}@gmail.com`;
+      }
+      return value;
     }
 
     function escapeHtml(text) {
@@ -219,11 +229,12 @@
     }
 
     async function checkAdmin() {
-      if (ownerAccess && userEmail === "hadi.naji145@gmail.com") return true;
+      if (ownerAccess && normalizeGmail(userEmail) === normalizeGmail(OWNER_EMAIL)) return true;
       if (!userUid) return false;
       try {
         const snap = await getDoc(doc(db, "users", userUid));
-        return snap.exists() && snap.data().role === "admin";
+        const data = snap.exists() ? snap.data() : {};
+        return data.role === "admin" || normalizeGmail(data.email) === normalizeGmail(OWNER_EMAIL);
       } catch {
         return false;
       }
