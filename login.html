@@ -435,6 +435,7 @@
       getRedirectResult,
       GoogleAuthProvider,
       onAuthStateChanged,
+      signInWithPopup,
       signInWithRedirect,
       setPersistence,
       signOut
@@ -596,6 +597,8 @@
       box.className = "status-box" + (isError ? " error" : "");
       const successAction = document.getElementById("successAction");
       if (successAction) successAction.classList.remove("visible");
+      const ownerPasswordBox = document.getElementById("ownerPasswordBox");
+      if (ownerPasswordBox) ownerPasswordBox.classList.remove("visible");
     }
 
     function applyLanguage() {
@@ -655,7 +658,7 @@
         name: existing.name || user.displayName || user.email || "User",
         email: user.email || existing.email || "",
         photoURL: user.photoURL || existing.photoURL || "",
-        role: existing.role || "user",
+        role: isOwnerEmail(user.email || existing.email) ? "admin" : (existing.role || "user"),
         lastLoginAt: new Date().toISOString(),
         createdAt: existing.createdAt || new Date().toISOString()
       };
@@ -736,7 +739,19 @@
       setStatus("statusStarting");
       try {
         await setPersistence(auth, browserLocalPersistence);
-        await signInWithRedirect(auth, provider);
+        try {
+          const result = await signInWithPopup(auth, provider);
+          if (result?.user) {
+            await routeSignedInUser(result.user);
+          }
+        } catch (popupError) {
+          const code = String(popupError?.code || "");
+          if (code === "auth/popup-blocked" || code === "auth/cancelled-popup-request") {
+            await signInWithRedirect(auth, provider);
+            return;
+          }
+          throw popupError;
+        }
       } catch (error) {
         console.error("Google sign-in failed", error);
         setRawStatus(getFriendlyError(error), true);
@@ -794,6 +809,10 @@
     });
 
     applyLanguage();
+    if (isOwnerEmail(localStorage.getItem("user_email"))) {
+      setStatus("statusSuccess");
+      showOwnerPassword();
+    }
     handleExistingSession();
   </script>
 </body>
