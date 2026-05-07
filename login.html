@@ -385,9 +385,10 @@
     import {
       browserLocalPersistence,
       getAuth,
+      getRedirectResult,
       GoogleAuthProvider,
       onAuthStateChanged,
-      signInWithPopup,
+      signInWithRedirect,
       setPersistence,
       signOut
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
@@ -624,10 +625,7 @@
       setStatus("statusStarting");
       try {
         await setPersistence(auth, browserLocalPersistence);
-        const result = await signInWithPopup(auth, provider);
-        if (result?.user) {
-          await routeSignedInUser(result.user);
-        }
+        await signInWithRedirect(auth, provider);
       } catch (error) {
         console.error("Google sign-in failed", error);
         setRawStatus(getFriendlyError(error), true);
@@ -636,6 +634,19 @@
 
     async function handleExistingSession() {
       await setPersistence(auth, browserLocalPersistence);
+      try {
+        const result = await getRedirectResult(auth);
+        if (result?.user) {
+          sessionStorage.setItem("login_auth_handled", result.user.uid);
+          await routeSignedInUser(result.user);
+          return;
+        }
+      } catch (error) {
+        console.error("Google redirect sign-in failed", error);
+        setRawStatus(getFriendlyError(error), true);
+        return;
+      }
+
       onAuthStateChanged(auth, async (user) => {
         if (!user) return;
         const handledUid = sessionStorage.getItem("login_auth_handled");
