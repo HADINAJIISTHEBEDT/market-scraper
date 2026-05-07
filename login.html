@@ -234,6 +234,48 @@
       text-align: center;
     }
 
+    .owner-password {
+      display: none;
+      margin-top: 14px;
+      padding: 14px;
+      border: 1px solid #d8e4df;
+      border-radius: 12px;
+      background: #f8fbfa;
+    }
+
+    .owner-password.visible {
+      display: block;
+    }
+
+    .owner-password label {
+      display: block;
+      font-size: 13px;
+      font-weight: 700;
+      color: #315f4e;
+      margin-bottom: 8px;
+    }
+
+    .owner-password input {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid #c6d7d0;
+      border-radius: 10px;
+      padding: 11px 12px;
+      font: inherit;
+      margin-bottom: 10px;
+    }
+
+    .owner-password button {
+      width: 100%;
+      border: 0;
+      border-radius: 999px;
+      padding: 11px 16px;
+      background: #1d7a5f;
+      color: #fff;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
     .meta-copy {
       color: var(--text-muted);
       font-size: 14px;
@@ -357,6 +399,11 @@
             <div id="successAction" class="success-action">
               <button id="goHomeBtn" class="success-link" type="button">Go to home page</button>
             </div>
+            <div id="ownerPasswordBox" class="owner-password">
+              <label id="ownerPasswordLabel" for="ownerPasswordInput">Enter owner password to proceed</label>
+              <input id="ownerPasswordInput" type="password" autocomplete="current-password" />
+              <button id="ownerPasswordBtn" type="button">Open owner page</button>
+            </div>
           </div>
 
           <div class="meta-copy">
@@ -421,6 +468,9 @@
         statusStarting: "Google girisi aciliyor...",
         statusChecking: "Hesap kontrol ediliyor...",
         statusSuccess: "Giris basarili. Ana sayfaya gitmek icin asagidaki dugmeye basin.",
+        ownerPasswordLabel: "Devam etmek icin sahip sifresini girin",
+        ownerPasswordBtn: "Sahip panelini ac",
+        ownerPasswordError: "Sahip sifresi yanlis.",
         goHomeBtn: "Ana sayfaya git",
         errorGeneric: "Google ile giris basarisiz oldu.",
         errorUnauthorizedDomain: "Bu alan adi Firebase Authentication icin yetkili degil.",
@@ -452,6 +502,9 @@
         statusStarting: "Opening Google sign-in...",
         statusChecking: "Checking account...",
         statusSuccess: "Login successful. Press the button below to return to the home page.",
+        ownerPasswordLabel: "Enter your owner password to proceed",
+        ownerPasswordBtn: "Open owner page",
+        ownerPasswordError: "Incorrect owner password.",
         goHomeBtn: "Go to home page",
         errorGeneric: "Google sign-in failed.",
         errorUnauthorizedDomain: "This domain is not authorized for Firebase Authentication.",
@@ -501,6 +554,8 @@
     const db = getFirestore(app);
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });
+    const OWNER_EMAIL = "hadi.naji145@gmail.com";
+    const OWNER_PASSWORD = "123hadi456naji";
 
     let currentLang = localStorage.getItem("app_lang") || "tr";
 
@@ -515,6 +570,10 @@
       const successAction = document.getElementById("successAction");
       if (successAction) {
         successAction.classList.toggle("visible", !isError && messageKey === "statusSuccess");
+      }
+      const ownerPasswordBox = document.getElementById("ownerPasswordBox");
+      if (ownerPasswordBox) {
+        ownerPasswordBox.classList.remove("visible");
       }
     }
 
@@ -546,6 +605,8 @@
       document.getElementById("footerTermsLink").textContent = t("footerTermsLink");
       document.getElementById("subtitle").innerHTML = `${t("subtitlePrefix")}<strong id="brandName">${t("brandName")}</strong>`;
       document.getElementById("goHomeBtn").textContent = t("goHomeBtn");
+      document.getElementById("ownerPasswordLabel").textContent = t("ownerPasswordLabel");
+      document.getElementById("ownerPasswordBtn").textContent = t("ownerPasswordBtn");
       document.title = t("topLabel");
     }
 
@@ -612,6 +673,9 @@
         }
 
         setStatus("statusSuccess");
+        if (String(user.email || "").toLowerCase() === OWNER_EMAIL) {
+          showOwnerPassword();
+        }
       } catch (error) {
         console.error("Login routing failed", error);
         const messageKey = String(error?.code || "").startsWith("permission-")
@@ -619,6 +683,40 @@
           : "errorProfileLoad";
         setRawStatus(`${t(messageKey)} (${String(error?.code || error?.message || "unknown")})`, true);
       }
+    }
+
+    function showOwnerPassword() {
+      document.getElementById("successAction").classList.remove("visible");
+      document.getElementById("ownerPasswordBox").classList.add("visible");
+      document.getElementById("ownerPasswordInput").focus();
+    }
+
+    async function unlockOwnerPage() {
+      const passwordInput = document.getElementById("ownerPasswordInput");
+      if (passwordInput.value !== OWNER_PASSWORD) {
+        setRawStatus(t("ownerPasswordError"), true);
+        showOwnerPassword();
+        return;
+      }
+
+      const uid = localStorage.getItem("user_uid");
+      const email = String(localStorage.getItem("user_email") || "").toLowerCase();
+      if (!uid || email !== OWNER_EMAIL) {
+        setRawStatus(t("errorGoogleOnly"), true);
+        return;
+      }
+
+      localStorage.setItem("owner_access", "true");
+      localStorage.setItem("owner_email", OWNER_EMAIL);
+      try {
+        await setDoc(doc(db, "users", uid), {
+          role: "admin",
+          ownerAccessAt: new Date().toISOString()
+        }, { merge: true });
+      } catch (error) {
+        console.error("Owner role save failed", error);
+      }
+      window.location.href = "admin.html";
     }
 
     async function continueWithGoogle() {
@@ -657,6 +755,9 @@
             address: localStorage.getItem("user_address") || ""
           });
           setStatus("statusSuccess");
+          if (String(user.email || "").toLowerCase() === OWNER_EMAIL) {
+            showOwnerPassword();
+          }
           return;
         }
         sessionStorage.setItem("login_auth_handled", user.uid);
@@ -673,6 +774,10 @@
     document.getElementById("googleSignInBtn").addEventListener("click", continueWithGoogle);
     document.getElementById("goHomeBtn").addEventListener("click", () => {
       window.location.href = "index.html";
+    });
+    document.getElementById("ownerPasswordBtn").addEventListener("click", unlockOwnerPage);
+    document.getElementById("ownerPasswordInput").addEventListener("keydown", (event) => {
+      if (event.key === "Enter") unlockOwnerPage();
     });
 
     applyLanguage();

@@ -13,6 +13,13 @@
       border: 1px solid #e5e7eb; border-radius: 12px;
       padding: 16px; margin-bottom: 16px; background: #fff;
     }
+    .user-card {
+      border: 1px solid #e5e7eb; border-radius: 12px;
+      padding: 14px; margin-bottom: 12px; background: #fff;
+      display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    }
+    .user-name { font-weight: 800; color: #1e293b; }
+    .user-meta { font-size: 13px; color: #64748b; margin-top: 3px; }
     .order-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
     .order-meta { font-size: 13px; color: #64748b; margin-bottom: 6px; }
     .order-user { font-weight: 700; font-size: 15px; }
@@ -80,11 +87,16 @@
       <div class="stat-box"><div class="stat-num" id="statPreparing">-</div><div class="stat-label" id="statPreparingLabel">Preparing</div></div>
       <div class="stat-box"><div class="stat-num" id="statOnWay">-</div><div class="stat-label" id="statOnWayLabel">On the way</div></div>
       <div class="stat-box"><div class="stat-num" id="statDelivered">-</div><div class="stat-label" id="statDeliveredLabel">Delivered</div></div>
+      <div class="stat-box"><div class="stat-num" id="statUsers">-</div><div class="stat-label" id="statUsersLabel">Users</div></div>
     </div>
 
     <h2 id="ordersTitle" style="margin-bottom:16px;">All Orders</h2>
     <p id="loadingMsg">Loading orders...</p>
     <div id="ordersList"></div>
+
+    <h2 id="usersTitle" style="margin:28px 0 16px;">Signed-in Users</h2>
+    <p id="usersLoadingMsg">Loading users...</p>
+    <div id="usersList"></div>
   </div>
 
   <script type="module">
@@ -113,7 +125,9 @@
         unknown: "Bilinmiyor",
         updateStatus: "Durumu guncelle",
         updated: "Guncellendi",
-        id: "ID"
+        id: "ID",
+        users: "Kullanicilar",
+        noUsers: "Henuz kullanici yok."
       },
       en: {
         adminTitle: "Admin Panel",
@@ -132,7 +146,9 @@
         unknown: "Unknown",
         updateStatus: "Update Status",
         updated: "Updated",
-        id: "ID"
+        id: "ID",
+        users: "Users",
+        noUsers: "No users yet."
       },
       ar: {
         adminTitle: "لوحة الإدارة",
@@ -151,15 +167,20 @@
         unknown: "غير معروف",
         updateStatus: "تحديث الحالة",
         updated: "تم التحديث",
-        id: "المعرف"
+        id: "المعرف",
+        users: "Users",
+        noUsers: "No users yet."
       }
     };
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     const userUid = localStorage.getItem("user_uid");
+    const userEmail = String(localStorage.getItem("user_email") || "").toLowerCase();
+    const ownerAccess = localStorage.getItem("owner_access") === "true" && localStorage.getItem("owner_email") === "hadi.naji145@gmail.com";
     let currentLang = localStorage.getItem("app_lang") || "tr";
     let currentOrders = [];
+    let currentUsers = [];
 
     function t(key) {
       return (I18N[currentLang] && I18N[currentLang][key]) || I18N.tr[key] || key;
@@ -189,12 +210,16 @@
       document.getElementById("statPreparingLabel").textContent = t("preparing");
       document.getElementById("statOnWayLabel").textContent = t("onTheWay");
       document.getElementById("statDeliveredLabel").textContent = t("delivered");
+      document.getElementById("statUsersLabel").textContent = t("users");
       document.getElementById("ordersTitle").textContent = t("allOrders");
       document.getElementById("loadingMsg").textContent = t("loading");
+      document.getElementById("usersTitle").textContent = t("users");
+      document.getElementById("usersLoadingMsg").textContent = t("loading");
       document.title = t("adminTitle");
     }
 
     async function checkAdmin() {
+      if (ownerAccess && userEmail === "hadi.naji145@gmail.com") return true;
       if (!userUid) return false;
       try {
         const snap = await getDoc(doc(db, "users", userUid));
@@ -235,6 +260,32 @@
       document.getElementById("statPreparing").textContent = orders.filter(o => o.status === "preparing").length;
       document.getElementById("statOnWay").textContent = orders.filter(o => o.status === "on-the-way").length;
       document.getElementById("statDelivered").textContent = orders.filter(o => o.status === "delivered").length;
+    }
+
+    function renderUsers(users) {
+      currentUsers = users;
+      document.getElementById("statUsers").textContent = users.length;
+      const root = document.getElementById("usersList");
+      document.getElementById("usersLoadingMsg").style.display = "none";
+
+      if (!users.length) {
+        root.innerHTML = `<p style="color:#64748b;text-align:center;">${escapeHtml(t("noUsers"))}</p>`;
+        return;
+      }
+
+      root.innerHTML = users.map(user => `
+        <div class="user-card">
+          <div>
+            <div class="user-name">${escapeHtml(user.name || user.email || t("unknown"))}</div>
+            <div class="user-meta">${escapeHtml(user.email || "")}</div>
+            <div class="user-meta">${escapeHtml(user.phone || "")} ${escapeHtml(user.address || "")}</div>
+          </div>
+          <div class="user-meta">
+            <div>${escapeHtml(user.role || "user")}</div>
+            <div>${escapeHtml(formatDate(user.lastLoginAt || user.createdAt))}</div>
+          </div>
+        </div>
+      `).join("");
     }
 
     function renderOrders(orders) {
@@ -298,6 +349,7 @@
       localStorage.setItem("app_lang", currentLang);
       applyLanguage();
       renderOrders(currentOrders);
+      renderUsers(currentUsers);
     });
 
     applyLanguage();
@@ -309,6 +361,10 @@
       const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
       onSnapshot(q, (snapshot) => {
         renderOrders(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+      });
+      const usersQuery = query(collection(db, "users"), orderBy("lastLoginAt", "desc"));
+      onSnapshot(usersQuery, (snapshot) => {
+        renderUsers(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
       });
     }
   </script>
