@@ -510,7 +510,7 @@
     function setStatus(messageKey, isError = false) {
       const box = document.getElementById("authStatus");
       box.textContent = t(messageKey);
-      box.className = "status-box" + (isError ? " error" : " success");
+      box.className = "status-box" + (isError ? " error" : messageKey === "statusSuccess" ? " success" : "");
       const successAction = document.getElementById("successAction");
       if (successAction) {
         successAction.classList.toggle("visible", !isError && messageKey === "statusSuccess");
@@ -520,7 +520,7 @@
     function setRawStatus(message, isError = false) {
       const box = document.getElementById("authStatus");
       box.textContent = message;
-      box.className = "status-box" + (isError ? " error" : " success");
+      box.className = "status-box" + (isError ? " error" : "");
       const successAction = document.getElementById("successAction");
       if (successAction) successAction.classList.remove("visible");
     }
