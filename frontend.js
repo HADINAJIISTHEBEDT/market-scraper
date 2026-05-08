@@ -124,16 +124,16 @@ const PRODUCT_TRANSLATIONS = {
 
 const I18N = {
   tr: {
-    title: "Market Urun Arama",
-    subtitle: "Kayitli urun yok. Sadece urun adini yazip ara.",
+    title: "Basketly",
+    subtitle: "Gunluk ihtiyaclarini daha hizli bul, sec ve sepetine ekle.",
     placeholder: "Urun adi yazin...",
     search: "Ara",
-    statusSearching: "Araniyor... Tum marketleri kontrol ediyoruz. Daha iyi sonuc icin yaklasik 1 dakika gerekebilir.",
+    statusSearching: "Araniyor... En iyi secenekleri hazirliyoruz. Yaklasik 1 dakika surebilir.",
     statusDone: "Arama tamamlandi.",
     statusWriteProduct: "Lutfen urun adi yazin.",
     statusError: "Hata",
     noResults: "Sonuc bulunamadi.",
-    filterAllMarkets: "Tum Marketler",
+    filterAllMarkets: "Tum Kaynaklar",
     filterSort: "Sirala",
     filterSortAsc: "Fiyat: Dusuk > Yuksek",
     filterSortDesc: "Fiyat: Yuksek > Dusuk",
@@ -155,7 +155,7 @@ const I18N = {
     contactComponent: "Mesaj",
     contactSubmit: "Mesaj gonder",
     contactClose: "Kapat",
-    navBrand: "Market Uygulamasi",
+    navBrand: "Basketly",
     navCart: "Sepet",
     navOrders: "Siparisler",
     navProfile: "Profil",
@@ -165,16 +165,16 @@ const I18N = {
     addedToCart: "Eklendi!",
   },
   en: {
-    title: "Market Product Search",
-    subtitle: "No saved items. Just type a product and search. Make sure item names are written in Turkish.",
+    title: "Basketly",
+    subtitle: "Find everyday items, compare choices quietly, and build your basket faster.",
     placeholder: "Type product name...",
     search: "Search",
-    statusSearching: "Searching... We are checking all markets. It may take about 1 minute to give better results.",
+    statusSearching: "Searching... We are preparing the best options. This can take about 1 minute.",
     statusDone: "Search completed.",
     statusWriteProduct: "Please enter a product name.",
     statusError: "Error",
     noResults: "No results found.",
-    filterAllMarkets: "All Markets",
+    filterAllMarkets: "All Sources",
     filterSort: "Sort",
     filterSortAsc: "Price: Low > High",
     filterSortDesc: "Price: High > Low",
@@ -196,7 +196,7 @@ const I18N = {
     contactComponent: "Message",
     contactSubmit: "Send message",
     contactClose: "Close",
-    navBrand: "Market App",
+    navBrand: "Basketly",
     navCart: "Cart",
     navOrders: "Orders",
     navProfile: "Profile",
@@ -563,72 +563,18 @@ window.doLogout = function() {
 function renderResults(data) {
   const root = document.getElementById("results");
   if (!root) return;
-  
-  const errors =
-    data && typeof data._errors === "object" && data._errors ? data._errors : {};
 
   const allItems = getAllResultItems(data);
   updateMarketOptions(allItems);
   const filters = getFilters();
+  const items = applyFilters(allItems, filters);
 
-  // Group items by market
-  const groupedItems = {};
-  allItems.forEach(item => {
-    const market = normalizeMarketKey(item.market);
-    if (!groupedItems[market]) {
-      groupedItems[market] = [];
-    }
-    groupedItems[market].push(item);
-  });
-
-  let html = "";
-  
-  // If a specific market is filtered, only show that market
-  if (filters.market) {
-    const marketKey = normalizeMarketKey(filters.market);
-    const items = applyFilters(groupedItems[marketKey] || [], filters);
-    html += `<section class="panel"><h3>${escapeHtml(marketLabelForKey(marketKey))} <span class="market-count">${items.length}</span></h3>`;
-    if (!items.length) {
-      const errorText = escapeHtml(errors[marketKey] || "");
-      if (errorText) {
-        html += `<p>${t("noResults")} (${errorText})</p></section>`;
-      } else {
-        html += `<p>${t("noResults")}</p></section>`;
-      }
-    } else {
-      html += `<div class="result-grid">${items.map(renderItemCard).join("")}</div></section>`;
-    }
-  } else {
-    // Show all known markets, even when a source returns no items.
-    const marketKeys = [...new Set([
-      ...MARKETS.map((market) => market.key),
-      ...Object.keys(groupedItems),
-    ])].sort((a, b) =>
-      marketLabelForKey(a).localeCompare(marketLabelForKey(b)),
-    );
-    for (const marketKey of marketKeys) {
-      let items = groupedItems[marketKey] || [];
-
-      // Apply filters to items
-      items = applyFilters(items, filters);
-
-      html += `<section class="panel"><h3>${escapeHtml(marketLabelForKey(marketKey))} <span class="market-count">${items.length}</span></h3>`;
-      if (!items.length) {
-        const errorText = escapeHtml(errors[marketKey] || "");
-        if (errorText) {
-          html += `<p>${t("noResults")} (${errorText})</p></section>`;
-        } else {
-          html += `<p>${t("noResults")}</p></section>`;
-        }
-      } else {
-        html += `<div class="result-grid">${items.map(renderItemCard).join("")}</div></section>`;
-      }
-    }
+  if (!items.length) {
+    root.innerHTML = `<section class="panel"><p>${t("noResults")}</p></section>`;
+    return;
   }
-  if (!html) {
-    html = `<section class="panel"><p>${t("noResults")}</p></section>`;
-  }
-  root.innerHTML = html;
+
+  root.innerHTML = `<section class="panel"><div class="result-grid">${items.map(renderItemCard).join("")}</div></section>`;
 }
 
 async function runSearch() {

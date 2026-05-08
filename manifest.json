@@ -1,11 +1,11 @@
 {
-  "name": "Dessert Cafe Manager",
-  "short_name": "DessertCafe",
-  "description": "Manage dessert timers and market prices",
+  "name": "Basketly",
+  "short_name": "Basketly",
+  "description": "Find everyday items and build your basket faster",
   "start_url": "/index.html",
   "display": "standalone",
-  "background_color": "#fdf7f0",
-  "theme_color": "#c89b6d",
+  "background_color": "#f7f8f4",
+  "theme_color": "#1f7a5c",
   "icons": [
     {
       "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍰</text></svg>",
