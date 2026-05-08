@@ -543,18 +543,59 @@ window.doLogout = function() {
 function renderResults(data) {
   const root = document.getElementById("results");
   if (!root) return;
+  
+  const errors =
+    data && typeof data._errors === "object" && data._errors ? data._errors : {};
 
   const allItems = getAllResultItems(data);
   updateMarketOptions(allItems);
   const filters = getFilters();
-  const items = applyFilters(allItems, filters);
 
-  if (!items.length) {
-    root.innerHTML = `<section class="panel"><p>${t("noResults")}</p></section>`;
-    return;
+  const groupedItems = {};
+  allItems.forEach(item => {
+    const market = normalizeMarketKey(item.market);
+    if (!groupedItems[market]) {
+      groupedItems[market] = [];
+    }
+    groupedItems[market].push(item);
+  });
+
+  let html = "";
+  
+  if (filters.market) {
+    const marketKey = normalizeMarketKey(filters.market);
+    const items = applyFilters(groupedItems[marketKey] || [], filters);
+    html += `<section class="panel"><h3>${escapeHtml(marketLabelForKey(marketKey))} <span class="market-count">${items.length}</span></h3>`;
+    if (!items.length) {
+      const errorText = escapeHtml(errors[marketKey] || "");
+      html += `<p>${t("noResults")}${errorText ? ` (${errorText})` : ""}</p></section>`;
+    } else {
+      html += `<div class="result-grid">${items.map(renderItemCard).join("")}</div></section>`;
+    }
+  } else {
+    const marketKeys = [...new Set([
+      ...MARKETS.map((market) => market.key),
+      ...Object.keys(groupedItems),
+    ])].sort((a, b) =>
+      marketLabelForKey(a).localeCompare(marketLabelForKey(b)),
+    );
+
+    for (const marketKey of marketKeys) {
+      const items = applyFilters(groupedItems[marketKey] || [], filters);
+      html += `<section class="panel"><h3>${escapeHtml(marketLabelForKey(marketKey))} <span class="market-count">${items.length}</span></h3>`;
+      if (!items.length) {
+        const errorText = escapeHtml(errors[marketKey] || "");
+        html += `<p>${t("noResults")}${errorText ? ` (${errorText})` : ""}</p></section>`;
+      } else {
+        html += `<div class="result-grid">${items.map(renderItemCard).join("")}</div></section>`;
+      }
+    }
   }
 
-  root.innerHTML = `<section class="panel"><div class="result-grid">${items.map(renderItemCard).join("")}</div></section>`;
+  if (!html) {
+    html = `<section class="panel"><p>${t("noResults")}</p></section>`;
+  }
+  root.innerHTML = html;
 }
 
 async function runSearch() {
