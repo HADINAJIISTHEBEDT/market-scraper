@@ -470,24 +470,12 @@ function renderItemCard(item) {
   const brandHtml = item.brand
     ? `<div class="item-brand">${escapeHtml(item.brand)}</div>`
     : "";
-  // Encode item data safely for the onclick handler
-  const itemData = escapeHtml(JSON.stringify({
-    name: item.name,
-    price: item.price,
-    image: item.image || "",
-    market: item.market || "",
-    brand: item.brand || ""
-  }));
   return `<article class="item-card">
     ${imageHtml}
     ${brandHtml}
     <div class="item-name">${escapeHtml(item.name)}</div>
     <div class="item-price">${formatPrice(item.price)}</div>
     ${item.unitPrice ? `<div class="item-unit">${escapeHtml(item.unitPrice)}</div>` : ""}
-    <button
-      onclick="addToCart(${itemData})"
-      style="margin-top:8px;width:100%;padding:7px;background:#2563eb;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:13px;font-weight:600;"
-    >${escapeHtml(t("addToCart"))}</button>
   </article>`;
 }
 
@@ -532,22 +520,14 @@ window.addToCart = function(item) {
 
 // ── Navbar auth helpers ───────────────────────────────────────
 function updateNavbar() {
-  const name = localStorage.getItem("user_name");
   const navUser = document.getElementById("navUser");
   const navLoginBtn = document.getElementById("navLoginBtn");
   const navLogoutBtn = document.getElementById("navLogoutBtn");
   const navProfileBtn = document.getElementById("navProfileBtn");
-  if (name) {
-    if (navUser) navUser.textContent = `👤 ${name}`;
-    if (navLoginBtn) navLoginBtn.style.display = "none";
-    if (navLogoutBtn) navLogoutBtn.style.display = "";
-    if (navProfileBtn) navProfileBtn.style.display = "";
-  } else {
-    if (navUser) navUser.textContent = "";
-    if (navLoginBtn) navLoginBtn.style.display = "";
-    if (navLogoutBtn) navLogoutBtn.style.display = "none";
-    if (navProfileBtn) navProfileBtn.style.display = "none";
-  }
+  if (navUser) navUser.textContent = "";
+  if (navLoginBtn) navLoginBtn.style.display = "none";
+  if (navLogoutBtn) navLogoutBtn.style.display = "none";
+  if (navProfileBtn) navProfileBtn.style.display = "none";
 }
 
 window.doLogout = function() {

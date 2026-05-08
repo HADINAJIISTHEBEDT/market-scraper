@@ -57,13 +57,7 @@
         text-decoration: none;
       }
 
-      .hero {
-        display: grid;
-        grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
-        gap: 24px;
-        align-items: center;
-        padding: 22px 0 20px;
-      }
+      .hero { padding: 22px 0 14px; }
 
       .hero h1 {
         font-size: clamp(34px, 6vw, 64px);
@@ -86,7 +80,7 @@
       }
 
       .ad-tile {
-        min-height: 160px;
+        min-height: 150px;
         border-radius: 12px;
         overflow: hidden;
         background-size: cover;
@@ -259,10 +253,6 @@
           padding: 16px;
         }
 
-        .hero {
-          grid-template-columns: 1fr;
-        }
-
         .ad-strip {
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
@@ -280,10 +270,10 @@
       <span class="brand-lockup"><span class="brand-mark">B</span><span id="navBrand">Basketly</span></span>
       <div class="nav-links">
         <span id="navUser" style="font-size:14px;color:#334155;"></span>
-        <a id="navCartBtn" href="cart.html">Cart (<span id="cartCount">0</span>)</a>
-        <a id="navOrdersBtn" href="orders.html">Orders</a>
-        <a id="navProfileBtn" href="profile.html" style="display:none;">Profile</a>
-        <a id="navLoginBtn" href="login.html">Login</a>
+        <a id="navCartBtn" href="cart.html" hidden>Cart (<span id="cartCount">0</span>)</a>
+        <a id="navOrdersBtn" href="orders.html" hidden>Orders</a>
+        <a id="navProfileBtn" href="profile.html" hidden>Profile</a>
+        <a id="navLoginBtn" href="login.html" hidden>Login</a>
         <button id="navLogoutBtn" onclick="doLogout()" style="display:none;background:none;border:1px solid #e5e7eb;border-radius:6px;padding:4px 10px;cursor:pointer;color:#b91c1c;font-weight:600;">Logout</button>
       </div>
     </div>
@@ -292,11 +282,6 @@
       <section>
         <h1 id="title">Basketly</h1>
         <p id="subtitle">Find everyday items, compare choices quietly, and build your basket faster.</p>
-      </section>
-      <section class="ad-strip" aria-label="Featured items">
-        <div class="ad-tile" style="background-image:url('https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80')"><span>Fresh picks</span></div>
-        <div class="ad-tile" style="background-image:url('https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=600&q=80')"><span>Bakery</span></div>
-        <div class="ad-tile" style="background-image:url('https://images.unsplash.com/photo-1551024506-0bccd828d307?auto=format&fit=crop&w=600&q=80')"><span>Treats</span></div>
       </section>
     </div>
 
@@ -332,6 +317,12 @@
         <input id="itemLimit" type="number" placeholder="Item limit" min="1" max="100" />
       </div>
       <p id="status"></p>
+    </section>
+
+    <section class="ad-strip" aria-label="Featured items" style="margin-top:14px;">
+      <div class="ad-tile" style="background-image:url('https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80')"><span>Fresh vegetables</span></div>
+      <div class="ad-tile" style="background-image:url('https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=600&q=80')"><span>Bread and bakery</span></div>
+      <div class="ad-tile" style="background-image:url('https://images.unsplash.com/photo-1589927986089-35812388d1f4?auto=format&fit=crop&w=600&q=80')"><span>Daily groceries</span></div>
     </section>
 
     <div id="results"></div>
