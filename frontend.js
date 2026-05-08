@@ -124,11 +124,11 @@ const PRODUCT_TRANSLATIONS = {
 
 const I18N = {
   tr: {
-    title: "Basketly",
+    title: "PazarQuery",
     subtitle: "Gunluk ihtiyaclarini daha hizli bul, sec ve sepetine ekle.",
     placeholder: "Urun adi yazin...",
     search: "Ara",
-    statusSearching: "Araniyor... En iyi secenekleri hazirliyoruz. Yaklasik 1 dakika surebilir.",
+    statusSearching: "Araniyor... Daha iyi sonuclar icin bitirmemiz yaklasik 1 dakika surebilir.",
     statusDone: "Arama tamamlandi.",
     statusWriteProduct: "Lutfen urun adi yazin.",
     statusError: "Hata",
@@ -155,7 +155,7 @@ const I18N = {
     contactComponent: "Mesaj",
     contactSubmit: "Mesaj gonder",
     contactClose: "Kapat",
-    navBrand: "Basketly",
+    navBrand: "PazarQuery",
     navCart: "Sepet",
     navOrders: "Siparisler",
     navProfile: "Profil",
@@ -163,13 +163,14 @@ const I18N = {
     navLogout: "Cikis",
     addToCart: "Sepete ekle",
     addedToCart: "Eklendi!",
+    backToSearch: "Aramaya don",
   },
   en: {
-    title: "Basketly",
+    title: "PazarQuery",
     subtitle: "Find everyday items, compare choices quietly, and build your basket faster.",
     placeholder: "Type product name...",
     search: "Search",
-    statusSearching: "Searching... We are preparing the best options. This can take about 1 minute.",
+    statusSearching: "Searching... For better results we might take about 1 minute to finish.",
     statusDone: "Search completed.",
     statusWriteProduct: "Please enter a product name.",
     statusError: "Error",
@@ -196,7 +197,7 @@ const I18N = {
     contactComponent: "Message",
     contactSubmit: "Send message",
     contactClose: "Close",
-    navBrand: "Basketly",
+    navBrand: "PazarQuery",
     navCart: "Cart",
     navOrders: "Orders",
     navProfile: "Profile",
@@ -204,13 +205,14 @@ const I18N = {
     navLogout: "Logout",
     addToCart: "Add to Cart",
     addedToCart: "Added!",
+    backToSearch: "Back to search",
   },
   ar: {
-    title: "بحث منتجات السوق",
+    title: "PazarQuery",
     subtitle: "لا توجد عناصر محفوظة. فقط اكتب منتج وابحث. تأكد من كتابة أسماء المنتجات باللغة التركية.",
-    placeholder: "اكتب اسم المنتج...",
+    placeholder: "\u0627\u0643\u062a\u0628 \u0627\u0633\u0645 \u0627\u0644\u0645\u0646\u062a\u062c...",
     search: "ابحث",
-    statusSearching: "جار البحث... نحن نتحقق من جميع الأسواق. قد نحتاج حوالي دقيقة للحصول على نتائج أفضل.",
+    statusSearching: "\u062c\u0627\u0631 \u0627\u0644\u0628\u062d\u062b... \u0644\u0644\u062d\u0635\u0648\u0644 \u0639\u0644\u0649 \u0646\u062a\u0627\u0626\u062c \u0623\u0641\u0636\u0644 \u0642\u062f \u0646\u062d\u062a\u0627\u062c \u062d\u0648\u0627\u0644\u064a \u062f\u0642\u064a\u0642\u0629 \u0648\u0627\u062d\u062f\u0629 \u0644\u0644\u0627\u0646\u062a\u0647\u0627\u0621.",
     statusDone: "اكتمل البحث.",
     statusWriteProduct: "يرجى إدخال اسم المنتج.",
     statusError: "خطأ",
@@ -237,13 +239,14 @@ const I18N = {
     contactComponent: "الرسالة",
     contactSubmit: "إرسال الرسالة",
     contactClose: "إغلاق",
-    navBrand: "تطبيق السوق",
+    navBrand: "PazarQuery",
     navCart: "السلة",
     navOrders: "الطلبات",
     navProfile: "الملف الشخصي",
     navLogin: "تسجيل الدخول",
     navLogout: "تسجيل الخروج",
     addToCart: "أضف إلى السلة",
+    backToSearch: "\u0627\u0644\u0639\u0648\u062f\u0629 \u0625\u0644\u0649 \u0627\u0644\u0628\u062d\u062b",
     addedToCart: "تمت الإضافة!",
   },
 };
@@ -370,6 +373,28 @@ function applyLanguage() {
   if (navProfileBtn) navProfileBtn.textContent = t("navProfile");
   if (navLoginBtn) navLoginBtn.textContent = t("navLogin");
   if (navLogoutBtn) navLogoutBtn.textContent = t("navLogout");
+  const backToSearchBtn = document.getElementById("backToSearchBtn");
+  if (backToSearchBtn) backToSearchBtn.textContent = t("backToSearch");
+}
+
+function showResultsView() {
+  const homeView = document.getElementById("homeView");
+  const resultsView = document.getElementById("resultsView");
+  if (homeView) homeView.hidden = true;
+  if (resultsView) resultsView.hidden = false;
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function showSearchView() {
+  const homeView = document.getElementById("homeView");
+  const resultsView = document.getElementById("resultsView");
+  const results = document.getElementById("results");
+  if (homeView) homeView.hidden = false;
+  if (resultsView) resultsView.hidden = true;
+  if (results) results.innerHTML = "";
+  currentResultsData = null;
+  setStatus("");
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function getFilters() {
@@ -624,6 +649,7 @@ async function runSearch() {
     currentResultsData = data;
     renderResults(data);
     setStatus(t("statusDone"));
+    showResultsView();
   } catch (error) {
     setStatus(`${t("statusError")}: ${error.message}`, true);
   }
@@ -646,7 +672,9 @@ window.addEventListener("DOMContentLoaded", () => {
   applyLanguage();
   const button = document.getElementById("searchBtn");
   const input = document.getElementById("searchInput");
+  const backToSearchBtn = document.getElementById("backToSearchBtn");
   if (button) button.addEventListener("click", runSearch);
+  if (backToSearchBtn) backToSearchBtn.addEventListener("click", showSearchView);
   if (input) {
     input.addEventListener("keydown", (event) => {
       if (event.key === "Enter") runSearch();

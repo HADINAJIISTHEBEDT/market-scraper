@@ -1,6 +1,6 @@
 {
-  "name": "Basketly",
-  "short_name": "Basketly",
+  "name": "PazarQuery",
+  "short_name": "PazarQuery",
   "description": "Find everyday items and build your basket faster",
   "start_url": "/index.html",
   "display": "standalone",

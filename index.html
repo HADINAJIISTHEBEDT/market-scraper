@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Basketly</title>
+    <title>PazarQuery</title>
     <link rel="stylesheet" href="css.css" />
     <style>
       body {
@@ -259,7 +259,7 @@
   </head>
   <body>
     <div class="top-nav">
-      <span class="brand-lockup"><span class="brand-mark">B</span><span id="navBrand">Basketly</span></span>
+      <span class="brand-lockup"><span class="brand-mark">B</span><span id="navBrand">PazarQuery</span></span>
       <div class="nav-links">
         <span id="navUser" style="font-size:14px;color:#334155;"></span>
         <a id="navCartBtn" href="cart.html" hidden>Cart (<span id="cartCount">0</span>)</a>
@@ -270,9 +270,10 @@
       </div>
     </div>
 
+    <main id="homeView">
     <div class="hero">
       <section>
-        <h1 id="title">Basketly</h1>
+        <h1 id="title">PazarQuery</h1>
         <p id="subtitle">Find everyday items, compare choices quietly, and build your basket faster.</p>
       </section>
     </div>
@@ -315,15 +316,26 @@
       <div class="ad-tile" style="background-image:url('https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80')"><span>Fresh vegetables</span></div>
       <div class="ad-tile" style="background-image:url('https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=600&q=80')"><span>Bread and bakery</span></div>
       <div class="ad-tile" style="background-image:url('https://images.unsplash.com/photo-1589927986089-35812388d1f4?auto=format&fit=crop&w=600&q=80')"><span>Daily groceries</span></div>
+      <div class="ad-tile" style="background-image:url('https://images.unsplash.com/photo-1519996529931-28324d5a630e?auto=format&fit=crop&w=600&q=80')"><span>Fruit</span></div>
+      <div class="ad-tile" style="background-image:url('https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=600&q=80')"><span>Rice and grains</span></div>
+      <div class="ad-tile" style="background-image:url('https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=600&q=80')"><span>Desserts</span></div>
+      <div class="ad-tile" style="background-image:url('https://images.unsplash.com/photo-1518977676601-b53f82aba655?auto=format&fit=crop&w=600&q=80')"><span>Potatoes</span></div>
+      <div class="ad-tile" style="background-image:url('https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&w=600&q=80')"><span>Dairy</span></div>
+      <div class="ad-tile" style="background-image:url('https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=600&q=80')"><span>Vegetables</span></div>
+      <div class="ad-tile" style="background-image:url('https://images.unsplash.com/photo-1528825871115-3581a5387919?auto=format&fit=crop&w=600&q=80')"><span>Bananas</span></div>
     </section>
+    </main>
 
+    <section id="resultsView" hidden>
+      <button id="backToSearchBtn" type="button" style="margin:16px 0;padding:10px 16px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;cursor:pointer;font-weight:700;">Back to search</button>
+    </section>
     <div id="results"></div>
 
     <footer class="contact-area">
       <p><span id="contactPrompt">For any problem </span><button id="contactToggle" class="contact-link" type="button">contact us</button></p>
       <div id="contactFormWrap" hidden>
         <form class="contact-form" action="https://formsubmit.co/hadi.naji145@gmail.com" method="POST">
-          <input type="hidden" name="_subject" value="Basketly contact message" />
+          <input type="hidden" name="_subject" value="PazarQuery contact message" />
           <input type="hidden" name="_captcha" value="false" />
           <label>
             <span id="contactEmailLabel">Email</span>
