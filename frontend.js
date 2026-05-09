@@ -177,7 +177,7 @@ const I18N = {
   },
   en: {
     title: "PazarQuery",
-    subtitle: "Find everyday items, compare choices quietly. Make sure to write product names in Turkish.",
+    subtitle: "Find everyday items, compare choices quietly.",
     placeholder: "Type product name...",
     search: "Search",
     statusSearching: "Searching... For better results we might take about 1 minute to finish.",
