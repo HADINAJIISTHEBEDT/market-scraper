@@ -177,7 +177,7 @@ const I18N = {
   },
   en: {
     title: "PazarQuery",
-    subtitle: "Find everyday items, compare choices quietly.",
+    subtitle: "Find everyday items, compare choices quietly. Make sure to write product names in Turkish.",
     placeholder: "Type product name...",
     search: "Search",
     statusSearching: "Searching... For better results we might take about 1 minute to finish.",
@@ -353,7 +353,13 @@ function applyLanguage() {
   
   if (title) title.textContent = t("title");
   document.title = t("title");
-  if (subtitle) subtitle.textContent = t("subtitle");
+  if (subtitle) {
+    let sub = t("subtitle");
+    if (currentLang !== "tr") {
+      sub += " Make sure to write product names in Turkish.";
+    }
+    subtitle.textContent = sub;
+  }
   if (input) input.placeholder = t("placeholder");
   if (button) button.textContent = t("search");
   
