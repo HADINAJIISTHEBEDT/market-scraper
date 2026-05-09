@@ -703,12 +703,13 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   }
   applyLanguage();
+  loadCategories();
   const button = document.getElementById("searchBtn");
   const input = document.getElementById("searchInput");
   const backToSearchBtn = document.getElementById("backToSearchBtn");
   if (button) button.addEventListener("click", runSearch);
   if (backToSearchBtn) backToSearchBtn.addEventListener("click", showSearchView);
-  document.querySelectorAll(".ad-tile").forEach(tile => {
+document.querySelectorAll(".ad-tile").forEach(tile => {
     tile.style.cursor = "pointer";
     tile.addEventListener("click", () => {
       const searchTerm = tile.getAttribute("data-search");
@@ -718,6 +719,56 @@ window.addEventListener("DOMContentLoaded", () => {
         if (limitInput) limitInput.value = 30;
         runSearch();
       }
+    });
+  });
+}
+
+async function loadCategories() {
+  const categories = ["sebze", "ekmek", "gida", "meyve", "cikolata", "peynir"];
+  const resultsContainer = document.getElementById("results");
+  if (!resultsContainer) return;
+  
+  let html = "";
+  for (const category of categories) {
+    try {
+      const response = await fetch(`${SCRAPER_API_BASE}/search-all`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ product: category }),
+      });
+      if (!response.ok) continue;
+      const data = await response.json();
+      
+      const allItems = [];
+      for (const key in data || {}) {
+        if (key === "_errors") continue;
+        if (Array.isArray(data[key])) {
+          allItems.push(...data[key].slice(0, 30));
+        }
+      }
+      
+      if (allItems.length > 0) {
+        const categoryName = {
+          sebze: "Fresh vegetables",
+          ekmek: "Bread and bakery",
+          gida: "Daily groceries",
+          meyve: "Fruits",
+          cikolata: "Desserts",
+          peynir: "Dairy"
+        }[category] || category;
+        
+        html += `<section class="panel"><h3>${escapeHtml(categoryName)}</h3>`;
+        html += `<div class="result-grid">${allItems.slice(0, 30).map(renderItemCard).join("")}</div></section>`;
+      }
+    } catch (e) {
+      console.error("Error loading category:", category, e);
+    }
+  }
+  
+  if (html) {
+    resultsContainer.innerHTML = html;
+  }
+}
     });
   });
   if (input) {
