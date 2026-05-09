@@ -724,6 +724,16 @@ window.addEventListener("DOMContentLoaded", () => {
   const backToSearchBtn = document.getElementById("backToSearchBtn");
   if (button) button.addEventListener("click", runSearch);
   if (backToSearchBtn) backToSearchBtn.addEventListener("click", showSearchView);
+  document.querySelectorAll(".ad-tile").forEach(tile => {
+    tile.style.cursor = "pointer";
+    tile.addEventListener("click", () => {
+      const searchTerm = tile.getAttribute("data-search");
+      if (searchTerm && input) {
+        input.value = searchTerm;
+        runSearch();
+      }
+    });
+  });
   if (input) {
     input.addEventListener("keydown", (event) => {
       if (event.key === "Enter") runSearch();
