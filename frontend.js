@@ -125,7 +125,7 @@ const PRODUCT_TRANSLATIONS = {
 const I18N = {
   tr: {
     title: "PazarQuery",
-    subtitle: "Gunluk ihtiyaclarini daha hizli bul, sec ve sepetine ekle.",
+    subtitle: "Gunluk ihtiyaclarini bul ve secimlerini karsilastir. Urun isimlerini Turkce yazmayi unutma.",
     placeholder: "Urun adi yazin...",
     search: "Ara",
     statusSearching: "Araniyor... Daha iyi sonuclar icin bitirmemiz yaklasik 1 dakika surebilir.",
@@ -177,7 +177,7 @@ const I18N = {
   },
   en: {
     title: "PazarQuery",
-    subtitle: "Find everyday items, compare choices quietly, and build your basket faster.",
+    subtitle: "Find everyday items, compare choices quietly. Make sure to write product names in Turkish.",
     placeholder: "Type product name...",
     search: "Search",
     statusSearching: "Searching... For better results we might take about 1 minute to finish.",
