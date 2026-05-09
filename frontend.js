@@ -730,6 +730,8 @@ window.addEventListener("DOMContentLoaded", () => {
       const searchTerm = tile.getAttribute("data-search");
       if (searchTerm && input) {
         input.value = searchTerm;
+        const limitInput = document.getElementById("itemLimit");
+        if (limitInput) limitInput.value = 30;
         runSearch();
       }
     });
