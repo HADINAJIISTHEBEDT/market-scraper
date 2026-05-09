@@ -164,6 +164,16 @@ const I18N = {
     addToCart: "Sepete ekle",
     addedToCart: "Eklendi!",
     backToSearch: "Aramaya don",
+    featuredFreshVegetables: "Taze sebzeler",
+    featuredBreadAndBakery: "Ekmek ve fırın ürünleri",
+    featuredDailyGroceries: "Günlük temel gıdalar",
+    featuredFruit: "Meyve",
+    featuredRiceAndGrains: "Pirinç ve tahıllar",
+    featuredDesserts: "Tatlılar",
+    featuredPotatoes: "Patates",
+    featuredDairy: "Süt ürünleri",
+    featuredVegetables: "Sebzeler",
+    featuredBananas: "Muz",
   },
   en: {
     title: "PazarQuery",
@@ -206,6 +216,16 @@ const I18N = {
     addToCart: "Add to Cart",
     addedToCart: "Added!",
     backToSearch: "Back to search",
+    featuredFreshVegetables: "Fresh vegetables",
+    featuredBreadAndBakery: "Bread and bakery",
+    featuredDailyGroceries: "Daily groceries",
+    featuredFruit: "Fruit",
+    featuredRiceAndGrains: "Rice and grains",
+    featuredDesserts: "Desserts",
+    featuredPotatoes: "Potatoes",
+    featuredDairy: "Dairy",
+    featuredVegetables: "Vegetables",
+    featuredBananas: "Bananas",
   },
   ar: {
     title: "PazarQuery",
@@ -247,7 +267,17 @@ const I18N = {
     navLogout: "تسجيل الخروج",
     addToCart: "أضف إلى السلة",
     backToSearch: "\u0627\u0644\u0639\u0648\u062f\u0629 \u0625\u0644\u0649 \u0627\u0644\u0628\u062d\u062b",
-    addedToCart: "تمت الإضافة!",
+    addedToCart: "\u062a\u0645\u062a \u0627\u0644\u0625\u0636\u0627\u0641\u0629!",
+    featuredFreshVegetables: "\u062e\u0636\u0631\u0648\u0627\u062a \u0637\u0627\u0632\u062c\u0629",
+    featuredBreadAndBakery: "\u0627\u0644\u062e\u0628\u0632 \u0648\u0627\u0644\u0645\u062e\u0628\u0632\u0627\u062a",
+    featuredDailyGroceries: "\u0627\u0644\u0628\u0642\u0627\u0644\u0629 \u0627\u0644\u064a\u0648\u0645\u064a\u0629",
+    featuredFruit: "\u0627\u0644\u0641\u0627\u0643\u0647\u0629",
+    featuredRiceAndGrains: "\u0627\u0644\u0623\u0631\u0632 \u0648\u0627\u0644\u062d\u0628\u0648\u0628",
+    featuredDesserts: "\u0627\u0644\u062d\u0644\u0648\u064a\u0627\u062a",
+    featuredPotatoes: "\u0627\u0644\u0628\u0637\u0637\u0633",
+    featuredDairy: "\u0645\u0646\u062a\u062c\u0627\u062a \u0627\u0644\u0623\u0644\u0628\u0627\u0646",
+    featuredVegetables: "\u0627\u0644\u062e\u0636\u0631\u0648\u0627\u062a",
+    featuredBananas: "\u0627\u0644\u0645\u0648\u0632",
   },
 };
 
@@ -375,6 +405,25 @@ function applyLanguage() {
   if (navLogoutBtn) navLogoutBtn.textContent = t("navLogout");
   const backToSearchBtn = document.getElementById("backToSearchBtn");
   if (backToSearchBtn) backToSearchBtn.textContent = t("backToSearch");
+
+  const featuredItems = document.querySelectorAll(".ad-tile span");
+  const featuredKeys = [
+    "featuredFreshVegetables",
+    "featuredBreadAndBakery",
+    "featuredDailyGroceries",
+    "featuredFruit",
+    "featuredRiceAndGrains",
+    "featuredDesserts",
+    "featuredPotatoes",
+    "featuredDairy",
+    "featuredVegetables",
+    "featuredBananas",
+  ];
+  featuredItems.forEach((span, index) => {
+    if (span && featuredKeys[index]) {
+      span.textContent = t(featuredKeys[index]);
+    }
+  });
 }
 
 function showResultsView() {
