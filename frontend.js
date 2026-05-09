@@ -165,6 +165,7 @@ const I18N = {
     addedToCart: "Eklendi!",
     backToSearch: "Aramaya don",
     featuredFreshVegetables: "Taze sebzeler",
+    featuredBreadAndBakery: "Ekmek ve fırın ürünleri",
     featuredDailyGroceries: "Günlük gıda ürünleri",
     featuredFruits: "Meyveler",
     featuredDesserts: "Tatlılar",
@@ -212,6 +213,7 @@ const I18N = {
     addedToCart: "Added!",
     backToSearch: "Back to search",
     featuredFreshVegetables: "Fresh vegetables",
+    featuredBreadAndBakery: "Bread and bakery",
     featuredDailyGroceries: "Daily groceries",
     featuredFruits: "Fruits",
     featuredDesserts: "Desserts",
@@ -259,6 +261,7 @@ const I18N = {
     backToSearch: "\u0627\u0644\u0639\u0648\u062f\u0629 \u0625\u0644\u0649 \u0627\u0644\u0628\u062d\u062b",
     addedToCart: "\u062a\u0645\u062a \u0627\u0644\u0625\u0636\u0627\u0641\u0629!",
     featuredFreshVegetables: "\u062e\u0636\u0631\u0648\u0627\u062a \u0637\u0627\u0632\u062c\u0629",
+    featuredBreadAndBakery: "\u0627\u0644\u062e\u0628\u0632 \u0648\u0627\u0644\u0645\u062e\u0628\u0632\u0627\u062a",
     featuredDailyGroceries: "\u0627\u0644\u0628\u0642\u0627\u0644\u0629 \u0627\u0644\u064a\u0648\u0645\u064a\u0629",
     featuredFruits: "\u0627\u0644\u0641\u0627\u0643\u0647\u0629",
     featuredDesserts: "\u0627\u0644\u062d\u0644\u0648\u064a\u0627\u062a",
@@ -394,6 +397,7 @@ function applyLanguage() {
   const featuredItems = document.querySelectorAll(".ad-tile span");
   const featuredKeys = [
     "featuredFreshVegetables",
+    "featuredBreadAndBakery",
     "featuredDailyGroceries",
     "featuredFruits",
     "featuredDesserts",
