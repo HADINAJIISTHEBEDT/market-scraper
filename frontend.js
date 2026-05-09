@@ -125,7 +125,7 @@ const PRODUCT_TRANSLATIONS = {
 const I18N = {
   tr: {
     title: "PazarQuery",
-    subtitle: "Gunluk ihtiyaclarini bul ve secimlerini karsilastir. Urun isimlerini Turkce yazmayi unutma.",
+    subtitle: "Gunluk ihtiyaclarini bul ve secimlerini karsilastir.",
     placeholder: "Urun adi yazin...",
     search: "Ara",
     statusSearching: "Araniyor... Daha iyi sonuclar icin bitirmemiz yaklasik 1 dakika surebilir.",
@@ -353,13 +353,7 @@ function applyLanguage() {
   
   if (title) title.textContent = t("title");
   document.title = t("title");
-  if (subtitle) {
-    let sub = t("subtitle");
-    if (currentLang !== "tr") {
-      sub += " Make sure to write product names in Turkish.";
-    }
-    subtitle.textContent = sub;
-  }
+  if (subtitle) subtitle.textContent = t("subtitle");
   if (input) input.placeholder = t("placeholder");
   if (button) button.textContent = t("search");
   
