@@ -713,16 +713,48 @@ document.querySelectorAll(".ad-tile").forEach(tile => {
     tile.style.cursor = "pointer";
     tile.addEventListener("click", () => {
       const category = tile.getAttribute("data-category");
-      if (category && categoryData[category]) {
-        const resultsContainer = document.getElementById("results");
-        if (resultsContainer) {
-          let html = `<section class="panel"><h3>${escapeHtml(CATEGORY_NAMES[category])}</h3>`;
-          html += `<div class="result-grid">${categoryData[category].map(renderItemCard).join("")}</div></section>`;
-          resultsContainer.innerHTML = html;
-        }
+      const resultsContainer = document.getElementById("results");
+      
+      if (!resultsContainer) return;
+      
+      if (category && categoryData[category] && categoryData[category].length > 0) {
+        let html = `<section class="panel"><h3>${escapeHtml(CATEGORY_NAMES[category])}</h3>`;
+        html += `<div class="result-grid">${categoryData[category].map(renderItemCard).join("")}</div></section>`;
+        resultsContainer.innerHTML = html;
+        window.scrollTo({ top: resultsContainer.offsetTop - 20, behavior: "smooth" });
+      } else {
+        resultsContainer.innerHTML = '<p id="status">Loading...</p>';
+        loadSingleCategory(category).then(items => {
+          if (items && items.length > 0) {
+            categoryData[category] = items;
+            let html = `<section class="panel"><h3>${escapeHtml(CATEGORY_NAMES[category])}</h3>`;
+            html += `<div class="result-grid">${items.map(renderItemCard).join("")}</div></section>`;
+            resultsContainer.innerHTML = html;
+          } else {
+            resultsContainer.innerHTML = '<p id="status">No items found</p>';
+          }
+        });
       }
     });
   });
+  
+  async function loadSingleCategory(category) {
+    const products = CATEGORY_ITEMS[category];
+    if (!products) return [];
+    
+    let allItems = [];
+    for (const product of products) {
+      const items = await searchProduct(product);
+      for (const item of items) {
+        const existing = allItems.find(i => i.name === item.name && i.market === item.market);
+        if (!existing) {
+          allItems.push({...item, _searchTerm: product});
+        }
+      }
+      if (allItems.length >= 30) break;
+    }
+    return allItems.slice(0, 30);
+  }
 }
 
 const CATEGORY_ITEMS = {
