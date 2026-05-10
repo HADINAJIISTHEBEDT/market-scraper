@@ -9,6 +9,7 @@ const MARKETS = [
   { key: "a101", label: "A101" },
   { key: "sok", label: "SOK" },
   { key: "migros", label: "Migros" },
+  { key: "tahtakale", label: "Tahtakale" },
   { key: "carrefour", label: "Carrefour" },
 ];
 
@@ -144,6 +145,7 @@ const I18N = {
       a101: "A101",
       sok: "SOK",
       migros: "Migros",
+      tahtakale: "Tahtakale",
       carrefour: "Carrefour",
     },
     contactPrompt: "Herhangi bir sorun icin ",
@@ -195,6 +197,7 @@ const I18N = {
       a101: "A101",
       sok: "SOK",
       migros: "Migros",
+      tahtakale: "Tahtakale",
       carrefour: "Carrefour",
     },
     contactPrompt: "For any problem ",
@@ -246,6 +249,7 @@ const I18N = {
       a101: "A101",
       sok: "SOK",
       migros: "Migros",
+      tahtakale: "Tahtakale",
       carrefour: "Carrefour",
     },
     contactPrompt: "لأي مشكلة ",
