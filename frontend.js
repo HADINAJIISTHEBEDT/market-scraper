@@ -508,7 +508,10 @@ function getAllResultItems(data) {
   for (const key in data || {}) {
     if (key === "_errors") continue;
     if (Array.isArray(data[key])) {
-      allItems.push(...data[key]);
+      const filtered = data[key].filter(item => 
+        item.market && item.market.toLowerCase() !== "tarim_kredi"
+      );
+      allItems.push(...filtered);
     }
   }
   return allItems;
@@ -723,7 +726,10 @@ async function searchProduct(product) {
     for (const key in data || {}) {
       if (key === "_errors") continue;
       if (Array.isArray(data[key])) {
-        items.push(...data[key]);
+        const filtered = data[key].filter(item => 
+          item.market && item.market.toLowerCase() !== "tarim_kredi"
+        );
+        items.push(...filtered);
       }
     }
     return items;
