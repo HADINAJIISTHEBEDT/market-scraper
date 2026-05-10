@@ -827,16 +827,7 @@ window.addEventListener("DOMContentLoaded", () => {
   const backToSearchBtn = document.getElementById("backToSearchBtn");
   if (button) button.addEventListener("click", runSearch);
   if (backToSearchBtn) backToSearchBtn.addEventListener("click", showSearchView);
-  document.querySelectorAll(".ad-tile").forEach(tile => {
-    tile.style.cursor = "pointer";
-    tile.addEventListener("click", (e) => {
-      e.preventDefault();
-      const category = tile.getAttribute("data-category");
-      if (category) {
-        window.open(`?search=vegetables&category=${category}`, '_blank');
-      }
-    });
-  });
+  
   if (input) {
     input.addEventListener("keydown", (event) => {
       if (event.key === "Enter") runSearch();
