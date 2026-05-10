@@ -541,12 +541,12 @@ function renderItemCard(item) {
   const imageHtml = item.image
     ? `<img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.name)}" class="item-image" onerror="this.style.display='none'">`
     : "";
-  const brandHtml = item.brand
-    ? `<div class="item-brand">${escapeHtml(item.brand)}</div>`
+  const marketHtml = item.market
+    ? `<div class="item-brand">${escapeHtml(item.market)}</div>`
     : "";
   return `<article class="item-card">
     ${imageHtml}
-    ${brandHtml}
+    ${marketHtml}
     <div class="item-name">${escapeHtml(item.name)}</div>
     <div class="item-price">${formatPrice(item.price)}</div>
     ${item.unitPrice ? `<div class="item-unit">${escapeHtml(item.unitPrice)}</div>` : ""}
@@ -705,7 +705,7 @@ async function runSearch() {
 }
 
 const CATEGORY_ITEMS = {
-  vegetables: ["domates", "lahana", "havuç", "soğan", "mantar", "biber", "patlıcan", "sarımsak", "mısır", "salatalık", "ıspanak", "brokoli", "kereviz", "pazı", "yeşil soğan", "karalahana", "kabak", "enginar", "fasulye", "nohut", "mercimek", "bezelye", "maydanoz", "nane", "limon", "portakal", "greyfurt", "elma", "armut", "şeftali", "kayısı"],
+  vegetables: ["domates", "lahana", "havuç", "soğan", "mantar", "biber", "patlıcan", "sarımsak", "mısır", "salatalık", "ıspanak", "brokoli", "kereviz", "pazı", "yeşil soğan", "karalahana", "kabak", "enginar", "kabak", "pırasa", "maydanoz", "nane", "marul", "roka", "tere", "semizotu", "kırmızı lahana", " Brüksel lahanası"],
 };
 
 let categoryData = {};
@@ -829,15 +829,11 @@ window.addEventListener("DOMContentLoaded", () => {
   if (backToSearchBtn) backToSearchBtn.addEventListener("click", showSearchView);
   document.querySelectorAll(".ad-tile").forEach(tile => {
     tile.style.cursor = "pointer";
-    tile.addEventListener("click", () => {
-      const resultsContainer = document.getElementById("results");
-      if (!resultsContainer) return;
-      const items = categoryData["vegetables"];
-      if (items && items.length > 0) {
-        let html = `<section class="panel"><h3>Fresh vegetables</h3>`;
-        html += `<div class="result-grid">${items.map(renderItemCard).join("")}</div></section>`;
-        resultsContainer.innerHTML = html;
-        window.scrollTo({ top: resultsContainer.offsetTop - 20, behavior: "smooth" });
+    tile.addEventListener("click", (e) => {
+      e.preventDefault();
+      const category = tile.getAttribute("data-category");
+      if (category) {
+        window.open(`?search=vegetables&category=${category}`, '_blank');
       }
     });
   });
