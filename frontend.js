@@ -9,7 +9,6 @@ const MARKETS = [
   { key: "a101", label: "A101" },
   { key: "sok", label: "SOK" },
   { key: "migros", label: "Migros" },
-  { key: "tahtakale", label: "Tahtakale" },
   { key: "carrefour", label: "Carrefour" },
 ];
 
@@ -124,7 +123,7 @@ const PRODUCT_TRANSLATIONS = {
 
 const I18N = {
   tr: {
-    title: "PazarQuery",
+    title: "Pazar Fiyatı",
     subtitle: "Gunluk ihtiyaclarini bul ve secimlerini karsilastir.",
     placeholder: "Urun adi yazin...",
     search: "Ara",
@@ -145,7 +144,6 @@ const I18N = {
       a101: "A101",
       sok: "SOK",
       migros: "Migros",
-      tahtakale: "Tahtakale",
       carrefour: "Carrefour",
     },
     contactPrompt: "Herhangi bir sorun icin ",
@@ -176,7 +174,7 @@ const I18N = {
     featuredBananas: "Muz",
   },
   en: {
-    title: "PazarQuery",
+    title: "Pazar Fiyatı",
     subtitle: "Find everyday items, compare choices quietly. Make sure to write product names in Turkish.",
     placeholder: "Type product name...",
     search: "Search",
@@ -197,7 +195,6 @@ const I18N = {
       a101: "A101",
       sok: "SOK",
       migros: "Migros",
-      tahtakale: "Tahtakale",
       carrefour: "Carrefour",
     },
     contactPrompt: "For any problem ",
@@ -228,7 +225,7 @@ const I18N = {
     featuredBananas: "Bananas",
   },
   ar: {
-    title: "PazarQuery",
+    title: "Pazar Fiyatı",
     subtitle: "لا توجد عناصر محفوظة. فقط اكتب منتج وابحث. تأكد من كتابة أسماء المنتجات باللغة التركية.",
     placeholder: "\u0627\u0643\u062a\u0628 \u0627\u0633\u0645 \u0627\u0644\u0645\u0646\u062a\u062c...",
     search: "ابحث",
@@ -249,7 +246,6 @@ const I18N = {
       a101: "A101",
       sok: "SOK",
       migros: "Migros",
-      tahtakale: "Tahtakale",
       carrefour: "Carrefour",
     },
     contactPrompt: "لأي مشكلة ",
