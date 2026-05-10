@@ -704,9 +704,112 @@ async function runSearch() {
   }
 }
 
+const CATEGORY_ITEMS = {
+  vegetables: ["domates", "lahana", "havuç", "soğan", "mantar", "biber", "patlıcan", "sarımsak", "mısır", "salatalık", "ıspanak", "brokoli", "kereviz", "pazı", "yeşil soğan", "karalahana", "kabak", "enginar", "fasulye", "nohut", "mercimek", "bezelye", "maydanoz", "nane", "limon", "portakal", "greyfurt", "elma", "armut", "şeftali", "kayısı"],
+};
+
+let categoryData = {};
+
+async function searchProduct(product) {
+  try {
+    const response = await fetch(`${SCRAPER_API_BASE}/search-all`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ product }),
+    });
+    if (!response.ok) return [];
+    const data = await response.json();
+    const items = [];
+    for (const key in data || {}) {
+      if (key === "_errors") continue;
+      if (Array.isArray(data[key])) {
+        items.push(...data[key]);
+      }
+    }
+    return items;
+  } catch (e) {
+    console.error("Error searching:", product, e);
+    return [];
+  }
+}
+
+async function loadCategories() {
+  const resultsContainer = document.getElementById("results");
+  if (!resultsContainer) return;
+  
+  resultsContainer.innerHTML = '<p id="status">Loading items...</p>';
+  
+  let html = "";
+  
+  for (const [category, products] of Object.entries(CATEGORY_ITEMS)) {
+    let allItems = [];
+    
+    for (const product of products) {
+      const items = await searchProduct(product);
+      for (const item of items) {
+        const existing = allItems.find(i => i.name === item.name && i.market === item.market);
+        if (!existing) {
+          allItems.push({...item, _searchTerm: product});
+        }
+      }
+      if (allItems.length >= 30) break;
+    }
+    
+    allItems = allItems.slice(0, 30);
+    categoryData[category] = allItems;
+    
+    if (allItems.length > 0) {
+      html += `<section class="panel"><h3>${escapeHtml("Fresh vegetables")}</h3>`;
+      html += `<div class="result-grid">${allItems.map(renderItemCard).join("")}</div></section>`;
+    }
+  }
+  
+  if (html) {
+    resultsContainer.innerHTML = html;
+  }
+  
+  setInterval(refreshPrices, 600000);
+}
+
+async function refreshPrices() {
+  for (const [category, products] of Object.entries(CATEGORY_ITEMS)) {
+    let allItems = [];
+    
+    for (const product of products) {
+      const items = await searchProduct(product);
+      for (const item of items) {
+        const existing = allItems.find(i => i.name === item.name && i.market === item.market);
+        if (!existing) {
+          allItems.push({...item, _searchTerm: product});
+        }
+      }
+      if (allItems.length >= 30) break;
+    }
+    
+    allItems = allItems.slice(0, 30);
+    categoryData[category] = allItems;
+  }
+  
+  const resultsContainer = document.getElementById("results");
+  if (!resultsContainer) return;
+  
+  let html = "";
+  for (const [category, items] of Object.entries(categoryData)) {
+    if (items && items.length > 0) {
+      html += `<section class="panel"><h3>${escapeHtml("Fresh vegetables")}</h3>`;
+      html += `<div class="result-grid">${items.map(renderItemCard).join("")}</div></section>`;
+    }
+  }
+  
+  if (html) {
+    resultsContainer.innerHTML = html;
+  }
+}
+
 window.addEventListener("DOMContentLoaded", () => {
   updateNavbar();
   updateCartCount();
+  loadCategories();
   currentLang = localStorage.getItem("app_lang") || "tr";
   const langSelect = document.getElementById("langSelect");
   if (langSelect) {
@@ -724,6 +827,20 @@ window.addEventListener("DOMContentLoaded", () => {
   const backToSearchBtn = document.getElementById("backToSearchBtn");
   if (button) button.addEventListener("click", runSearch);
   if (backToSearchBtn) backToSearchBtn.addEventListener("click", showSearchView);
+  document.querySelectorAll(".ad-tile").forEach(tile => {
+    tile.style.cursor = "pointer";
+    tile.addEventListener("click", () => {
+      const resultsContainer = document.getElementById("results");
+      if (!resultsContainer) return;
+      const items = categoryData["vegetables"];
+      if (items && items.length > 0) {
+        let html = `<section class="panel"><h3>Fresh vegetables</h3>`;
+        html += `<div class="result-grid">${items.map(renderItemCard).join("")}</div></section>`;
+        resultsContainer.innerHTML = html;
+        window.scrollTo({ top: resultsContainer.offsetTop - 20, behavior: "smooth" });
+      }
+    });
+  });
   if (input) {
     input.addEventListener("keydown", (event) => {
       if (event.key === "Enter") runSearch();
