@@ -712,56 +712,131 @@ window.addEventListener("DOMContentLoaded", () => {
 document.querySelectorAll(".ad-tile").forEach(tile => {
     tile.style.cursor = "pointer";
     tile.addEventListener("click", () => {
-      const searchTerm = tile.getAttribute("data-search");
-      if (searchTerm && input) {
-        input.value = searchTerm;
-        const limitInput = document.getElementById("itemLimit");
-        if (limitInput) limitInput.value = 30;
-        runSearch();
+      const category = tile.getAttribute("data-category");
+      if (category && categoryData[category]) {
+        const resultsContainer = document.getElementById("results");
+        if (resultsContainer) {
+          let html = `<section class="panel"><h3>${escapeHtml(CATEGORY_NAMES[category])}</h3>`;
+          html += `<div class="result-grid">${categoryData[category].map(renderItemCard).join("")}</div></section>`;
+          resultsContainer.innerHTML = html;
+        }
       }
     });
   });
 }
 
+const CATEGORY_ITEMS = {
+  vegetables: ["domates", "lahana", "havuç", "soğan", "mantar", "biber", "patlıcan", "sarımsak", "mısır", "salatalık", "ıspanak", "brokoli", "kereviz", "pazı", "yeşil soğan", "karalahana", "kabak", "enginar", "fasulye", "nohut", "mercimek", "bezelye", "maydanoz", "nane", "limon", "portakal", "greyfurt", "elma", "armut", "şeftali", "kayısı"],
+  bread: ["ekmek", "simit", "poğaça", "sandviç", "börek", "çörek", "tost ekmeği", "fransız ekmeği", "tam buğday ekmek", "esmer ekmek", "lavaş", "yufka", "etiket", "galeta", "un", "pirinç unu", "mısır unu"],
+  groceries: ["bisküvi", "çay", "kahve", "süt", "yumurta", "ekmek", "un", "pirinç", "makarna", "şeker", "tuz", "zeytinyağı", "ayçiçek yağı", "margarin", "bal", "recel", "çikolata", "kaka", "dondurma", "çips", "kuru meyve", "findık", "fıstık", "badem", "ceviz", "keten tohumu", "kahvaltılık", "müsli", "yulaf", "krem peynir", "reçel"],
+  fruits: ["muz", "elma", "portakal", "limon", "greyfurt", "üzüm", "çilek", "ahududu", "yaban mersini", "böğürtlen", "karadut", "dut", "şeftali", "kayısı", "kiraz", "vişne", "armut", "kavun", "karpuz", "ananas", "mango", "avokado", "kivi", "nar", "hurma", "incir", "karpuz", "şeftali", "erik", "greyfurt"],
+  desserts: ["çikolata", "bisküvi", "çips", "dondurma", "şeker", "lokum", "puding", "krem karamel", "truffle", "gofret", "wafer", "kraker", "bar", "jöl", "marshmallow", "pastane ürünleri", "kurabiye", " Kek", "brownie", "makaron"],
+  dairy: ["süt", "yoğurt", "peynir", "tereyağ", "kaymak", "krem peynir", "süzme peynir", "labne", "Ayran", "kefir", "süt tozu", "yumurta"]
+};
+
+const CATEGORY_NAMES = {
+  vegetables: "Fresh vegetables",
+  bread: "Bread and bakery",
+  groceries: "Daily groceries",
+  fruits: "Fruits",
+  desserts: "Desserts",
+  dairy: "Dairy"
+};
+
+let categoryData = {};
+
+async function searchProduct(product) {
+  try {
+    const response = await fetch(`${SCRAPER_API_BASE}/search-all`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ product }),
+    });
+    if (!response.ok) return [];
+    const data = await response.json();
+    const items = [];
+    for (const key in data || {}) {
+      if (key === "_errors") continue;
+      if (Array.isArray(data[key])) {
+        items.push(...data[key]);
+      }
+    }
+    return items;
+  } catch (e) {
+    console.error("Error searching:", product, e);
+    return [];
+  }
+}
+
 async function loadCategories() {
-  const categories = ["sebze", "ekmek", "gida", "meyve", "cikolata", "peynir"];
+  const resultsContainer = document.getElementById("results");
+  if (!resultsContainer) return;
+  
+  resultsContainer.innerHTML = '<p id="status">Loading items...</p>';
+  
+  let html = "";
+  
+  for (const [category, products] of Object.entries(CATEGORY_ITEMS)) {
+    let allItems = [];
+    
+    for (const product of products) {
+      const items = await searchProduct(product);
+      for (const item of items) {
+        const existing = allItems.find(i => i.name === item.name && i.market === item.market);
+        if (!existing) {
+          allItems.push({...item, _searchTerm: product});
+        }
+      }
+      if (allItems.length >= 30) break;
+    }
+    
+    allItems = allItems.slice(0, 30);
+    categoryData[category] = allItems;
+    
+    if (allItems.length > 0) {
+      html += `<section class="panel"><h3>${escapeHtml(CATEGORY_NAMES[category])}</h3>`;
+      html += `<div class="result-grid">${allItems.map(renderItemCard).join("")}</div></section>`;
+    }
+  }
+  
+  if (html) {
+    resultsContainer.innerHTML = html;
+  }
+  
+  setInterval(refreshPrices, 600000);
+}
+
+async function refreshPrices() {
+  for (const [category, products] of Object.entries(CATEGORY_ITEMS)) {
+    let allItems = [];
+    
+    for (const product of products) {
+      const items = await searchProduct(product);
+      for (const item of items) {
+        const existing = allItems.find(i => i.name === item.name && i.market === item.market);
+        if (!existing) {
+          allItems.push({...item, _searchTerm: product});
+        }
+      }
+      if (allItems.length >= 30) break;
+    }
+    
+    allItems = allItems.slice(0, 30);
+    categoryData[category] = allItems;
+  }
+  
+  renderCategoryResults();
+}
+
+function renderCategoryResults() {
   const resultsContainer = document.getElementById("results");
   if (!resultsContainer) return;
   
   let html = "";
-  for (const category of categories) {
-    try {
-      const response = await fetch(`${SCRAPER_API_BASE}/search-all`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ product: category }),
-      });
-      if (!response.ok) continue;
-      const data = await response.json();
-      
-      const allItems = [];
-      for (const key in data || {}) {
-        if (key === "_errors") continue;
-        if (Array.isArray(data[key])) {
-          allItems.push(...data[key].slice(0, 30));
-        }
-      }
-      
-      if (allItems.length > 0) {
-        const categoryName = {
-          sebze: "Fresh vegetables",
-          ekmek: "Bread and bakery",
-          gida: "Daily groceries",
-          meyve: "Fruits",
-          cikolata: "Desserts",
-          peynir: "Dairy"
-        }[category] || category;
-        
-        html += `<section class="panel"><h3>${escapeHtml(categoryName)}</h3>`;
-        html += `<div class="result-grid">${allItems.slice(0, 30).map(renderItemCard).join("")}</div></section>`;
-      }
-    } catch (e) {
-      console.error("Error loading category:", category, e);
+  for (const [category, items] of Object.entries(categoryData)) {
+    if (items && items.length > 0) {
+      html += `<section class="panel"><h3>${escapeHtml(CATEGORY_NAMES[category])}</h3>`;
+      html += `<div class="result-grid">${items.map(renderItemCard).join("")}</div></section>`;
     }
   }
   
