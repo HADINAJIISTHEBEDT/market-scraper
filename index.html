@@ -34,14 +34,10 @@
       }
 
       .brand-mark {
-        width: 34px;
-        height: 34px;
-        border-radius: 10px;
-        display: grid;
-        place-items: center;
-        background: #1f7a5c;
-        color: #fff;
-        font-weight: 900;
+        width: 40px;
+        height: 40px;
+        object-fit: contain;
+        display: block;
       }
 
       .nav-links {
@@ -259,7 +255,7 @@
   </head>
   <body>
     <div class="top-nav">
-      <span class="brand-lockup"><span class="brand-mark">PF</span><span id="navBrand">Pazar Fiyatı</span></span>
+      <span class="brand-lockup"><img class="brand-mark" src="logo.png" alt="Pazar Fiyatı Logo" /><span id="navBrand">Pazar Fiyatı</span></span>
       <div class="nav-links">
         <span id="navUser" style="font-size:14px;color:#334155;"></span>
         <a id="navCartBtn" href="cart.html" hidden>Cart (<span id="cartCount">0</span>)</a>
