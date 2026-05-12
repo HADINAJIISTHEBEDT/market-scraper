@@ -26,6 +26,8 @@ const MIME = {
   ".gif": "image/gif",
   ".svg": "image/svg+xml",
   ".ico": "image/x-icon",
+  ".txt": "text/plain",
+  ".xml": "application/xml",
   ".webmanifest": "application/manifest+json",
 };
 
