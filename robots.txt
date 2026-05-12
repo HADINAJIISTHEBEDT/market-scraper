@@ -1,4 +1,2 @@
 User-agent: *
 Allow: /
-
-Sitemap: https://market-scraper-0k36.onrender.com/sitemap.xml
