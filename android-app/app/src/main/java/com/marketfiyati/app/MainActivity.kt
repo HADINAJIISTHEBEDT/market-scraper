@@ -1,4 +1,4 @@
-package com.dessertscraper.app
+package com.marketfiyati.app
 
 import android.Manifest
 import android.annotation.SuppressLint
@@ -31,7 +31,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-import com.dessertscraper.app.databinding.ActivityMainBinding
+import com.marketfiyati.app.databinding.ActivityMainBinding
 import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
@@ -195,11 +195,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     companion object {
-        private const val APP_URL = "https://dessertscraper-b595.onrender.com/"
-        private const val NOTIFICATION_CHANNEL_ID = "dessert_scraper_alerts"
-        private const val UPDATE_CHANNEL_ID = "dessert_scraper_updates"
-        private const val VERSION_CHECK_URL = "https://raw.githubusercontent.com/HADINAJIISTHEBEDT/DessertScraper/main/android-app/app/build.gradle"
-        private const val PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.dessertscraper.app"
+        private const val APP_URL = "https://market-scraper-0k36.onrender.com/"
+        private const val NOTIFICATION_CHANNEL_ID = "market_scraper_alerts"
+        private const val UPDATE_CHANNEL_ID = "market_scraper_updates"
+        private const val VERSION_CHECK_URL = "https://raw.githubusercontent.com/HADINAJIISTHEBEDT/market-scraper/main/android-app/app/build.gradle"
+        private const val PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.marketfiyati.app"
         private const val PREFS_NAME = "app_prefs"
         private const val LAST_VERSION_CHECK = "last_version_check"
         private const val CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000L // 24 hours
@@ -269,7 +269,7 @@ class MainActivity : AppCompatActivity() {
                 .setSmallIcon(android.R.drawable.ic_dialog_info)
                 .setContentTitle(title?.takeIf { it.isNotBlank() } ?: "App Update Available")
                 .setContentText(body?.takeIf { it.isNotBlank() } ?: "A new version is available. Tap to update.")
-                .setStyle(NotificationCompat.BigTextStyle().bigText(body?.takeIf { it.isNotBlank() } ?: "A new version of Dessert Scraper is available."))
+                .setStyle(NotificationCompat.BigTextStyle().bigText(body?.takeIf { it.isNotBlank() } ?: "A new version of Pazar Fiyatı is available."))
                 .setAutoCancel(true)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setContentIntent(pendingIntent)
@@ -388,10 +388,10 @@ class MainActivity : AppCompatActivity() {
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val channel = NotificationChannel(
             NOTIFICATION_CHANNEL_ID,
-            "Dessert Scraper Alerts",
+            "Pazar Fiyatı Alerts",
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
-            description = "Timer and app alerts for Dessert Scraper"
+            description = "Alerts for Pazar Fiyatı"
         }
         manager.createNotificationChannel(channel)
     }
@@ -402,7 +402,7 @@ class MainActivity : AppCompatActivity() {
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val channel = NotificationChannel(
             UPDATE_CHANNEL_ID,
-            "Dessert Scraper Updates",
+            "Pazar Fiyatı Updates",
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
             description = "App update notifications"
@@ -448,7 +448,7 @@ class MainActivity : AppCompatActivity() {
                         val bridge = AndroidBridge()
                         bridge.showUpdateNotification(
                             "Update Available",
-                            "Dessert Scraper $remoteVersionName is available. Tap to update."
+                            "Pazar Fiyatı $remoteVersionName is available. Tap to update."
                         )
                     }
                 }
