@@ -67,6 +67,8 @@
     .status-on-the-way { background: #fce7f3; color: #9d174d; }
     .status-delivered { background: #dcfce7; color: #166534; }
     .status-blocked { background: #fee2e2; color: #991b1b; }
+    .status-done { background: #dcfce7; color: #166534; }
+    .status-completed { background: #e0e7ff; color: #3730a3; }
     .message-box { margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: #f8fafc; white-space: pre-wrap; }
     .order-item-row, .tile-preview-row { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
     .tile-preview {
@@ -200,7 +202,7 @@
 
     <section class="panel-section" id="panel-inbox">
       <h2 id="inboxTitle">Inbox</h2>
-      <p class="help" id="inboxHelp">Messages sent from account deletion requests appear here.</p>
+      <p class="help" id="inboxHelp">Messages from account deletion requests are saved here permanently and are never deleted.</p>
       <div id="inboxList"></div>
     </section>
   </div>
@@ -258,7 +260,8 @@
         updateStatus: "Durumu guncelle", delete: "Sil", saveUser: "Kullaniciyi kaydet", updated: "Guncellendi",
         saved: "Kaydedildi", removed: "Silindi", id: "ID", role: "Rol", name: "Ad", phone: "Telefon", address: "Adres", email: "E-posta",
         deleteRequestsTitle: "Hesap silme istekleri", noDeleteRequests: "Henuz silme istegi yok.", requestedAt: "Istek tarihi", markRequestDone: "Tamamlandi olarak isaretle",
-        inboxTitle: "Gelen kutusu", inboxHelp: "Hesap silme isteklerinden gelen mesajlar burada gorunur.", noInboxMessages: "Henuz mesaj yok.", message: "Mesaj",
+        inboxTitle: "Gelen kutusu", inboxHelp: "Hesap silme isteklerinden gelen mesajlar burada kalici olarak saklanir ve hicbir zaman silinmez.", noInboxMessages: "Henuz mesaj yok.", message: "Mesaj",
+        inboxDone: "Tamamlandi", inboxCompleted: "Hesap silindi", inboxEmailSent: "E-posta gonderildi",
         emailQueued: "E-posta gonderim siraya alindi", emailQueueFailed: "E-posta siraya alinamadi",
         block: "Engelle", unblock: "Engeli kaldir", blocked: "Engellendi"
       },
@@ -278,7 +281,8 @@
         updateStatus: "Update status", delete: "Delete", saveUser: "Save user", updated: "Updated",
         saved: "Saved", removed: "Removed", id: "ID", role: "Role", name: "Name", phone: "Phone", address: "Address", email: "Email",
         deleteRequestsTitle: "Account delete requests", noDeleteRequests: "No delete requests yet.", requestedAt: "Requested at", markRequestDone: "Mark request done",
-        inboxTitle: "Inbox", inboxHelp: "Messages sent from account deletion requests appear here.", noInboxMessages: "No messages yet.", message: "Message",
+        inboxTitle: "Inbox", inboxHelp: "Messages from account deletion requests are saved here permanently and are never deleted.", noInboxMessages: "No messages yet.", message: "Message",
+        inboxDone: "Done", inboxCompleted: "Account deleted", inboxEmailSent: "Email sent",
         emailQueued: "Email send queued", emailQueueFailed: "Could not queue email",
         block: "Block", unblock: "Unblock", blocked: "Blocked"
       },
@@ -298,7 +302,8 @@
         updateStatus: "تحديث الحالة", delete: "حذف", saveUser: "حفظ المستخدم", updated: "تم التحديث",
         saved: "تم الحفظ", removed: "تم الحذف", id: "المعرف", role: "الدور", name: "الاسم", phone: "الهاتف", address: "العنوان", email: "البريد الإلكتروني",
         deleteRequestsTitle: "طلبات حذف الحساب", noDeleteRequests: "لا توجد طلبات حذف بعد.", requestedAt: "تاريخ الطلب", markRequestDone: "وضع علامة مكتمل",
-        inboxTitle: "صندوق الوارد", inboxHelp: "تظهر هنا الرسائل المرسلة من طلبات حذف الحساب.", noInboxMessages: "لا توجد رسائل بعد.", message: "الرسالة",
+        inboxTitle: "صندوق الوارد", inboxHelp: "يتم حفظ رسائل طلبات حذف الحساب هنا بشكل دائم ولا يتم حذفها أبداً.", noInboxMessages: "لا توجد رسائل بعد.", message: "الرسالة",
+        inboxDone: "مكتمل", inboxCompleted: "تم حذف الحساب", inboxEmailSent: "تم إرسال البريد",
         emailQueued: "تمت إضافة البريد الإلكتروني إلى قائمة الإرسال", emailQueueFailed: "تعذر إضافة البريد الإلكتروني إلى قائمة الإرسال",
         block: "حظر", unblock: "إلغاء الحظر", blocked: "محظور"
       }
@@ -619,11 +624,29 @@
       `).join("");
     }
 
+    function getInboxStatus(request) {
+      if (request.status === "completed") return "completed";
+      if (request.status === "done" || request.status === "done-pending-email" || request.doneMarkedAt) return "done";
+      return "pending";
+    }
+
+    function inboxStatusLabel(status) {
+      if (status === "completed") return t("inboxCompleted");
+      if (status === "done") return t("inboxDone");
+      return t("pending");
+    }
+
+    function inboxStatusClass(status) {
+      if (status === "completed") return "status-completed";
+      if (status === "done") return "status-done";
+      return "status-pending";
+    }
+
     function renderDeleteRequests(requests) {
       currentDeleteRequests = requests;
       const root = document.getElementById("deleteRequestsList");
       if (!root) return;
-      const pending = requests.filter((request) => request.status !== "completed" || (!request.emailQueuedAt && !request.emailSentAt));
+      const pending = requests.filter((request) => getInboxStatus(request) === "pending");
       if (!pending.length) {
         root.innerHTML = `<p class="empty-msg">${escapeHtml(t("noDeleteRequests"))}</p>`;
         return;
@@ -649,27 +672,38 @@
     function renderInbox(requests) {
       const root = document.getElementById("inboxList");
       if (!root) return;
-      const messages = requests.filter((request) => String(request.message || "").trim() && !request.emailQueuedAt && !request.emailSentAt);
+      const messages = requests.filter((request) => String(request.message || "").trim());
       if (!messages.length) {
         root.innerHTML = `<p class="empty-msg">${escapeHtml(t("noInboxMessages"))}</p>`;
         return;
       }
-      root.innerHTML = messages.map((request) => `
+      root.innerHTML = messages.map((request) => {
+        const status = getInboxStatus(request);
+        const emailSent = Boolean(request.doneEmailQueuedAt || request.emailQueuedAt || request.emailSentAt);
+        const actionsHtml = status === "pending" ? `
+          <div class="actions-row">
+            <button class="btn-danger" type="button" onclick="deleteUser('${request.id}')">${escapeHtml(t("delete"))}</button>
+            <button class="btn-secondary" type="button" onclick="markDeleteRequestDone('${request.id}')">${escapeHtml(t("markRequestDone"))}</button>
+          </div>
+        ` : "";
+        return `
         <div class="card">
           <div class="card-header">
             <div>
               <div class="card-title">${escapeHtml(request.email || t("unknown"))}</div>
               <div class="card-meta">${escapeHtml(request.name || "")}</div>
               <div class="card-meta">${escapeHtml(t("requestedAt"))}: ${escapeHtml(formatDate(request.requestedAt))}</div>
+              <div class="card-meta">
+                <span class="status-badge ${inboxStatusClass(status)}">${escapeHtml(inboxStatusLabel(status))}</span>
+                ${emailSent ? `<span class="status-badge status-done">${escapeHtml(t("inboxEmailSent"))}</span>` : ""}
+              </div>
             </div>
           </div>
           <div class="message-box">${escapeHtml(request.message)}</div>
-          <div class="actions-row">
-            <button class="btn-danger" type="button" onclick="deleteUser('${request.id}')">${escapeHtml(t("delete"))}</button>
-            <button class="btn-secondary" type="button" onclick="markDeleteRequestDone('${request.id}')">${escapeHtml(t("markRequestDone"))}</button>
-          </div>
+          ${actionsHtml}
         </div>
-      `).join("");
+      `;
+      }).join("");
     }
 
     function renderOrders(orders) {
@@ -785,6 +819,38 @@
       return requestSnap.exists() ? { id: requestSnap.id, ...requestSnap.data() } : null;
     }
 
+    async function queueDeleteRequestDoneEmail(userId) {
+      const request = await getDeleteRequestForUser(userId);
+      const user = currentUsers.find((entry) => entry.id === userId) || {};
+      const email = request?.email || user.email || "";
+      if (!email) throw new Error("No Gmail found for this delete request.");
+
+      const name = request?.name || user.name || email;
+      const subject = "Your Pazar Fiyatı account deletion request was processed";
+      const text = `Hello ${name},
+
+We received your account deletion request and marked it as done. Your data will be deleted within a maximum of 7 days, as promised.
+
+If you did not request this, please contact ${OWNER_EMAIL}.
+
+Pazar Fiyatı Admin`;
+      const html = `
+        <p>Hello ${escapeHtml(name)},</p>
+        <p>We received your account deletion request and marked it as done. Your data will be deleted within a maximum of 7 days, as promised.</p>
+        <p>If you did not request this, please contact <a href="mailto:${OWNER_EMAIL}">${OWNER_EMAIL}</a>.</p>
+        <p>Pazar Fiyatı Admin</p>
+      `;
+
+      await setDoc(doc(db, "mail", `delete-request-done-${userId}-${Date.now()}`), {
+        to: email,
+        message: { subject, text, html },
+        deleteRequestId: userId,
+        queuedAt: new Date().toISOString(),
+        queuedBy: localStorage.getItem("user_email") || OWNER_EMAIL,
+      });
+      return true;
+    }
+
     async function queueAccountDeletedEmail(userId) {
       const request = await getDeleteRequestForUser(userId);
       const user = currentUsers.find((entry) => entry.id === userId) || {};
@@ -818,6 +884,7 @@ Pazar Fiyatı Admin`;
     }
 
     window.deleteUser = async function(userId) {
+      const request = await getDeleteRequestForUser(userId);
       let emailQueued = true;
       try {
         await queueAccountDeletedEmail(userId);
@@ -830,6 +897,11 @@ Pazar Fiyatı Admin`;
         status: "completed",
         completedAt: new Date().toISOString(),
         completedBy: localStorage.getItem("user_email") || OWNER_EMAIL,
+        email: request?.email || "",
+        name: request?.name || "",
+        message: request?.message || "",
+        requestedAt: request?.requestedAt || new Date().toISOString(),
+        inboxPreserved: true,
         emailQueued,
         emailQueuedAt: emailQueued ? new Date().toISOString() : null,
       }, { merge: true });
@@ -838,13 +910,26 @@ Pazar Fiyatı Admin`;
     };
 
     window.markDeleteRequestDone = async function(userId) {
+      const request = await getDeleteRequestForUser(userId);
+      try {
+        await queueDeleteRequestDoneEmail(userId);
+      } catch (error) {
+        console.error("Delete request done email queue failed", error);
+        showToast(`${t("emailQueueFailed")}: ${error.message}`);
+        return;
+      }
       await setDoc(doc(db, "deleteRequests", userId), {
-        status: "done-pending-email",
+        status: "done",
         doneMarkedAt: new Date().toISOString(),
         doneMarkedBy: localStorage.getItem("user_email") || OWNER_EMAIL,
-        messagePreservedUntilEmail: true,
+        email: request?.email || "",
+        name: request?.name || "",
+        message: request?.message || "",
+        requestedAt: request?.requestedAt || new Date().toISOString(),
+        inboxPreserved: true,
+        doneEmailQueuedAt: new Date().toISOString(),
       }, { merge: true });
-      showToast(t("updated"));
+      showToast(`${t("updated")} - ${t("emailQueued")}`);
     };
 
     document.querySelectorAll(".tab-btn").forEach((button) => {
