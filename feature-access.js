@@ -21,7 +21,7 @@
       pageLockBack: "Ana sayfaya don",
       blockedTitle: "Erisim engellendi",
       blockedAccountBody: `Admin tarafindan engellendiniz. Bunun bir yanlis anlama oldugunu dusunuyorsaniz ${OWNER_EMAIL} hesabina e-posta gonderin.`,
-      deletedAccountBody: "Hesabiniz admin tarafindan silindi. Yeniden giris yaparak yeni bir hesap olusturabilirsiniz.",
+      deletedAccountBody: "Hesabiniz admin tarafindan kalici olarak silindi ve admin panelinden kaldirildi.",
     },
     en: {
       modalTitle: "Coming soon",
@@ -40,7 +40,7 @@
       pageLockBack: "Back to home",
       blockedTitle: "Access blocked",
       blockedAccountBody: `You were blocked by the admin. If you think this is a misunderstanding, send an email to ${OWNER_EMAIL}.`,
-      deletedAccountBody: "Your account was deleted by the admin. Sign in again to create a new account.",
+      deletedAccountBody: "Your account was permanently deleted by the admin and removed from the admin panel.",
     },
     ar: {
       modalTitle: "قريباً",
@@ -59,7 +59,7 @@
       pageLockBack: "العودة إلى الرئيسية",
       blockedTitle: "تم حظر الوصول",
       blockedAccountBody: `تم حظرك من قبل المسؤول. إذا كنت تعتقد أن هذا سوء فهم، أرسل بريداً إلكترونياً إلى ${OWNER_EMAIL}.`,
-      deletedAccountBody: "تم حذف حسابك من قبل المسؤول. سجّل الدخول مرة أخرى لإنشاء حساب جديد.",
+      deletedAccountBody: "تم حذف حسابك نهائياً من قبل المسؤول وإزالته من لوحة الإدارة.",
     },
   };
 

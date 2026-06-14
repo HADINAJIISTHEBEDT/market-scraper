@@ -325,6 +325,7 @@
     let currentUsers = [];
     let currentDeleteRequests = [];
     let currentInboxMessages = [];
+    let permanentlyDeletedUserIds = new Set();
     let currentTiles = [];
     let currentSettings = {
       featuresUnlocked: false,
@@ -591,14 +592,15 @@
 
     function renderUsers(users) {
       currentUsers = users;
-      updateStats(currentOrders, users);
+      const visibleUsers = users.filter((user) => !permanentlyDeletedUserIds.has(user.id));
+      updateStats(currentOrders, visibleUsers);
       const root = document.getElementById("usersList");
       document.getElementById("usersLoading").style.display = "none";
-      if (!users.length) {
+      if (!visibleUsers.length) {
         root.innerHTML = `<p class="empty-msg">${escapeHtml(t("noUsers"))}</p>`;
         return;
       }
-      root.innerHTML = users.map((user) => `
+      root.innerHTML = visibleUsers.map((user) => `
         <div class="card" id="user-${user.id}">
           <div class="form-grid">
             <label>${escapeHtml(t("name"))}<input class="field-input" id="user-name-${user.id}" value="${escapeHtml(user.name || "")}" /></label>
@@ -938,17 +940,18 @@ Pazar Fiyatı Admin`;
 
     window.deleteUser = async function(userId) {
       const user = await getUserForAdmin(userId);
-      let emailQueued = true;
+      let emailQueued = false;
       try {
         await queueAccountDeletedEmail(userId);
+        emailQueued = true;
       } catch (error) {
         console.error("Account deletion email queue failed", error);
         showToast(`${t("emailQueueFailed")}: ${error.message}`);
-        return;
       }
       const now = new Date().toISOString();
       await setDoc(doc(db, "deletedAccounts", userId), {
         forceLogout: true,
+        permanentlyDeleted: true,
         deletedAt: now,
         deletedBy: localStorage.getItem("user_email") || OWNER_EMAIL,
         email: user.email || "",
@@ -957,7 +960,7 @@ Pazar Fiyatı Admin`;
       await updateAdminInboxForUser(userId, {
         status: "completed",
         completedAt: now,
-        accountDeletedEmailQueuedAt: now,
+        accountDeletedEmailQueuedAt: emailQueued ? now : null,
       });
       await setDoc(doc(db, "deleteRequests", userId), {
         status: "completed",
@@ -967,6 +970,9 @@ Pazar Fiyatı Admin`;
         emailQueuedAt: emailQueued ? now : null,
       }, { merge: true });
       await deleteDoc(doc(db, "users", userId));
+      permanentlyDeletedUserIds.add(userId);
+      currentUsers = currentUsers.filter((entry) => entry.id !== userId);
+      renderUsers(currentUsers);
       showToast(emailQueued ? `${t("removed")} - ${t("emailQueued")}` : t("removed"));
     };
 
@@ -1060,6 +1066,15 @@ Pazar Fiyatı Admin`;
 
       onSnapshot(query(collection(db, "users"), orderBy("lastLoginAt", "desc")), (snapshot) => {
         renderUsers(snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() })));
+      });
+
+      onSnapshot(collection(db, "deletedAccounts"), (snapshot) => {
+        permanentlyDeletedUserIds = new Set(
+          snapshot.docs
+            .filter((entry) => entry.data()?.permanentlyDeleted === true)
+            .map((entry) => entry.id),
+        );
+        renderUsers(currentUsers);
       });
 
       onSnapshot(query(collection(db, "deleteRequests"), orderBy("requestedAt", "desc")), (snapshot) => {
