@@ -261,7 +261,7 @@
         saved: "Kaydedildi", removed: "Silindi", id: "ID", role: "Rol", name: "Ad", phone: "Telefon", address: "Adres", email: "E-posta",
         deleteRequestsTitle: "Hesap silme istekleri", noDeleteRequests: "Henuz silme istegi yok.", requestedAt: "Istek tarihi", markRequestDone: "Tamamlandi olarak isaretle",
         inboxTitle: "Gelen kutusu", inboxHelp: "Hesap silme isteklerinden gelen mesajlar burada kalici olarak saklanir ve hicbir zaman silinmez.", noInboxMessages: "Henuz mesaj yok.", message: "Mesaj",
-        inboxDone: "Tamamlandi", inboxCompleted: "Hesap silindi", inboxEmailSent: "E-posta gonderildi",
+        inboxDone: "Tamamlandi", inboxCompleted: "Hesap silindi", inboxEmailQueued: "E-posta siraya alindi", inboxEmailSent: "E-posta gonderildi",
         emailQueued: "E-posta gonderim siraya alindi", emailQueueFailed: "E-posta siraya alinamadi",
         block: "Engelle", unblock: "Engeli kaldir", blocked: "Engellendi"
       },
@@ -282,7 +282,7 @@
         saved: "Saved", removed: "Removed", id: "ID", role: "Role", name: "Name", phone: "Phone", address: "Address", email: "Email",
         deleteRequestsTitle: "Account delete requests", noDeleteRequests: "No delete requests yet.", requestedAt: "Requested at", markRequestDone: "Mark request done",
         inboxTitle: "Inbox", inboxHelp: "Messages from account deletion requests are saved here permanently and are never deleted.", noInboxMessages: "No messages yet.", message: "Message",
-        inboxDone: "Done", inboxCompleted: "Account deleted", inboxEmailSent: "Email sent",
+        inboxDone: "Done", inboxCompleted: "Account deleted", inboxEmailQueued: "Email queued", inboxEmailSent: "Email sent",
         emailQueued: "Email send queued", emailQueueFailed: "Could not queue email",
         block: "Block", unblock: "Unblock", blocked: "Blocked"
       },
@@ -303,7 +303,7 @@
         saved: "تم الحفظ", removed: "تم الحذف", id: "المعرف", role: "الدور", name: "الاسم", phone: "الهاتف", address: "العنوان", email: "البريد الإلكتروني",
         deleteRequestsTitle: "طلبات حذف الحساب", noDeleteRequests: "لا توجد طلبات حذف بعد.", requestedAt: "تاريخ الطلب", markRequestDone: "وضع علامة مكتمل",
         inboxTitle: "صندوق الوارد", inboxHelp: "يتم حفظ رسائل طلبات حذف الحساب هنا بشكل دائم ولا يتم حذفها أبداً.", noInboxMessages: "لا توجد رسائل بعد.", message: "الرسالة",
-        inboxDone: "مكتمل", inboxCompleted: "تم حذف الحساب", inboxEmailSent: "تم إرسال البريد",
+        inboxDone: "مكتمل", inboxCompleted: "تم حذف الحساب", inboxEmailQueued: "تمت جدولة البريد", inboxEmailSent: "تم إرسال البريد",
         emailQueued: "تمت إضافة البريد الإلكتروني إلى قائمة الإرسال", emailQueueFailed: "تعذر إضافة البريد الإلكتروني إلى قائمة الإرسال",
         block: "حظر", unblock: "إلغاء الحظر", blocked: "محظور"
       }
@@ -680,7 +680,8 @@
       }
       root.innerHTML = entries.map((entry) => {
         const status = getInboxStatus(entry);
-        const emailSent = Boolean(entry.doneEmailQueuedAt || entry.accountDeletedEmailQueuedAt || entry.emailSentAt);
+        const emailQueued = Boolean(entry.doneEmailQueuedAt || entry.accountDeletedEmailQueuedAt);
+        const emailSent = Boolean(entry.emailSentAt);
         const userId = entry.userId || entry.id;
         const actionsHtml = status === "pending" ? `
           <div class="actions-row">
@@ -697,7 +698,7 @@
               <div class="card-meta">${escapeHtml(t("requestedAt"))}: ${escapeHtml(formatDate(entry.requestedAt))}</div>
               <div class="card-meta">
                 <span class="status-badge ${inboxStatusClass(status)}">${escapeHtml(inboxStatusLabel(status))}</span>
-                ${emailSent ? `<span class="status-badge status-done">${escapeHtml(t("inboxEmailSent"))}</span>` : ""}
+                ${emailSent ? `<span class="status-badge status-done">${escapeHtml(t("inboxEmailSent"))}</span>` : emailQueued ? `<span class="status-badge status-preparing">${escapeHtml(t("inboxEmailQueued"))}</span>` : ""}
               </div>
             </div>
           </div>

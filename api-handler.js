@@ -14,6 +14,10 @@ const {
   scheduleNotification,
   cancelNotification,
 } = require("./push-service");
+const {
+  initializeMailService,
+  getMailStatus,
+} = require("./mail-service");
 
 const MIME = {
   ".html": "text/html",
@@ -84,6 +88,7 @@ function normalizeMarket(value) {
 
 async function routeApiRequest(method, urlPath, body) {
   await initializePushService();
+  await initializeMailService();
 
   if (method === "OPTIONS") {
     return jsonResponse(200, { ok: true });
@@ -93,6 +98,7 @@ async function routeApiRequest(method, urlPath, body) {
     return jsonResponse(200, {
       status: "ok",
       push: getPushStatus().supported,
+      mail: getMailStatus().supported,
       timestamp: Date.now(),
     });
   }
