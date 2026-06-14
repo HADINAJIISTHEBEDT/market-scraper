@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1f7a5c"/>
+      <stop offset="100%" stop-color="#0d4d35"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <g transform="translate(256,256) scale(4.5)">
+    <path d="M-28-30 L28-30 L36-22 L36-18 L34-16 L30-16 L26-22 L-26-22 L-30-16 L-34-16 L-36-18 L-36-22 Z" fill="#fff" opacity="0.9"/>
+    <rect x="-24" y="-12" width="48" height="8" rx="2" fill="#fff" opacity="0.9"/>
+    <rect x="-24" y="0" width="48" height="8" rx="2" fill="#fff" opacity="0.9"/>
+    <rect x="-24" y="12" width="32" height="8" rx="2" fill="#fff" opacity="0.85"/>
+    <circle cx="-16" cy="32" r="6" fill="#ffd966"/>
+    <circle cx="16" cy="32" r="6" fill="#ffd966"/>
+    <text x="-18" y="36" font-size="10" font-weight="bold" fill="#1f7a5c">₺</text>
+    <text x="14" y="36" font-size="10" font-weight="bold" fill="#1f7a5c">₺</text>
+  </g>
+</svg>

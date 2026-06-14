@@ -1,0 +1,74 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- White background -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M0,0h108v108h-108z" />
+
+    <group
+        android:pivotX="53"
+        android:pivotY="53"
+        android:scaleX="1.2"
+        android:scaleY="1.2"
+        android:translateY="2">
+
+        <!-- Basket carry handles -->
+        <path
+            android:fillColor="#1F3FA0"
+            android:pathData="M44,45 L48,45 L40,26 L36,27 Z" />
+        <path
+            android:fillColor="#1F3FA0"
+            android:pathData="M48,45 L52,45 L58,27 L54,26 Z" />
+
+        <!-- Basket rim -->
+        <path
+            android:fillColor="#1F3FA0"
+            android:pathData="M24,43 L64,43 L64,49 L24,49 Z" />
+        <!-- Basket body -->
+        <path
+            android:fillColor="#1F3FA0"
+            android:pathData="M27,49 L61,49 L56,75 L32,75 Z" />
+        <!-- Basket slats -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M35,50 L33,74 L36,74 L38,50 Z" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M43,50 L42,74 L45,74 L46,50 Z" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M51,50 L51,74 L54,74 L54,50 Z" />
+
+        <!-- White lens disc -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M53,52 a13,13 0 1,0 26,0 a13,13 0 1,0 -26,0 Z" />
+
+        <!-- Magnifier ring -->
+        <path
+            android:fillColor="#1F3FA0"
+            android:fillType="evenOdd"
+            android:pathData="M50,52 a16,16 0 1,0 32,0 a16,16 0 1,0 -32,0 Z M55.5,52 a10.5,10.5 0 1,0 21,0 a10.5,10.5 0 1,0 -21,0 Z" />
+        <!-- Magnifier handle -->
+        <path
+            android:fillColor="#1F3FA0"
+            android:pathData="M51,59 L57,65 L47,75 L41,69 Z" />
+
+        <!-- Orange price tag -->
+        <group
+            android:pivotX="66"
+            android:pivotY="52"
+            android:rotation="-35">
+            <path
+                android:fillColor="#F37021"
+                android:pathData="M60,44 L72,44 L72,52 L66,58 L60,52 Z" />
+            <path
+                android:fillColor="#FFFFFF"
+                android:pathData="M67.2,47 a1.8,1.8 0 1,0 3.6,0 a1.8,1.8 0 1,0 -3.6,0 Z" />
+        </group>
+    </group>
+</vector>

@@ -1,0 +1,95 @@
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+}
+
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+} else {
+    def localPropsFile = rootProject.file("local.properties")
+    if (localPropsFile.exists()) {
+        def localProps = new Properties()
+        localProps.load(new FileInputStream(localPropsFile))
+        if (localProps["RELEASE_STORE_PASSWORD"] && localProps["RELEASE_KEY_PASSWORD"]) {
+            keystoreProperties["storeFile"] = localProps["RELEASE_STORE_FILE"] ?: "market-scraper-keystore.jks"
+            keystoreProperties["storePassword"] = localProps["RELEASE_STORE_PASSWORD"]
+            keystoreProperties["keyAlias"] = localProps["RELEASE_KEY_ALIAS"] ?: "market-scraper-key"
+            keystoreProperties["keyPassword"] = localProps["RELEASE_KEY_PASSWORD"]
+        }
+    }
+    if (!keystoreProperties["storePassword"]) {
+        def env = System.getenv()
+        if (env["RELEASE_STORE_PASSWORD"] && env["RELEASE_KEY_PASSWORD"]) {
+            keystoreProperties["storeFile"] = env["RELEASE_STORE_FILE"] ?: "market-scraper-keystore.jks"
+            keystoreProperties["storePassword"] = env["RELEASE_STORE_PASSWORD"]
+            keystoreProperties["keyAlias"] = env["RELEASE_KEY_ALIAS"] ?: "market-scraper-key"
+            keystoreProperties["keyPassword"] = env["RELEASE_KEY_PASSWORD"]
+        }
+    }
+}
+def hasReleaseSigning = keystoreProperties["storePassword"] != null
+
+android {
+    namespace = "com.marketfiyati.app"
+    compileSdk = 34
+
+    defaultConfig {
+        applicationId = "com.marketfiyati.app"
+        minSdk = 24
+        targetSdk = 34
+        versionCode = 5
+        versionName = "1.2"
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        release {
+            if (hasReleaseSigning) {
+                storeFile = rootProject.file(keystoreProperties["storeFile"])
+                storePassword = keystoreProperties["storePassword"]
+                keyAlias = keystoreProperties["keyAlias"]
+                keyPassword = keystoreProperties["keyPassword"]
+            } else {
+                storeFile = file("${System.getProperty("user.home")}/.android/debug.keystore")
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
+    buildFeatures {
+        viewBinding = true
+    }
+}
+
+dependencies {
+    implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.appcompat:appcompat:1.7.0")
+    implementation("com.google.android.material:material:1.12.0")
+    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
+    implementation("com.google.android.gms:play-services-ads:24.3.0")
+}
