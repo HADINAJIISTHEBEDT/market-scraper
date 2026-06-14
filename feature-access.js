@@ -73,15 +73,21 @@
   }
 
   function isAdminUser() {
-    const ownerAccess = localStorage.getItem("owner_access") === "true";
-    const ownerEmail = normalizeGmail(localStorage.getItem("owner_email"));
     const userEmail = normalizeGmail(localStorage.getItem("user_email"));
     const role = localStorage.getItem("user_role");
+    const userUid = localStorage.getItem("user_uid");
     const ownerMatch = normalizeGmail(OWNER_EMAIL);
 
-    if (ownerAccess && ownerEmail === ownerMatch) return true;
-    if (role === "admin" && userEmail === ownerMatch) return true;
+    if (userUid && role === "admin" && userEmail === ownerMatch) return true;
     return false;
+  }
+
+  function areFeaturesUnlockedForAll() {
+    return localStorage.getItem("app_features_unlocked") === "true";
+  }
+
+  function canUseFeatures() {
+    return isAdminUser() || areFeaturesUnlockedForAll();
   }
 
   function ensureModal() {
@@ -124,7 +130,7 @@
     if (!element || element.dataset.lockBound === "true") return;
     element.dataset.lockBound = "true";
     element.addEventListener("click", (event) => {
-      if (isAdminUser()) return;
+      if (canUseFeatures()) return;
       event.preventDefault();
       showLockedModal();
     });
@@ -146,7 +152,7 @@
   }
 
   function guardPage() {
-    if (isAdminUser()) return true;
+    if (canUseFeatures()) return true;
     showPageLock();
     return false;
   }
@@ -154,7 +160,7 @@
   function updateDeleteAccountLink() {
     const link = document.getElementById("deleteAccountLink");
     if (!link) return;
-    if (isAdminUser()) {
+    if (canUseFeatures()) {
       link.hidden = false;
       link.removeAttribute("aria-disabled");
       link.classList.remove("locked-feature-link");
@@ -170,7 +176,7 @@
     const panel = document.getElementById("comingSoonPanel");
     if (!panel) return;
 
-    if (isAdminUser()) {
+    if (canUseFeatures()) {
       panel.hidden = true;
       return;
     }
@@ -205,7 +211,7 @@
   }
 
   function initLoginNotice() {
-    if (isAdminUser()) return;
+    if (canUseFeatures()) return;
     const status = document.getElementById("authStatus");
     if (status && !status.textContent.trim()) {
       status.textContent = t("modalBody");
@@ -216,6 +222,8 @@
   window.FeatureAccess = {
     OWNER_EMAIL,
     isAdminUser,
+    canUseFeatures,
+    areFeaturesUnlockedForAll,
     showLockedModal,
     hideLockedModal,
     showPageLock,

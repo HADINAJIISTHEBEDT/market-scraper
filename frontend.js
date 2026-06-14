@@ -155,12 +155,15 @@ const I18N = {
     contactComponent: "Mesaj",
     contactSubmit: "Mesaj gonder",
     contactClose: "Kapat",
+    privacyPolicy: "Gizlilik Politikasi",
+    deleteAccount: "Hesabi sil",
     navBrand: "Pazar Fiyatı",
     navCart: "Sepet",
     navOrders: "Siparisler",
     navProfile: "Profil",
     navLogin: "Giris",
     navLogout: "Cikis",
+    navAdmin: "Admin Paneli",
     addToCart: "Sepete ekle",
     addedToCart: "Eklendi!",
     backToSearch: "Aramaya don",
@@ -207,12 +210,15 @@ const I18N = {
     contactComponent: "Message",
     contactSubmit: "Send message",
     contactClose: "Close",
+    privacyPolicy: "Privacy Policy",
+    deleteAccount: "Delete Account",
     navBrand: "Pazar Fiyatı",
     navCart: "Cart",
     navOrders: "Orders",
     navProfile: "Profile",
     navLogin: "Login",
     navLogout: "Logout",
+    navAdmin: "Admin",
     addToCart: "Add to Cart",
     addedToCart: "Added!",
     backToSearch: "Back to search",
@@ -259,12 +265,15 @@ const I18N = {
     contactComponent: "الرسالة",
     contactSubmit: "إرسال الرسالة",
     contactClose: "إغلاق",
+    privacyPolicy: "سياسة الخصوصية",
+    deleteAccount: "حذف الحساب",
     navBrand: "Pazar Fiyatı",
     navCart: "السلة",
     navOrders: "الطلبات",
     navProfile: "الملف الشخصي",
     navLogin: "تسجيل الدخول",
     navLogout: "تسجيل الخروج",
+    navAdmin: "الإدارة",
     addToCart: "أضف إلى السلة",
     backToSearch: "\u0627\u0644\u0639\u0648\u062f\u0629 \u0625\u0644\u0649 \u0627\u0644\u0628\u062d\u062b",
     addedToCart: "\u062a\u0645\u062a \u0627\u0644\u0625\u0636\u0627\u0641\u0629!",
@@ -383,12 +392,15 @@ function applyLanguage() {
   const contactComponentLabel = document.getElementById("contactComponentLabel");
   const contactSubmit = document.getElementById("contactSubmit");
   const contactClose = document.getElementById("contactClose");
+  const privacyLink = document.getElementById("privacyLink");
+  const deleteAccountLink = document.getElementById("deleteAccountLink");
   const navBrand = document.getElementById("navBrand");
   const navCartBtn = document.getElementById("navCartBtn");
   const navOrdersBtn = document.getElementById("navOrdersBtn");
   const navProfileBtn = document.getElementById("navProfileBtn");
   const navLoginBtn = document.getElementById("navLoginBtn");
   const navLogoutBtn = document.getElementById("navLogoutBtn");
+  const navAdminBtn = document.getElementById("navAdminBtn");
 
   if (contactPrompt) contactPrompt.textContent = t("contactPrompt");
   if (contactToggle) contactToggle.textContent = t("contactButton");
@@ -397,12 +409,15 @@ function applyLanguage() {
   if (contactComponentLabel) contactComponentLabel.textContent = t("contactComponent");
   if (contactSubmit) contactSubmit.textContent = t("contactSubmit");
   if (contactClose) contactClose.textContent = t("contactClose");
+  if (privacyLink) privacyLink.textContent = t("privacyPolicy");
+  if (deleteAccountLink) deleteAccountLink.textContent = t("deleteAccount");
   if (navBrand) navBrand.textContent = t("navBrand");
   if (navCartBtn) navCartBtn.innerHTML = `${escapeHtml(t("navCart"))} (<span id="cartCount">${escapeHtml(document.getElementById("cartCount")?.textContent || "0")}</span>)`;
   if (navOrdersBtn) navOrdersBtn.textContent = t("navOrders");
   if (navProfileBtn) navProfileBtn.textContent = t("navProfile");
   if (navLoginBtn) navLoginBtn.textContent = t("navLogin");
   if (navLogoutBtn) navLogoutBtn.textContent = t("navLogout");
+  if (navAdminBtn) navAdminBtn.textContent = t("navAdmin");
   const backToSearchBtn = document.getElementById("backToSearchBtn");
   if (backToSearchBtn) backToSearchBtn.textContent = t("backToSearch");
 
@@ -595,6 +610,37 @@ window.addToCart = function(item) {
   }
 };
 
+function renderHomepageTiles(tiles) {
+  const strip = document.getElementById("adStrip");
+  if (!strip || !Array.isArray(tiles) || !tiles.length) return;
+  strip.innerHTML = tiles.map((tile) => `
+    <div class="ad-tile" style="background-image:url('${escapeHtml(tile.imageUrl)}')">
+      <span>${escapeHtml(tile.label)}</span>
+    </div>
+  `).join("");
+}
+
+function applyRemoteSettings(settings) {
+  if (!settings) return;
+
+  const announcement = document.getElementById("announcementBanner");
+  if (announcement) {
+    const text = String(settings.announcement || "").trim();
+    announcement.hidden = !text;
+    announcement.textContent = text;
+  }
+
+  const title = document.getElementById("title");
+  const subtitle = document.getElementById("subtitle");
+  if (settings.heroTitle && title) title.textContent = settings.heroTitle;
+  else if (title) title.textContent = t("title");
+  if (settings.heroSubtitle && subtitle) subtitle.textContent = settings.heroSubtitle;
+  else if (subtitle) subtitle.textContent = t("subtitle");
+
+  renderHomepageTiles(settings.homepageTiles);
+  updateNavbar();
+}
+
 // ── Navbar auth helpers ───────────────────────────────────────
 function updateNavbar() {
   const navUser = document.getElementById("navUser");
@@ -603,18 +649,19 @@ function updateNavbar() {
   const navLoginBtn = document.getElementById("navLoginBtn");
   const navLogoutBtn = document.getElementById("navLogoutBtn");
   const navProfileBtn = document.getElementById("navProfileBtn");
-  const isAdmin = window.FeatureAccess?.isAdminUser?.() === true;
+  const navAdminBtn = document.getElementById("navAdminBtn");
+  const canUse = window.FeatureAccess?.canUseFeatures?.() === true;
   const userName = localStorage.getItem("user_name");
   const isLoggedIn = Boolean(localStorage.getItem("user_uid"));
 
-  [navCartBtn, navOrdersBtn, navLoginBtn, navLogoutBtn, navProfileBtn].forEach((el) => {
+  [navCartBtn, navOrdersBtn, navLoginBtn, navLogoutBtn, navProfileBtn, navAdminBtn].forEach((el) => {
     if (!el) return;
     el.hidden = true;
     if (el.id === "navLogoutBtn") el.style.display = "none";
   });
   if (navUser) navUser.textContent = "";
 
-  if (!isAdmin) {
+  if (!canUse) {
     window.FeatureAccess?.initComingSoonPanel?.();
     window.FeatureAccess?.initLockedFooterLinks?.();
     return;
@@ -851,6 +898,12 @@ async function refreshPrices() {
 window.addEventListener("DOMContentLoaded", () => {
   updateNavbar();
   updateCartCount();
+  if (window.AppSettings?.get) {
+    applyRemoteSettings(window.AppSettings.get());
+  }
+  window.addEventListener("app-settings-changed", (event) => {
+    applyRemoteSettings(event.detail);
+  });
   currentLang = localStorage.getItem("app_lang") || "tr";
   const langSelect = document.getElementById("langSelect");
   if (langSelect) {
@@ -860,6 +913,7 @@ window.addEventListener("DOMContentLoaded", () => {
       localStorage.setItem("app_lang", currentLang);
       applyLanguage();
       updateNavbar();
+      if (window.AppSettings?.get) applyRemoteSettings(window.AppSettings.get());
       if (currentResultsData) renderResults(currentResultsData);
     });
   }

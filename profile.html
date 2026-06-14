@@ -135,7 +135,7 @@
     <div class="top-row">
       <a class="back-link" id="backLink" href="index.html">&larr; Back to app</a>
       <select id="langSelect" class="lang-select">
-        <option value="tr">Turkce</option>
+        <option value="tr">Türkçe</option>
         <option value="en">English</option>
         <option value="ar">العربية</option>
       </select>
@@ -171,17 +171,19 @@
   </main>
 
   <footer style="width:min(720px,calc(100vw - 24px));margin:0 auto 24px;font-size:14px;color:#64748b;display:flex;gap:16px;flex-wrap:wrap;">
-    <a href="privacy-policy.html">Privacy Policy</a>
+    <a href="privacy-policy.html" id="privacyLink">Privacy Policy</a>
     <a href="delete-account.html" id="deleteAccountLink" class="locked-feature-link">Delete Account</a>
   </footer>
 
   <script src="feature-access.js"></script>
+  <script src="app-settings.js"></script>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { browserLocalPersistence, getAuth, onAuthStateChanged, setPersistence, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
     import { doc, getDoc, getFirestore, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
     import firebaseConfig from "./firebase-config.js";
 
+    await window.AppSettings.ready();
     if (!window.FeatureAccess?.guardPage()) {
       window.FeatureAccess?.initLockedFooterLinks?.();
     } else {
@@ -203,7 +205,9 @@
         errorLoginRequired: "Devam etmek icin once giris yapin.",
         errorLoad: "Profil bilgileri yuklenemedi.",
         errorSave: "Profil kaydedilemedi.",
-        logoutDone: "Cikis yapildi."
+        logoutDone: "Cikis yapildi.",
+        privacyPolicy: "Gizlilik Politikasi",
+        deleteAccount: "Hesabi sil"
       },
       en: {
         title: "Profile details",
@@ -221,7 +225,9 @@
         errorLoginRequired: "Please sign in first.",
         errorLoad: "The profile data could not be loaded.",
         errorSave: "The profile data could not be saved.",
-        logoutDone: "Logged out."
+        logoutDone: "Logged out.",
+        privacyPolicy: "Privacy Policy",
+        deleteAccount: "Delete Account"
       },
       ar: {
         title: "بيانات الملف الشخصي",
@@ -239,7 +245,9 @@
         errorLoginRequired: "يرجى تسجيل الدخول أولاً.",
         errorLoad: "تعذر تحميل بيانات الملف الشخصي.",
         errorSave: "تعذر حفظ بيانات الملف الشخصي.",
-        logoutDone: "تم تسجيل الخروج."
+        logoutDone: "تم تسجيل الخروج.",
+        privacyPolicy: "سياسة الخصوصية",
+        deleteAccount: "حذف الحساب"
       }
     };
 
@@ -272,6 +280,8 @@
       document.getElementById("saveButton").textContent = t("saveButton");
       document.getElementById("logoutButton").textContent = t("logoutButton");
       document.getElementById("backLink").innerHTML = "&larr; " + t("backLink");
+      document.getElementById("privacyLink").textContent = t("privacyPolicy");
+      document.getElementById("deleteAccountLink").textContent = t("deleteAccount");
       document.title = t("title");
     }
 

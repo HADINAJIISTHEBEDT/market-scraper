@@ -17,9 +17,11 @@
   <p>We will delete account data (email, name, user ID, profile details, and saved app data linked to your account) within 7 days. Some backup copies may be retained for up to 90 days for legal or security reasons.</p>
   <p>See our <a href="privacy-policy.html">Privacy Policy</a> for more information about how we handle data.</p>
   <script src="feature-access.js"></script>
-  <script>
+  <script src="app-settings.js"></script>
+  <script type="module">
+    await window.AppSettings.ready();
     if (!window.FeatureAccess?.guardPage()) {
-      // Locked for non-admin visitors.
+      // Locked for non-admin visitors until features are unlocked globally.
     }
   </script>
 </body>

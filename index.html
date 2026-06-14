@@ -423,11 +423,13 @@
         <a id="navOrdersBtn" href="orders.html" hidden>Orders</a>
         <a id="navProfileBtn" href="profile.html" hidden>Profile</a>
         <a id="navLoginBtn" href="login.html" hidden>Login</a>
+        <a id="navAdminBtn" href="admin.html" hidden>Admin</a>
         <button id="navLogoutBtn" onclick="doLogout()" style="display:none;background:none;border:1px solid #e5e7eb;border-radius:6px;padding:4px 10px;cursor:pointer;color:#b91c1c;font-weight:600;">Logout</button>
       </div>
     </div>
 
     <main id="homeView">
+    <div id="announcementBanner" hidden style="margin-bottom:14px;padding:12px 14px;border-radius:12px;background:#fff7ed;border:1px solid #fdba74;color:#9a3412;font-weight:600;"></div>
     <div class="hero">
       <section>
         <h1 id="title">Pazar Fiyatı</h1>
@@ -438,9 +440,9 @@
     <section class="search-panel">
       <div class="search-row" style="justify-content:flex-end;">
         <select id="langSelect">
-          <option value="tr">Turkce</option>
+          <option value="tr">Türkçe</option>
           <option value="en">English</option>
-          <option value="ar">Arabic</option>
+          <option value="ar">العربية</option>
         </select>
       </div>
       <div class="search-row">
@@ -470,7 +472,7 @@
       <p id="status"></p>
     </section>
 
-    <section class="ad-strip" aria-label="Featured items" style="margin-top:14px;">
+    <section class="ad-strip" id="adStrip" aria-label="Featured items" style="margin-top:14px;">
       <div class="ad-tile" style="background-image:url('https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80')"><span>Fresh vegetables</span></div>
       <div class="ad-tile" style="background-image:url('https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=600&q=80')"><span>Bread and bakery</span></div>
       <div class="ad-tile" style="background-image:url('https://images.unsplash.com/photo-1589927986089-35812388d1f4?auto=format&fit=crop&w=600&q=80')"><span>Daily groceries</span></div>
@@ -519,7 +521,7 @@
     <footer class="contact-area">
       <p><span id="contactPrompt">For any problem </span><button id="contactToggle" class="contact-link" type="button">contact us</button></p>
       <p style="margin-top:12px;font-size:14px;">
-        <a href="privacy-policy.html">Privacy Policy</a>
+        <a href="privacy-policy.html" id="privacyLink">Privacy Policy</a>
         <span id="deleteAccountWrap">
           &nbsp;·&nbsp;
           <a href="delete-account.html" id="deleteAccountLink" class="locked-feature-link">Delete Account</a>
@@ -548,6 +550,7 @@
         </form>
       </div>
     </footer>
+    <script src="app-settings.js"></script>
     <script src="feature-access.js"></script>
     <script src="frontend.js"></script>
   </body>

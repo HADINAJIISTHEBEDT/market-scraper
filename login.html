@@ -354,7 +354,7 @@
   <main class="page">
     <div class="lang-row">
       <select id="langSelect" class="lang-select">
-        <option value="tr">Turkce</option>
+        <option value="tr">Türkçe</option>
         <option value="en">English</option>
         <option value="ar">العربية</option>
       </select>
@@ -408,12 +408,13 @@
   <footer class="footer">
     <a href="index.html" id="backLink">&larr; Aramaya don</a>
     <div class="footer-links">
-      <a href="privacy-policy.html">Privacy Policy</a>
+      <a href="privacy-policy.html" id="privacyLink">Privacy Policy</a>
       <a href="delete-account.html" id="deleteAccountLink" class="locked-feature-link">Delete Account</a>
     </div>
   </footer>
 
   <script src="feature-access.js"></script>
+  <script src="app-settings.js"></script>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import {
@@ -430,7 +431,7 @@
     import {
       doc,
       getDoc,
-      getFirestore,
+      initializeFirestore,
       setDoc
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
     import firebaseConfig from "./firebase-config.js";
@@ -453,6 +454,8 @@
         ownerPasswordBtn: "Sahip panelini ac",
         ownerPasswordError: "Sahip sifresi yanlis.",
         goHomeBtn: "Ana sayfaya git",
+        privacyPolicy: "Gizlilik Politikasi",
+        deleteAccount: "Hesabi sil",
         errorGeneric: "Google ile giris basarisiz oldu.",
         errorUnauthorizedDomain: "Bu alan adi Firebase Authentication icin yetkili degil.",
         errorGoogleOnly: "Lutfen Gmail ile bagli bir Google hesabi kullanin.",
@@ -480,6 +483,8 @@
         ownerPasswordBtn: "Open owner page",
         ownerPasswordError: "Incorrect owner password.",
         goHomeBtn: "Go to home page",
+        privacyPolicy: "Privacy Policy",
+        deleteAccount: "Delete Account",
         errorGeneric: "Google sign-in failed.",
         errorUnauthorizedDomain: "This domain is not authorized for Firebase Authentication.",
         errorGoogleOnly: "Please use a real Google account with Gmail.",
@@ -504,6 +509,11 @@
         statusChecking: "جار فحص الحساب...",
         statusSuccess: "تم تسجيل الدخول بنجاح. اضغط الزر أدناه للعودة إلى الصفحة الرئيسية.",
         goHomeBtn: "الذهاب إلى الصفحة الرئيسية",
+        ownerPasswordLabel: "أدخل كلمة مرور المالك للمتابعة",
+        ownerPasswordBtn: "فتح صفحة المالك",
+        ownerPasswordError: "كلمة مرور المالك غير صحيحة.",
+        privacyPolicy: "سياسة الخصوصية",
+        deleteAccount: "حذف الحساب",
         errorGeneric: "فشل تسجيل الدخول عبر Google.",
         errorUnauthorizedDomain: "اسم النطاق هذا غير مصرح به في Firebase Authentication.",
         errorGoogleOnly: "يرجى استخدام حساب Google حقيقي مرتبط بـ Gmail.",
@@ -518,7 +528,10 @@
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
-    const db = getFirestore(app);
+    const db = initializeFirestore(app, {
+      experimentalForceLongPolling: true,
+      useFetchStreams: false,
+    });
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });
     const OWNER_EMAIL = "hadi.naji145@gmail.com";
@@ -567,6 +580,15 @@
       if (ownerPasswordBox) ownerPasswordBox.classList.remove("visible");
     }
 
+    function withTimeout(promise, ms, message) {
+      return Promise.race([
+        promise,
+        new Promise((_, reject) => {
+          setTimeout(() => reject(new Error(message)), ms);
+        }),
+      ]);
+    }
+
     function applyLanguage() {
       document.documentElement.lang = currentLang;
       document.documentElement.dir = currentLang === "ar" ? "rtl" : "ltr";
@@ -582,6 +604,8 @@
       document.getElementById("goHomeBtn").textContent = t("goHomeBtn");
       document.getElementById("ownerPasswordLabel").textContent = t("ownerPasswordLabel");
       document.getElementById("ownerPasswordBtn").textContent = t("ownerPasswordBtn");
+      document.getElementById("privacyLink").textContent = t("privacyPolicy");
+      document.getElementById("deleteAccountLink").textContent = t("deleteAccount");
       document.title = t("topLabel");
     }
 
@@ -611,7 +635,7 @@
 
     async function syncUserRecord(user) {
       const userRef = doc(db, "users", user.uid);
-      const snap = await getDoc(userRef);
+      const snap = await withTimeout(getDoc(userRef), 8000, "Profile load timed out.");
       const existing = snap.exists() ? snap.data() : {};
       const mergedProfile = {
         ...existing,
@@ -622,7 +646,7 @@
         lastLoginAt: new Date().toISOString(),
         createdAt: existing.createdAt || new Date().toISOString()
       };
-      await setDoc(userRef, mergedProfile, { merge: true });
+      await withTimeout(setDoc(userRef, mergedProfile, { merge: true }), 8000, "Profile save timed out.");
       return mergedProfile;
     }
 
@@ -641,14 +665,19 @@
           address: localStorage.getItem("user_address") || ""
         });
 
+        let profileWarning = "";
         try {
           const profile = await syncUserRecord(user);
           storeUserLocally(user, profile);
         } catch (error) {
           console.error("Profile sync failed", error);
+          profileWarning = ` ${t("errorProfileSave")} (${error.message || "unknown"})`;
         }
 
         setStatus("statusSuccess");
+        if (profileWarning) {
+          document.getElementById("authStatus").textContent += profileWarning;
+        }
         if (isOwnerEmail(user.email)) {
           showOwnerPassword();
         }
@@ -686,10 +715,10 @@
       localStorage.setItem("owner_email", normalizeGmail(OWNER_EMAIL));
       localStorage.setItem("user_role", "admin");
       try {
-        await setDoc(doc(db, "users", uid), {
+        await withTimeout(setDoc(doc(db, "users", uid), {
           role: "admin",
           ownerAccessAt: new Date().toISOString()
-        }, { merge: true });
+        }, { merge: true }), 8000, "Owner role save timed out.");
       } catch (error) {
         console.error("Owner role save failed", error);
       }
@@ -770,6 +799,7 @@
     });
 
     applyLanguage();
+    await window.AppSettings.ready();
     window.FeatureAccess?.initLoginNotice?.();
     if (isOwnerEmail(localStorage.getItem("user_email"))) {
       setStatus("statusSuccess");
