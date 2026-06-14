@@ -19,6 +19,7 @@
       pageLockTitle: "Bu sayfa simdilik kilitli",
       pageLockBody: "Bu ozellik en kisa surede herkese acilacak. Simdilik sadece admin kullanabilir.",
       pageLockBack: "Ana sayfaya don",
+      blockedTitle: "Erisim engellendi",
       blockedAccountBody: `Admin tarafindan engellendiniz. Bunun bir yanlis anlama oldugunu dusunuyorsaniz ${OWNER_EMAIL} hesabina e-posta gonderin.`,
     },
     en: {
@@ -36,6 +37,7 @@
       pageLockTitle: "This page is locked for now",
       pageLockBody: "This feature will be unlocked as soon as possible. Only the admin can use it for now.",
       pageLockBack: "Back to home",
+      blockedTitle: "Access blocked",
       blockedAccountBody: `You were blocked by the admin. If you think this is a misunderstanding, send an email to ${OWNER_EMAIL}.`,
     },
     ar: {
@@ -53,6 +55,7 @@
       pageLockTitle: "هذه الصفحة مقفلة حالياً",
       pageLockBody: "سيتم فتح هذه الميزة في أقرب وقت ممكن. يمكن للمسؤول فقط استخدامها الآن.",
       pageLockBack: "العودة إلى الرئيسية",
+      blockedTitle: "تم حظر الوصول",
       blockedAccountBody: `تم حظرك من قبل المسؤول. إذا كنت تعتقد أن هذا سوء فهم، أرسل بريداً إلكترونياً إلى ${OWNER_EMAIL}.`,
     },
   };
@@ -73,6 +76,18 @@
       return `${local.replace(/\./g, "")}@gmail.com`;
     }
     return value;
+  }
+
+  function getDeviceId() {
+    let deviceId = localStorage.getItem("app_device_id");
+    if (deviceId) return deviceId;
+    if (window.crypto?.randomUUID) {
+      deviceId = window.crypto.randomUUID();
+    } else {
+      deviceId = `device-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    }
+    localStorage.setItem("app_device_id", deviceId);
+    return deviceId;
   }
 
   function isAdminUser() {
@@ -148,6 +163,23 @@
         <h1>${t("pageLockTitle")}</h1>
         <p>${t("pageLockBody")}</p>
         <a href="index.html">${t("pageLockBack")}</a>
+      </div>
+    `;
+    document.body.prepend(overlay);
+    document.body.classList.add("feature-page-locked");
+  }
+
+  function showBlockedPage(message = t("blockedAccountBody")) {
+    if (document.getElementById("blockedAccountLock")) return;
+    const overlay = document.createElement("div");
+    overlay.id = "blockedAccountLock";
+    overlay.className = "feature-page-lock";
+    overlay.innerHTML = `
+      <div class="feature-page-lock__panel">
+        <div class="feature-page-lock__badge">${t("lockedBadge")}</div>
+        <h1>${t("blockedTitle")}</h1>
+        <p>${message}</p>
+        <a href="mailto:${OWNER_EMAIL}">${OWNER_EMAIL}</a>
       </div>
     `;
     document.body.prepend(overlay);
@@ -249,6 +281,17 @@
     sessionStorage.removeItem("blocked_account_notice");
   }
 
+  function handleBlockedAccess() {
+    const message = t("blockedAccountBody");
+    sessionStorage.setItem("blocked_account_notice", message);
+    clearLocalUser();
+    if (location.pathname.endsWith("/login.html")) {
+      showBlockedAccountNotice();
+    } else {
+      showBlockedPage(message);
+    }
+  }
+
   function startDeletedAccountWatcher() {
     const uid = localStorage.getItem("user_uid");
     if (!uid || window.__deletedAccountWatcherStarted) return;
@@ -279,12 +322,13 @@
         firestore.onSnapshot(firestore.doc(db, "users", uid), (snapshot) => {
           const data = snapshot.exists() ? snapshot.data() : null;
           if (data && !data.blocked) return;
-          sessionStorage.setItem("blocked_account_notice", data?.blocked ? t("blockedAccountBody") : "");
-          clearLocalUser();
-          if (location.pathname.endsWith("/login.html")) {
-            showBlockedAccountNotice();
+          if (data?.blocked) {
+            handleBlockedAccess();
           } else {
-            window.location.href = "login.html";
+            clearLocalUser();
+            if (!location.pathname.endsWith("/login.html")) {
+              window.location.href = "login.html";
+            }
           }
         });
       })
@@ -293,14 +337,54 @@
       });
   }
 
+  function startBlockedDeviceWatcher() {
+    const deviceId = getDeviceId();
+    if (!deviceId || window.__blockedDeviceWatcherStarted) return;
+    window.__blockedDeviceWatcherStarted = true;
+
+    import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js")
+      .then(({ getApps, initializeApp }) => Promise.all([
+        Promise.resolve(getApps()[0] || initializeApp({
+          apiKey: "AIzaSyA4ZmYg5sTs4gU1Nm25s7of6oqJ4xGpR28",
+          authDomain: "st-business-86a9b.firebaseapp.com",
+          projectId: "st-business-86a9b",
+          storageBucket: "st-business-86a9b.firebasestorage.app",
+          messagingSenderId: "472603409840",
+          appId: "1:472603409840:web:30127c81e74c3b3c4e2a75",
+        })),
+        import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js"),
+      ]))
+      .then(([app, firestore]) => {
+        let db;
+        try {
+          db = firestore.initializeFirestore(app, {
+            experimentalForceLongPolling: true,
+            useFetchStreams: false,
+          });
+        } catch {
+          db = firestore.getFirestore(app);
+        }
+        firestore.onSnapshot(firestore.doc(db, "blockedDevices", deviceId), (snapshot) => {
+          const data = snapshot.exists() ? snapshot.data() : null;
+          if (!data?.blocked) return;
+          handleBlockedAccess();
+        });
+      })
+      .catch((error) => {
+        console.error("[FeatureAccess] Blocked device watcher failed:", error);
+      });
+  }
+
   window.FeatureAccess = {
     OWNER_EMAIL,
+    getDeviceId,
     isAdminUser,
     canUseFeatures,
     areFeaturesUnlockedForAll,
     showLockedModal,
     hideLockedModal,
     showPageLock,
+    showBlockedPage,
     guardPage,
     initComingSoonPanel,
     initLockedFooterLinks,
@@ -313,5 +397,7 @@
     t,
   };
 
+  getDeviceId();
   startDeletedAccountWatcher();
+  startBlockedDeviceWatcher();
 })();

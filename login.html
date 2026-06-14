@@ -429,6 +429,7 @@
       signOut
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
     import {
+      arrayUnion,
       doc,
       getDoc,
       initializeFirestore,
@@ -640,16 +641,24 @@
       const userRef = doc(db, "users", user.uid);
       const snap = await withTimeout(getDoc(userRef), 8000, "Profile load timed out.");
       const existing = snap.exists() ? snap.data() : {};
+      const deviceId = window.FeatureAccess?.getDeviceId?.() || "";
+      const sessionId = sessionStorage.getItem("app_session_id") || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      sessionStorage.setItem("app_session_id", sessionId);
       const mergedProfile = {
         ...existing,
         name: existing.name || user.displayName || user.email || "User",
         email: user.email || existing.email || "",
         photoURL: user.photoURL || existing.photoURL || "",
         role: isOwnerEmail(user.email || existing.email) ? "admin" : (existing.role || "user"),
+        lastDeviceId: deviceId,
+        lastSessionId: sessionId,
         lastLoginAt: new Date().toISOString(),
         createdAt: existing.createdAt || new Date().toISOString()
       };
       await withTimeout(setDoc(userRef, mergedProfile, { merge: true }), 8000, "Profile save timed out.");
+      if (deviceId) {
+        await withTimeout(setDoc(userRef, { deviceIds: arrayUnion(deviceId) }, { merge: true }), 8000, "Device save timed out.");
+      }
       return mergedProfile;
     }
 
