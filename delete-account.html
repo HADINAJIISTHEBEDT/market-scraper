@@ -13,6 +13,8 @@
     button { padding:11px 16px; border:0; border-radius:10px; cursor:pointer; font:inherit; font-weight:700; }
     .danger { background:#dc2626; color:#fff; }
     .secondary { background:#e2e8f0; color:#1e293b; text-decoration:none; padding:11px 16px; border-radius:10px; font-weight:700; }
+    textarea { width:100%; min-height:110px; box-sizing:border-box; border:1px solid #cbd5e1; border-radius:10px; padding:11px 12px; font:inherit; resize:vertical; }
+    label { display:grid; gap:8px; margin-top:14px; font-weight:700; }
     .status { margin-top:16px; padding:12px 14px; border-radius:10px; background:#eff6ff; color:#1e3a8a; font-weight:700; }
     .status.error { background:#fee2e2; color:#991b1b; }
   </style>
@@ -23,6 +25,10 @@
     <p id="intro">Press the button below to send a deletion request for the Gmail account saved in your profile.</p>
     <p><strong id="emailLabel">Gmail:</strong> <span id="requestEmail"></span></p>
     <p id="promiseText">We will send your request to the admin. Your data will be deleted within a maximum of 7 days, and we will send you an email as soon as possible.</p>
+    <label>
+      <span id="messageLabel">Message to admin</span>
+      <textarea id="requestMessage" placeholder="Write your message here"></textarea>
+    </label>
     <div class="actions">
       <button id="requestDeleteBtn" class="danger" type="button">Send delete request</button>
       <a id="backLink" class="secondary" href="index.html">Back to app</a>
@@ -46,6 +52,8 @@
           intro: "Profilinde kayitli Gmail hesabi icin silme istegi gondermek uzere asagidaki dugmeye bas.",
           emailLabel: "Gmail:",
           promiseText: "Silme istegini admine gonderecegiz. Verilerin en fazla 7 gun icinde silinecek ve en kisa surede sana e-posta gonderecegiz.",
+          messageLabel: "Admine mesaj",
+          messagePlaceholder: "Mesajini buraya yaz",
           requestDeleteBtn: "Silme istegi gonder",
           backLink: "Uygulamaya don",
           missingLogin: "Silme istegi gondermek icin once giris yapmalisin.",
@@ -58,6 +66,8 @@
           intro: "Press the button below to send a deletion request for the Gmail account saved in your profile.",
           emailLabel: "Gmail:",
           promiseText: "We will send your request to the admin. Your data will be deleted within a maximum of 7 days, and we will send you an email as soon as possible.",
+          messageLabel: "Message to admin",
+          messagePlaceholder: "Write your message here",
           requestDeleteBtn: "Send delete request",
           backLink: "Back to app",
           missingLogin: "Please sign in before sending a deletion request.",
@@ -70,6 +80,8 @@
           intro: "اضغط الزر أدناه لإرسال طلب حذف لحساب Gmail المحفوظ في ملفك.",
           emailLabel: "Gmail:",
           promiseText: "سنرسل طلبك إلى المسؤول. سيتم حذف بياناتك خلال مدة أقصاها 7 أيام، وسنرسل لك بريداً إلكترونياً في أقرب وقت ممكن.",
+          messageLabel: "رسالة إلى المسؤول",
+          messagePlaceholder: "اكتب رسالتك هنا",
           requestDeleteBtn: "إرسال طلب الحذف",
           backLink: "العودة إلى التطبيق",
           missingLogin: "يرجى تسجيل الدخول قبل إرسال طلب الحذف.",
@@ -107,6 +119,8 @@
         document.getElementById("intro").textContent = t("intro");
         document.getElementById("emailLabel").textContent = t("emailLabel");
         document.getElementById("promiseText").textContent = t("promiseText");
+        document.getElementById("messageLabel").textContent = t("messageLabel");
+        document.getElementById("requestMessage").placeholder = t("messagePlaceholder");
         document.getElementById("requestDeleteBtn").textContent = t("requestDeleteBtn");
         document.getElementById("backLink").textContent = t("backLink");
         document.title = t("title");
@@ -124,6 +138,7 @@
             userId: userUid,
             email: userEmail,
             name: userName || "",
+            message: document.getElementById("requestMessage").value.trim(),
             status: "pending",
             requestedAt: new Date().toISOString(),
           }, { merge: true });

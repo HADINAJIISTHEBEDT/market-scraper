@@ -19,6 +19,7 @@
       pageLockTitle: "Bu sayfa simdilik kilitli",
       pageLockBody: "Bu ozellik en kisa surede herkese acilacak. Simdilik sadece admin kullanabilir.",
       pageLockBack: "Ana sayfaya don",
+      blockedAccountBody: `Admin tarafindan engellendiniz. Bunun bir yanlis anlama oldugunu dusunuyorsaniz ${OWNER_EMAIL} hesabina e-posta gonderin.`,
     },
     en: {
       modalTitle: "Coming soon",
@@ -35,6 +36,7 @@
       pageLockTitle: "This page is locked for now",
       pageLockBody: "This feature will be unlocked as soon as possible. Only the admin can use it for now.",
       pageLockBack: "Back to home",
+      blockedAccountBody: `You were blocked by the admin. If you think this is a misunderstanding, send an email to ${OWNER_EMAIL}.`,
     },
     ar: {
       modalTitle: "قريباً",
@@ -51,6 +53,7 @@
       pageLockTitle: "هذه الصفحة مقفلة حالياً",
       pageLockBody: "سيتم فتح هذه الميزة في أقرب وقت ممكن. يمكن للمسؤول فقط استخدامها الآن.",
       pageLockBack: "العودة إلى الرئيسية",
+      blockedAccountBody: `تم حظرك من قبل المسؤول. إذا كنت تعتقد أن هذا سوء فهم، أرسل بريداً إلكترونياً إلى ${OWNER_EMAIL}.`,
     },
   };
 
@@ -233,6 +236,19 @@
     ].forEach((key) => localStorage.removeItem(key));
   }
 
+  function showBlockedAccountNotice() {
+    const message = sessionStorage.getItem("blocked_account_notice");
+    if (!message) return;
+    const status = document.getElementById("authStatus");
+    if (status) {
+      status.textContent = message;
+      status.className = "status-box error";
+    } else {
+      alert(message);
+    }
+    sessionStorage.removeItem("blocked_account_notice");
+  }
+
   function startDeletedAccountWatcher() {
     const uid = localStorage.getItem("user_uid");
     if (!uid || window.__deletedAccountWatcherStarted) return;
@@ -261,9 +277,13 @@
           db = firestore.getFirestore(app);
         }
         firestore.onSnapshot(firestore.doc(db, "users", uid), (snapshot) => {
-          if (snapshot.exists()) return;
+          const data = snapshot.exists() ? snapshot.data() : null;
+          if (data && !data.blocked) return;
+          sessionStorage.setItem("blocked_account_notice", data?.blocked ? t("blockedAccountBody") : "");
           clearLocalUser();
-          if (!location.pathname.endsWith("/login.html")) {
+          if (location.pathname.endsWith("/login.html")) {
+            showBlockedAccountNotice();
+          } else {
             window.location.href = "login.html";
           }
         });
@@ -286,6 +306,7 @@
     initLockedFooterLinks,
     initLoginNotice,
     clearLocalUser,
+    showBlockedAccountNotice,
     startDeletedAccountWatcher,
     updateDeleteAccountLink,
     bindLockedTrigger,

@@ -50,12 +50,13 @@
     .card-header { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: flex-start; }
     .card-title { font-weight: 800; color: #1e293b; }
     .card-meta { font-size: 13px; color: #64748b; margin-top: 4px; }
-    .btn-primary, .btn-secondary, .btn-danger, .btn-update {
+    .btn-primary, .btn-secondary, .btn-danger, .btn-warning, .btn-update {
       padding: 8px 14px; border: none; border-radius: 8px; cursor: pointer; font: inherit; font-weight: 700;
     }
     .btn-primary { background: #2563eb; color: #fff; }
     .btn-secondary { background: #e2e8f0; color: #1e293b; }
     .btn-danger { background: #fee2e2; color: #b91c1c; }
+    .btn-warning { background: #fef3c7; color: #92400e; }
     .btn-update { background: #2563eb; color: #fff; }
     .actions-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
     .status-badge {
@@ -65,6 +66,8 @@
     .status-preparing { background: #dbeafe; color: #1e40af; }
     .status-on-the-way { background: #fce7f3; color: #9d174d; }
     .status-delivered { background: #dcfce7; color: #166534; }
+    .status-blocked { background: #fee2e2; color: #991b1b; }
+    .message-box { margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: #f8fafc; white-space: pre-wrap; }
     .order-item-row, .tile-preview-row { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
     .tile-preview {
       width: 72px; height: 52px; border-radius: 8px; background-size: cover; background-position: center; border: 1px solid #e2e8f0;
@@ -114,6 +117,7 @@
       <button class="tab-btn" data-tab="homepage" id="tabHomepage">Homepage</button>
       <button class="tab-btn" data-tab="orders" id="tabOrders">Orders</button>
       <button class="tab-btn" data-tab="users" id="tabUsers">Users</button>
+      <button class="tab-btn" data-tab="inbox" id="tabInbox">Inbox</button>
     </div>
 
     <section class="panel-section active" id="panel-settings">
@@ -193,6 +197,12 @@
       <div id="deleteRequestsList"></div>
       <div id="usersList"></div>
     </section>
+
+    <section class="panel-section" id="panel-inbox">
+      <h2 id="inboxTitle">Inbox</h2>
+      <p class="help" id="inboxHelp">Messages sent from account deletion requests appear here.</p>
+      <div id="inboxList"></div>
+    </section>
   </div>
 
   <div class="toast" id="toast"></div>
@@ -236,7 +246,7 @@
         adminTitle: "Admin Paneli", backLink: "Uygulamaya don", deniedTitle: "Erisim reddedildi",
         deniedMessage: "Bu sayfayi gormek icin admin olmalisiniz.", deniedBack: "Geri don",
         totalOrders: "Toplam siparis", pending: "Beklemede", users: "Kullanicilar", tiles: "Ana sayfa kartlari",
-        tabSettings: "Uygulama ayarlari", tabHomepage: "Ana sayfa", tabOrders: "Siparisler", tabUsers: "Kullanicilar",
+        tabSettings: "Uygulama ayarlari", tabHomepage: "Ana sayfa", tabOrders: "Siparisler", tabUsers: "Kullanicilar", tabInbox: "Gelen kutusu",
         settingsTitle: "Genel uygulama ayarlari", settingsHelp: "Buradaki degisiklikler Firebase'e kaydedilir ve tum kullanicilara canli yansir.",
         featuresAccessLabel: "Giris, sepet, profil ve siparis erisimi", featuresLockOption: "Normal kullanicilar icin kilitle", featuresUnlockOption: "Tum kullanicilar icin ac",
         announcementLabel: "Duyuru bandi", appPauseModeLabel: "Uygulama durumu", appRunOption: "Uygulamayi normal kullanicilar icin calistir", appPauseOption: "Uygulamayi normal kullanicilar icin duraklat", commandMessageLabel: "Komut mesaji",
@@ -247,13 +257,15 @@
         preparing: "Hazirlaniyor", onTheWay: "Yolda", delivered: "Teslim edildi", unknown: "Bilinmiyor",
         updateStatus: "Durumu guncelle", delete: "Sil", saveUser: "Kullaniciyi kaydet", updated: "Guncellendi",
         saved: "Kaydedildi", removed: "Silindi", id: "ID", role: "Rol", name: "Ad", phone: "Telefon", address: "Adres", email: "E-posta",
-        deleteRequestsTitle: "Hesap silme istekleri", noDeleteRequests: "Henuz silme istegi yok.", requestedAt: "Istek tarihi", markRequestDone: "Tamamlandi olarak isaretle"
+        deleteRequestsTitle: "Hesap silme istekleri", noDeleteRequests: "Henuz silme istegi yok.", requestedAt: "Istek tarihi", markRequestDone: "Tamamlandi olarak isaretle",
+        inboxTitle: "Gelen kutusu", inboxHelp: "Hesap silme isteklerinden gelen mesajlar burada gorunur.", noInboxMessages: "Henuz mesaj yok.", message: "Mesaj",
+        block: "Engelle", unblock: "Engeli kaldir", blocked: "Engellendi"
       },
       en: {
         adminTitle: "Admin Panel", backLink: "Back to App", deniedTitle: "Access Denied",
         deniedMessage: "You must be an admin to view this page.", deniedBack: "Go back",
         totalOrders: "Total Orders", pending: "Pending", users: "Users", tiles: "Homepage tiles",
-        tabSettings: "App settings", tabHomepage: "Homepage", tabOrders: "Orders", tabUsers: "Users",
+        tabSettings: "App settings", tabHomepage: "Homepage", tabOrders: "Orders", tabUsers: "Users", tabInbox: "Inbox",
         settingsTitle: "Global app settings", settingsHelp: "Changes here are saved to Firebase and appear live for all users.",
         featuresAccessLabel: "Login, cart, profile, and orders access", featuresLockOption: "Lock for normal users", featuresUnlockOption: "Unlock for all users",
         announcementLabel: "Announcement banner", appPauseModeLabel: "App availability", appRunOption: "Run app for normal users", appPauseOption: "Pause app for normal users", commandMessageLabel: "Command message",
@@ -264,13 +276,15 @@
         preparing: "Preparing", onTheWay: "On the way", delivered: "Delivered", unknown: "Unknown",
         updateStatus: "Update status", delete: "Delete", saveUser: "Save user", updated: "Updated",
         saved: "Saved", removed: "Removed", id: "ID", role: "Role", name: "Name", phone: "Phone", address: "Address", email: "Email",
-        deleteRequestsTitle: "Account delete requests", noDeleteRequests: "No delete requests yet.", requestedAt: "Requested at", markRequestDone: "Mark request done"
+        deleteRequestsTitle: "Account delete requests", noDeleteRequests: "No delete requests yet.", requestedAt: "Requested at", markRequestDone: "Mark request done",
+        inboxTitle: "Inbox", inboxHelp: "Messages sent from account deletion requests appear here.", noInboxMessages: "No messages yet.", message: "Message",
+        block: "Block", unblock: "Unblock", blocked: "Blocked"
       },
       ar: {
         adminTitle: "لوحة الإدارة", backLink: "العودة إلى التطبيق", deniedTitle: "تم رفض الوصول",
         deniedMessage: "يجب أن تكون مسؤولا لعرض هذه الصفحة.", deniedBack: "رجوع",
         totalOrders: "إجمالي الطلبات", pending: "قيد الانتظار", users: "المستخدمون", tiles: "بطاقات الصفحة الرئيسية",
-        tabSettings: "إعدادات التطبيق", tabHomepage: "الصفحة الرئيسية", tabOrders: "الطلبات", tabUsers: "المستخدمون",
+        tabSettings: "إعدادات التطبيق", tabHomepage: "الصفحة الرئيسية", tabOrders: "الطلبات", tabUsers: "المستخدمون", tabInbox: "صندوق الوارد",
         settingsTitle: "إعدادات التطبيق العامة", settingsHelp: "يتم حفظ التغييرات في Firebase وتظهر مباشرة لجميع المستخدمين.",
         featuresAccessLabel: "الوصول إلى تسجيل الدخول والسلة والملف الشخصي والطلبات", featuresLockOption: "قفل للمستخدمين العاديين", featuresUnlockOption: "فتح لجميع المستخدمين",
         announcementLabel: "شريط الإعلان", appPauseModeLabel: "حالة التطبيق", appRunOption: "تشغيل التطبيق للمستخدمين العاديين", appPauseOption: "إيقاف التطبيق للمستخدمين العاديين", commandMessageLabel: "رسالة الأمر",
@@ -281,7 +295,9 @@
         preparing: "قيد التحضير", onTheWay: "في الطريق", delivered: "تم التسليم", unknown: "غير معروف",
         updateStatus: "تحديث الحالة", delete: "حذف", saveUser: "حفظ المستخدم", updated: "تم التحديث",
         saved: "تم الحفظ", removed: "تم الحذف", id: "المعرف", role: "الدور", name: "الاسم", phone: "الهاتف", address: "العنوان", email: "البريد الإلكتروني",
-        deleteRequestsTitle: "طلبات حذف الحساب", noDeleteRequests: "لا توجد طلبات حذف بعد.", requestedAt: "تاريخ الطلب", markRequestDone: "وضع علامة مكتمل"
+        deleteRequestsTitle: "طلبات حذف الحساب", noDeleteRequests: "لا توجد طلبات حذف بعد.", requestedAt: "تاريخ الطلب", markRequestDone: "وضع علامة مكتمل",
+        inboxTitle: "صندوق الوارد", inboxHelp: "تظهر هنا الرسائل المرسلة من طلبات حذف الحساب.", noInboxMessages: "لا توجد رسائل بعد.", message: "الرسالة",
+        block: "حظر", unblock: "إلغاء الحظر", blocked: "محظور"
       }
     };
 
@@ -436,14 +452,14 @@
       const textIds = {
         adminTitle: "adminTitle", backLink: "backLink", deniedTitle: "deniedTitle", deniedMessage: "deniedMessage",
         deniedBack: "deniedBack", statTotalLabel: "totalOrders", statPendingLabel: "pending", statUsersLabel: "users",
-        statTilesLabel: "tiles", tabSettings: "tabSettings", tabHomepage: "tabHomepage", tabOrders: "tabOrders", tabUsers: "tabUsers",
+        statTilesLabel: "tiles", tabSettings: "tabSettings", tabHomepage: "tabHomepage", tabOrders: "tabOrders", tabUsers: "tabUsers", tabInbox: "tabInbox",
         settingsTitle: "settingsTitle", settingsHelp: "settingsHelp", featuresAccessLabel: "featuresAccessLabel",
         featuresLockOption: "featuresLockOption", featuresUnlockOption: "featuresUnlockOption",
         announcementLabel: "announcementLabel", appPauseModeLabel: "appPauseModeLabel", appRunOption: "appRunOption", appPauseOption: "appPauseOption", commandMessageLabel: "commandMessageLabel",
         heroTitleLabel: "heroTitleLabel", heroSubtitleLabel: "heroSubtitleLabel",
         saveSettingsBtn: "saveSettings", homepageTitle: "homepageTitle", homepageHelp: "homepageHelp", addTileTitle: "addTileTitle",
         tileLabelLabel: "tileLabel", tileImageLabel: "tileImage", addTileBtn: "addTile", saveTilesBtn: "saveHomepage",
-        ordersTitle: "allOrders", usersTitle: "users", deleteRequestsTitle: "deleteRequestsTitle"
+        ordersTitle: "allOrders", usersTitle: "users", deleteRequestsTitle: "deleteRequestsTitle", inboxTitle: "inboxTitle", inboxHelp: "inboxHelp"
       };
       Object.entries(textIds).forEach(([id, key]) => {
         const el = document.getElementById(id);
@@ -452,6 +468,7 @@
       renderOrders(currentOrders);
       renderUsers(currentUsers);
       renderDeleteRequests(currentDeleteRequests);
+      renderInbox(currentDeleteRequests);
       renderTilesEditor();
     }
 
@@ -584,10 +601,15 @@
                 <option value="admin" ${user.role === "admin" ? "selected" : ""}>admin</option>
               </select>
             </label>
+            ${user.blocked ? `<div><span class="status-badge status-blocked">${escapeHtml(t("blocked"))}</span></div>` : ""}
             <div class="card-meta">${escapeHtml(formatDate(user.lastLoginAt || user.createdAt))}</div>
             <div class="actions-row">
               <button class="btn-primary" type="button" onclick="saveUser('${user.id}')">${escapeHtml(t("saveUser"))}</button>
               <button class="btn-danger" type="button" onclick="deleteUser('${user.id}')">${escapeHtml(t("delete"))}</button>
+              ${user.blocked
+                ? `<button class="btn-secondary" type="button" onclick="setUserBlocked('${user.id}', false)">${escapeHtml(t("unblock"))}</button>`
+                : `<button class="btn-warning" type="button" onclick="setUserBlocked('${user.id}', true)">${escapeHtml(t("block"))}</button>`
+              }
             </div>
           </div>
         </div>
@@ -610,8 +632,35 @@
               <div class="card-title">${escapeHtml(request.email || t("unknown"))}</div>
               <div class="card-meta">${escapeHtml(request.name || "")}</div>
               <div class="card-meta">${escapeHtml(t("requestedAt"))}: ${escapeHtml(formatDate(request.requestedAt))}</div>
+              ${request.message ? `<div class="message-box"><strong>${escapeHtml(t("message"))}:</strong> ${escapeHtml(request.message)}</div>` : ""}
             </div>
           </div>
+          <div class="actions-row">
+            <button class="btn-danger" type="button" onclick="deleteUser('${request.id}')">${escapeHtml(t("delete"))}</button>
+            <button class="btn-secondary" type="button" onclick="markDeleteRequestDone('${request.id}')">${escapeHtml(t("markRequestDone"))}</button>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    function renderInbox(requests) {
+      const root = document.getElementById("inboxList");
+      if (!root) return;
+      const messages = requests.filter((request) => request.status !== "completed" && String(request.message || "").trim());
+      if (!messages.length) {
+        root.innerHTML = `<p class="empty-msg">${escapeHtml(t("noInboxMessages"))}</p>`;
+        return;
+      }
+      root.innerHTML = messages.map((request) => `
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">${escapeHtml(request.email || t("unknown"))}</div>
+              <div class="card-meta">${escapeHtml(request.name || "")}</div>
+              <div class="card-meta">${escapeHtml(t("requestedAt"))}: ${escapeHtml(formatDate(request.requestedAt))}</div>
+            </div>
+          </div>
+          <div class="message-box">${escapeHtml(request.message)}</div>
           <div class="actions-row">
             <button class="btn-danger" type="button" onclick="deleteUser('${request.id}')">${escapeHtml(t("delete"))}</button>
             <button class="btn-secondary" type="button" onclick="markDeleteRequestDone('${request.id}')">${escapeHtml(t("markRequestDone"))}</button>
@@ -680,6 +729,16 @@
         updatedAt: new Date().toISOString(),
       });
       showToast(t("saved"));
+    };
+
+    window.setUserBlocked = async function(userId, blocked) {
+      await setDoc(doc(db, "users", userId), {
+        blocked,
+        blockedAt: blocked ? new Date().toISOString() : null,
+        blockedBy: blocked ? (localStorage.getItem("user_email") || OWNER_EMAIL) : null,
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
+      showToast(t("updated"));
     };
 
     window.deleteUser = async function(userId) {
@@ -771,7 +830,9 @@
       });
 
       onSnapshot(query(collection(db, "deleteRequests"), orderBy("requestedAt", "desc")), (snapshot) => {
-        renderDeleteRequests(snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() })));
+        const requests = snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() }));
+        renderDeleteRequests(requests);
+        renderInbox(requests);
       });
     }
   </script>
