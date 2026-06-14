@@ -157,6 +157,8 @@ const I18N = {
     contactClose: "Kapat",
     privacyPolicy: "Gizlilik Politikasi",
     deleteAccount: "Hesabi sil",
+    appPausedTitle: "Uygulama duraklatildi",
+    appPausedMessage: "Uygulama gecici olarak duraklatildi. Lutfen daha sonra tekrar deneyin.",
     navBrand: "Pazar Fiyatı",
     navCart: "Sepet",
     navOrders: "Siparisler",
@@ -212,6 +214,8 @@ const I18N = {
     contactClose: "Close",
     privacyPolicy: "Privacy Policy",
     deleteAccount: "Delete Account",
+    appPausedTitle: "App paused",
+    appPausedMessage: "The app is temporarily paused. Please check again later.",
     navBrand: "Pazar Fiyatı",
     navCart: "Cart",
     navOrders: "Orders",
@@ -267,6 +271,8 @@ const I18N = {
     contactClose: "إغلاق",
     privacyPolicy: "سياسة الخصوصية",
     deleteAccount: "حذف الحساب",
+    appPausedTitle: "تم إيقاف التطبيق مؤقتاً",
+    appPausedMessage: "تم إيقاف التطبيق مؤقتاً. يرجى المحاولة لاحقاً.",
     navBrand: "Pazar Fiyatı",
     navCart: "السلة",
     navOrders: "الطلبات",
@@ -562,12 +568,20 @@ function renderItemCard(item) {
   const marketHtml = item.market
     ? `<div class="item-brand">${escapeHtml(item.market)}</div>`
     : "";
+  const cartPayload = escapeHtml(JSON.stringify({
+    name: item.name || "",
+    market: item.market || "",
+    price: Number(item.price || 0),
+    image: item.image || "",
+    unitPrice: item.unitPrice || "",
+  }));
   return `<article class="item-card">
     ${imageHtml}
     ${marketHtml}
     <div class="item-name">${escapeHtml(item.name)}</div>
     <div class="item-price">${formatPrice(item.price)}</div>
     ${item.unitPrice ? `<div class="item-unit">${escapeHtml(item.unitPrice)}</div>` : ""}
+    <button class="btn-primary" type="button" onclick="addToCart(JSON.parse(this.dataset.item))" data-item="${cartPayload}">${escapeHtml(t("addToCart"))}</button>
   </article>`;
 }
 
@@ -598,7 +612,7 @@ window.addToCart = function(item) {
   saveCart(cart);
   updateCartCount();
   // Brief visual feedback
-  const btn = event && event.target;
+  const btn = window.event && window.event.target;
   if (btn) {
     const orig = btn.textContent;
     btn.textContent = t("addedToCart");
@@ -622,6 +636,23 @@ function renderHomepageTiles(tiles) {
 
 function applyRemoteSettings(settings) {
   if (!settings) return;
+
+  const commandBanner = document.getElementById("commandBanner");
+  if (commandBanner) {
+    const commandText = String(settings.commandMessage || "").trim();
+    commandBanner.hidden = !commandText;
+    commandBanner.textContent = commandText;
+  }
+
+  const pauseOverlay = document.getElementById("appPauseOverlay");
+  if (pauseOverlay) {
+    const isAdmin = window.FeatureAccess?.isAdminUser?.() === true;
+    pauseOverlay.hidden = !settings.appPaused || isAdmin;
+    const pauseTitle = document.getElementById("appPauseTitle");
+    const pauseMessage = document.getElementById("appPauseMessage");
+    if (pauseTitle) pauseTitle.textContent = t("appPausedTitle");
+    if (pauseMessage) pauseMessage.textContent = settings.commandMessage || t("appPausedMessage");
+  }
 
   const announcement = document.getElementById("announcementBanner");
   if (announcement) {

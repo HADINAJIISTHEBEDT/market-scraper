@@ -132,6 +132,17 @@
           <textarea id="announcementInput" class="field-textarea"></textarea>
         </label>
         <label>
+          <span id="appPauseModeLabel">App availability</span>
+          <select id="appPauseMode" class="status-select">
+            <option id="appRunOption" value="running">Run app for normal users</option>
+            <option id="appPauseOption" value="paused">Pause app for normal users</option>
+          </select>
+        </label>
+        <label>
+          <span id="commandMessageLabel">Command message</span>
+          <textarea id="commandMessageInput" class="field-textarea"></textarea>
+        </label>
+        <label>
           <span id="heroTitleLabel">Homepage title override</span>
           <input id="heroTitleInput" class="field-input" type="text" />
         </label>
@@ -226,7 +237,8 @@
         tabSettings: "Uygulama ayarlari", tabHomepage: "Ana sayfa", tabOrders: "Siparisler", tabUsers: "Kullanicilar",
         settingsTitle: "Genel uygulama ayarlari", settingsHelp: "Buradaki degisiklikler Firebase'e kaydedilir ve tum kullanicilara canli yansir.",
         featuresAccessLabel: "Giris, sepet, profil ve siparis erisimi", featuresLockOption: "Normal kullanicilar icin kilitle", featuresUnlockOption: "Tum kullanicilar icin ac",
-        announcementLabel: "Duyuru bandi", heroTitleLabel: "Ana sayfa baslik degistirme", heroSubtitleLabel: "Ana sayfa alt baslik degistirme",
+        announcementLabel: "Duyuru bandi", appPauseModeLabel: "Uygulama durumu", appRunOption: "Uygulamayi normal kullanicilar icin calistir", appPauseOption: "Uygulamayi normal kullanicilar icin duraklat", commandMessageLabel: "Komut mesaji",
+        heroTitleLabel: "Ana sayfa baslik degistirme", heroSubtitleLabel: "Ana sayfa alt baslik degistirme",
         saveSettings: "Ayarlari kaydet", saving: "Kaydediliyor...", saveFailed: "Firebase'e kaydedilemedi", homepageTitle: "Ana sayfa kartlari", homepageHelp: "Ana sayfada gorunen kategori kartlarini ekleyin, duzenleyin veya kaldirin.",
         addTileTitle: "Kart ekle", tileLabel: "Etiket", tileImage: "Gorsel URL", addTile: "Kart ekle", saveHomepage: "Ana sayfayi kaydet",
         allOrders: "Tum siparisler", loading: "Yukleniyor...", noOrders: "Henuz siparis yok.", noUsers: "Henuz kullanici yok.", noTiles: "Henuz kart yok.",
@@ -241,7 +253,8 @@
         tabSettings: "App settings", tabHomepage: "Homepage", tabOrders: "Orders", tabUsers: "Users",
         settingsTitle: "Global app settings", settingsHelp: "Changes here are saved to Firebase and appear live for all users.",
         featuresAccessLabel: "Login, cart, profile, and orders access", featuresLockOption: "Lock for normal users", featuresUnlockOption: "Unlock for all users",
-        announcementLabel: "Announcement banner", heroTitleLabel: "Homepage title override", heroSubtitleLabel: "Homepage subtitle override",
+        announcementLabel: "Announcement banner", appPauseModeLabel: "App availability", appRunOption: "Run app for normal users", appPauseOption: "Pause app for normal users", commandMessageLabel: "Command message",
+        heroTitleLabel: "Homepage title override", heroSubtitleLabel: "Homepage subtitle override",
         saveSettings: "Save settings", saving: "Saving...", saveFailed: "Could not save to Firebase", homepageTitle: "Homepage tiles", homepageHelp: "Add, edit, or remove category tiles shown on the homepage.",
         addTileTitle: "Add tile", tileLabel: "Label", tileImage: "Image URL", addTile: "Add tile", saveHomepage: "Save homepage",
         allOrders: "All orders", loading: "Loading...", noOrders: "No orders yet.", noUsers: "No users yet.", noTiles: "No tiles yet.",
@@ -256,7 +269,8 @@
         tabSettings: "إعدادات التطبيق", tabHomepage: "الصفحة الرئيسية", tabOrders: "الطلبات", tabUsers: "المستخدمون",
         settingsTitle: "إعدادات التطبيق العامة", settingsHelp: "يتم حفظ التغييرات في Firebase وتظهر مباشرة لجميع المستخدمين.",
         featuresAccessLabel: "الوصول إلى تسجيل الدخول والسلة والملف الشخصي والطلبات", featuresLockOption: "قفل للمستخدمين العاديين", featuresUnlockOption: "فتح لجميع المستخدمين",
-        announcementLabel: "شريط الإعلان", heroTitleLabel: "عنوان الصفحة الرئيسية", heroSubtitleLabel: "العنوان الفرعي للصفحة الرئيسية",
+        announcementLabel: "شريط الإعلان", appPauseModeLabel: "حالة التطبيق", appRunOption: "تشغيل التطبيق للمستخدمين العاديين", appPauseOption: "إيقاف التطبيق للمستخدمين العاديين", commandMessageLabel: "رسالة الأمر",
+        heroTitleLabel: "عنوان الصفحة الرئيسية", heroSubtitleLabel: "العنوان الفرعي للصفحة الرئيسية",
         saveSettings: "حفظ الإعدادات", saving: "جار الحفظ...", saveFailed: "تعذر الحفظ في Firebase", homepageTitle: "بطاقات الصفحة الرئيسية", homepageHelp: "أضف أو عدّل أو احذف بطاقات الفئات في الصفحة الرئيسية.",
         addTileTitle: "إضافة بطاقة", tileLabel: "التسمية", tileImage: "رابط الصورة", addTile: "إضافة بطاقة", saveHomepage: "حفظ الصفحة الرئيسية",
         allOrders: "كل الطلبات", loading: "جار التحميل...", noOrders: "لا توجد طلبات بعد.", noUsers: "لا يوجد مستخدمون بعد.", noTiles: "لا توجد بطاقات بعد.",
@@ -283,6 +297,8 @@
     let currentSettings = {
       featuresUnlocked: false,
       announcement: "",
+      appPaused: false,
+      commandMessage: "",
       heroTitle: "",
       heroSubtitle: "",
       homepageTiles: [],
@@ -417,7 +433,8 @@
         statTilesLabel: "tiles", tabSettings: "tabSettings", tabHomepage: "tabHomepage", tabOrders: "tabOrders", tabUsers: "tabUsers",
         settingsTitle: "settingsTitle", settingsHelp: "settingsHelp", featuresAccessLabel: "featuresAccessLabel",
         featuresLockOption: "featuresLockOption", featuresUnlockOption: "featuresUnlockOption",
-        announcementLabel: "announcementLabel", heroTitleLabel: "heroTitleLabel", heroSubtitleLabel: "heroSubtitleLabel",
+        announcementLabel: "announcementLabel", appPauseModeLabel: "appPauseModeLabel", appRunOption: "appRunOption", appPauseOption: "appPauseOption", commandMessageLabel: "commandMessageLabel",
+        heroTitleLabel: "heroTitleLabel", heroSubtitleLabel: "heroSubtitleLabel",
         saveSettingsBtn: "saveSettings", homepageTitle: "homepageTitle", homepageHelp: "homepageHelp", addTileTitle: "addTileTitle",
         tileLabelLabel: "tileLabel", tileImageLabel: "tileImage", addTileBtn: "addTile", saveTilesBtn: "saveHomepage",
         ordersTitle: "allOrders", usersTitle: "users"
@@ -457,6 +474,8 @@
       currentSettings = settings;
       document.getElementById("featuresAccessMode").value = settings.featuresUnlocked ? "unlocked" : "locked";
       document.getElementById("announcementInput").value = settings.announcement || "";
+      document.getElementById("appPauseMode").value = settings.appPaused ? "paused" : "running";
+      document.getElementById("commandMessageInput").value = settings.commandMessage || "";
       document.getElementById("heroTitleInput").value = settings.heroTitle || "";
       document.getElementById("heroSubtitleInput").value = settings.heroSubtitle || "";
       currentTiles = Array.isArray(settings.homepageTiles) ? settings.homepageTiles.map((tile) => ({ ...tile })) : [];
@@ -513,6 +532,8 @@
       const payload = {
         featuresUnlocked,
         announcement: document.getElementById("announcementInput").value.trim(),
+        appPaused: document.getElementById("appPauseMode").value === "paused",
+        commandMessage: document.getElementById("commandMessageInput").value.trim(),
         heroTitle: document.getElementById("heroTitleInput").value.trim(),
         heroSubtitle: document.getElementById("heroSubtitleInput").value.trim(),
         homepageTiles: currentTiles,
@@ -686,6 +707,8 @@
         fillSettingsForm({
           featuresUnlocked: Boolean(data.featuresUnlocked),
           announcement: data.announcement || "",
+          appPaused: Boolean(data.appPaused),
+          commandMessage: data.commandMessage || "",
           heroTitle: data.heroTitle || "",
           heroSubtitle: data.heroSubtitle || "",
           homepageTiles: Array.isArray(data.homepageTiles) ? data.homepageTiles : [],

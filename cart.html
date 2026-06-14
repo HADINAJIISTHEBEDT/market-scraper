@@ -32,6 +32,23 @@
       border-top: 2px solid #e5e7eb; margin-top: 20px;
       padding-top: 16px; text-align: right;
     }
+    .payment-box {
+      margin-top: 18px; padding: 14px; border: 1px solid #e5e7eb;
+      border-radius: 12px; background: #fff; text-align: left;
+    }
+    .payment-box h2 { margin: 0 0 10px; font-size: 18px; }
+    .payment-option {
+      display: flex; align-items: center; gap: 8px; padding: 8px 0; font-weight: 600;
+    }
+    .card-fields {
+      display: grid; gap: 10px; margin-top: 10px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .card-fields input {
+      width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font: inherit;
+    }
+    .card-fields input:first-child { grid-column: 1 / -1; }
+    .payment-note { margin: 8px 0 0; color: #64748b; font-size: 13px; }
     .cart-total { font-size: 22px; font-weight: 700; color: #1e293b; }
     .btn-order {
       margin-top: 14px; padding: 14px 32px;
@@ -92,6 +109,14 @@
         placeOrder: "Siparis ver",
         orderPlaced: "Siparis verildi!",
         viewOrders: "Siparislerinizi gorun",
+        paymentTitle: "Odeme yontemi",
+        payCash: "Kapida nakit odeme",
+        payCard: "Kart ile odeme",
+        cardNumber: "Kart numarasi",
+        cardName: "Kart uzerindeki ad",
+        cardExpiry: "AA/YY",
+        cardCvc: "CVC",
+        cardNote: "Kart odemesi su an kayit amaclidir. Gercek tahsilat icin odeme saglayicisi baglanmalidir.",
         error: "Hata",
         unknown: "Bilinmiyor"
       },
@@ -107,6 +132,14 @@
         placeOrder: "Place Order",
         orderPlaced: "Order placed!",
         viewOrders: "View your orders",
+        paymentTitle: "Payment method",
+        payCash: "Pay cash on delivery",
+        payCard: "Pay with card",
+        cardNumber: "Card number",
+        cardName: "Name on card",
+        cardExpiry: "MM/YY",
+        cardCvc: "CVC",
+        cardNote: "Card payment is saved for now. Connect a payment provider for real charging.",
         error: "Error",
         unknown: "Unknown"
       },
@@ -122,6 +155,14 @@
         placeOrder: "إرسال الطلب",
         orderPlaced: "تم إرسال الطلب!",
         viewOrders: "عرض طلباتك",
+        paymentTitle: "طريقة الدفع",
+        payCash: "الدفع نقداً عند التسليم",
+        payCard: "الدفع بالبطاقة",
+        cardNumber: "رقم البطاقة",
+        cardName: "الاسم على البطاقة",
+        cardExpiry: "شهر/سنة",
+        cardCvc: "CVC",
+        cardNote: "يتم حفظ خيار البطاقة حالياً فقط. يلزم ربط مزود دفع للتحصيل الحقيقي.",
         error: "خطأ",
         unknown: "غير معروف"
       }
@@ -205,10 +246,28 @@
       html += `
         <div class="cart-summary">
           <div class="cart-total">${escapeHtml(t("total"))}: ${formatPrice(total)}</div>
+          <div class="payment-box">
+            <h2>${escapeHtml(t("paymentTitle"))}</h2>
+            <label class="payment-option"><input type="radio" name="paymentMethod" value="cash" checked onchange="toggleCardFields()"> ${escapeHtml(t("payCash"))}</label>
+            <label class="payment-option"><input type="radio" name="paymentMethod" value="card" onchange="toggleCardFields()"> ${escapeHtml(t("payCard"))}</label>
+            <div id="cardFields" class="card-fields" hidden>
+              <input id="cardNumber" inputmode="numeric" autocomplete="cc-number" placeholder="${escapeHtml(t("cardNumber"))}" />
+              <input id="cardName" autocomplete="cc-name" placeholder="${escapeHtml(t("cardName"))}" />
+              <input id="cardExpiry" autocomplete="cc-exp" placeholder="${escapeHtml(t("cardExpiry"))}" />
+              <input id="cardCvc" inputmode="numeric" autocomplete="cc-csc" placeholder="${escapeHtml(t("cardCvc"))}" />
+            </div>
+            <p class="payment-note">${escapeHtml(t("cardNote"))}</p>
+          </div>
           <button class="btn-order" onclick="placeOrder()">${escapeHtml(t("placeOrder"))}</button>
         </div>`;
       root.innerHTML = html;
     }
+
+    window.toggleCardFields = function() {
+      const method = document.querySelector("input[name='paymentMethod']:checked")?.value || "cash";
+      const fields = document.getElementById("cardFields");
+      if (fields) fields.hidden = method !== "card";
+    };
 
     window.changeQty = function(idx, delta) {
       const cart = getCart();
@@ -232,6 +291,8 @@
       const cart = getCart();
       if (!cart.length) return;
       const total = cart.reduce((sum, item) => sum + (item.price || 0) * (item.qty || 1), 0);
+      const paymentMethod = document.querySelector("input[name='paymentMethod']:checked")?.value || "cash";
+      const cardNumber = String(document.getElementById("cardNumber")?.value || "").replace(/\D/g, "");
 
       try {
         await addDoc(collection(db, "orders"), {
@@ -239,6 +300,13 @@
           userName: userName || t("unknown"),
           items: cart,
           totalPrice: total,
+          paymentMethod,
+          paymentSummary: paymentMethod === "card" ? {
+            type: "card",
+            cardholderName: document.getElementById("cardName")?.value.trim() || "",
+            last4: cardNumber.slice(-4),
+            expiry: document.getElementById("cardExpiry")?.value.trim() || "",
+          } : { type: "cash" },
           status: "pending",
           createdAt: new Date().toISOString()
         });

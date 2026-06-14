@@ -26,6 +26,8 @@
   const DEFAULT_SETTINGS = {
     featuresUnlocked: false,
     announcement: "",
+    appPaused: false,
+    commandMessage: "",
     heroTitle: "",
     heroSubtitle: "",
     homepageTiles: DEFAULT_HOMEPAGE_TILES,
@@ -48,6 +50,8 @@
       ...data,
       featuresUnlocked: Boolean(data.featuresUnlocked),
       announcement: String(data.announcement || ""),
+      appPaused: Boolean(data.appPaused),
+      commandMessage: String(data.commandMessage || ""),
       heroTitle: String(data.heroTitle || ""),
       heroSubtitle: String(data.heroSubtitle || ""),
       homepageTiles: tiles.map((tile, index) => ({
