@@ -1,27 +1,141 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="tr">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Delete Account - Pazar Fiyatı</title>
   <style>
-    body { font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 24px; line-height: 1.6; color: #333; }
+    body { font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 24px; line-height: 1.6; color: #333; background:#f8fafc; }
     h1 { color: #1a73e8; }
     a { color: #1a73e8; }
+    .panel { background:#fff; border:1px solid #e5e7eb; border-radius:16px; padding:22px; box-shadow:0 12px 30px rgba(15,23,42,.06); }
+    .actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:18px; }
+    button { padding:11px 16px; border:0; border-radius:10px; cursor:pointer; font:inherit; font-weight:700; }
+    .danger { background:#dc2626; color:#fff; }
+    .secondary { background:#e2e8f0; color:#1e293b; text-decoration:none; padding:11px 16px; border-radius:10px; font-weight:700; }
+    .status { margin-top:16px; padding:12px 14px; border-radius:10px; background:#eff6ff; color:#1e3a8a; font-weight:700; }
+    .status.error { background:#fee2e2; color:#991b1b; }
   </style>
 </head>
 <body>
-  <h1>Delete Your Account — Pazar Fiyatı</h1>
-  <p><strong>App:</strong> Pazar Fiyatı (com.marketfiyati.app)</p>
-  <p>To request deletion of your Pazar Fiyatı account and associated personal data, email <strong><a href="mailto:hadi.naji145@gmail.com">hadi.naji145@gmail.com</a></strong> with the subject <strong>Delete Account</strong> from the Google account email you used to sign in.</p>
-  <p>We will delete account data (email, name, user ID, profile details, and saved app data linked to your account) within 7 days. Some backup copies may be retained for up to 90 days for legal or security reasons.</p>
-  <p>See our <a href="privacy-policy.html">Privacy Policy</a> for more information about how we handle data.</p>
+  <main class="panel">
+    <h1 id="title">Delete Your Account</h1>
+    <p id="intro">Press the button below to send a deletion request for the Gmail account saved in your profile.</p>
+    <p><strong id="emailLabel">Gmail:</strong> <span id="requestEmail"></span></p>
+    <p id="promiseText">We will send your request to the admin. Your data will be deleted within a maximum of 7 days, and we will send you an email as soon as possible.</p>
+    <div class="actions">
+      <button id="requestDeleteBtn" class="danger" type="button">Send delete request</button>
+      <a id="backLink" class="secondary" href="index.html">Back to app</a>
+    </div>
+    <div id="statusBox" class="status" hidden></div>
+  </main>
+
   <script src="feature-access.js"></script>
   <script src="app-settings.js"></script>
   <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { initializeFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import firebaseConfig from "./firebase-config.js";
+
     await window.AppSettings.ready();
     if (!window.FeatureAccess?.guardPage()) {
-      // Locked for non-admin visitors until features are unlocked globally.
+    } else {
+      const I18N = {
+        tr: {
+          title: "Hesabini sil",
+          intro: "Profilinde kayitli Gmail hesabi icin silme istegi gondermek uzere asagidaki dugmeye bas.",
+          emailLabel: "Gmail:",
+          promiseText: "Silme istegini admine gonderecegiz. Verilerin en fazla 7 gun icinde silinecek ve en kisa surede sana e-posta gonderecegiz.",
+          requestDeleteBtn: "Silme istegi gonder",
+          backLink: "Uygulamaya don",
+          missingLogin: "Silme istegi gondermek icin once giris yapmalisin.",
+          sending: "Istek gonderiliyor...",
+          sent: "Istek admine gonderildi. Verilerin en fazla 7 gun icinde silinecek ve en kisa surede sana e-posta gonderecegiz.",
+          failed: "Istek gonderilemedi"
+        },
+        en: {
+          title: "Delete your account",
+          intro: "Press the button below to send a deletion request for the Gmail account saved in your profile.",
+          emailLabel: "Gmail:",
+          promiseText: "We will send your request to the admin. Your data will be deleted within a maximum of 7 days, and we will send you an email as soon as possible.",
+          requestDeleteBtn: "Send delete request",
+          backLink: "Back to app",
+          missingLogin: "Please sign in before sending a deletion request.",
+          sending: "Sending request...",
+          sent: "Your request was sent to the admin. Your data will be deleted within a maximum of 7 days, and we will send you an email as soon as possible.",
+          failed: "Could not send request"
+        },
+        ar: {
+          title: "حذف حسابك",
+          intro: "اضغط الزر أدناه لإرسال طلب حذف لحساب Gmail المحفوظ في ملفك.",
+          emailLabel: "Gmail:",
+          promiseText: "سنرسل طلبك إلى المسؤول. سيتم حذف بياناتك خلال مدة أقصاها 7 أيام، وسنرسل لك بريداً إلكترونياً في أقرب وقت ممكن.",
+          requestDeleteBtn: "إرسال طلب الحذف",
+          backLink: "العودة إلى التطبيق",
+          missingLogin: "يرجى تسجيل الدخول قبل إرسال طلب الحذف.",
+          sending: "جار إرسال الطلب...",
+          sent: "تم إرسال طلبك إلى المسؤول. سيتم حذف بياناتك خلال مدة أقصاها 7 أيام، وسنرسل لك بريداً إلكترونياً في أقرب وقت ممكن.",
+          failed: "تعذر إرسال الطلب"
+        }
+      };
+
+      const app = initializeApp(firebaseConfig);
+      const db = initializeFirestore(app, {
+        experimentalForceLongPolling: true,
+        useFetchStreams: false,
+      });
+      const currentLang = localStorage.getItem("app_lang") || "tr";
+      const userUid = localStorage.getItem("user_uid");
+      const userEmail = localStorage.getItem("user_email");
+      const userName = localStorage.getItem("user_name");
+
+      function t(key) {
+        return (I18N[currentLang] && I18N[currentLang][key]) || I18N.tr[key] || key;
+      }
+
+      function setStatus(message, isError = false) {
+        const box = document.getElementById("statusBox");
+        box.hidden = false;
+        box.textContent = message;
+        box.className = "status" + (isError ? " error" : "");
+      }
+
+      function applyLanguage() {
+        document.documentElement.lang = currentLang;
+        document.documentElement.dir = currentLang === "ar" ? "rtl" : "ltr";
+        document.getElementById("title").textContent = t("title");
+        document.getElementById("intro").textContent = t("intro");
+        document.getElementById("emailLabel").textContent = t("emailLabel");
+        document.getElementById("promiseText").textContent = t("promiseText");
+        document.getElementById("requestDeleteBtn").textContent = t("requestDeleteBtn");
+        document.getElementById("backLink").textContent = t("backLink");
+        document.title = t("title");
+      }
+
+      async function sendDeleteRequest() {
+        if (!userUid || !userEmail) {
+          setStatus(t("missingLogin"), true);
+          setTimeout(() => { window.location.href = "login.html"; }, 900);
+          return;
+        }
+        setStatus(t("sending"));
+        try {
+          await setDoc(doc(db, "deleteRequests", userUid), {
+            userId: userUid,
+            email: userEmail,
+            name: userName || "",
+            status: "pending",
+            requestedAt: new Date().toISOString(),
+          }, { merge: true });
+          setStatus(t("sent"));
+        } catch (error) {
+          setStatus(`${t("failed")}: ${error.message}`, true);
+        }
+      }
+
+      applyLanguage();
+      document.getElementById("requestEmail").textContent = userEmail || t("missingLogin");
+      document.getElementById("requestDeleteBtn").addEventListener("click", sendDeleteRequest);
     }
   </script>
 </body>

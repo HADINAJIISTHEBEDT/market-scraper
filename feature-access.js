@@ -219,6 +219,60 @@
     }
   }
 
+  function clearLocalUser() {
+    [
+      "user_name",
+      "user_uid",
+      "user_email",
+      "user_phone",
+      "user_address",
+      "user_photo",
+      "user_role",
+      "owner_access",
+      "owner_email",
+    ].forEach((key) => localStorage.removeItem(key));
+  }
+
+  function startDeletedAccountWatcher() {
+    const uid = localStorage.getItem("user_uid");
+    if (!uid || window.__deletedAccountWatcherStarted) return;
+    window.__deletedAccountWatcherStarted = true;
+
+    import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js")
+      .then(({ getApps, initializeApp }) => Promise.all([
+        Promise.resolve(getApps()[0] || initializeApp({
+          apiKey: "AIzaSyA4ZmYg5sTs4gU1Nm25s7of6oqJ4xGpR28",
+          authDomain: "st-business-86a9b.firebaseapp.com",
+          projectId: "st-business-86a9b",
+          storageBucket: "st-business-86a9b.firebasestorage.app",
+          messagingSenderId: "472603409840",
+          appId: "1:472603409840:web:30127c81e74c3b3c4e2a75",
+        })),
+        import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js"),
+      ]))
+      .then(([app, firestore]) => {
+        let db;
+        try {
+          db = firestore.initializeFirestore(app, {
+            experimentalForceLongPolling: true,
+            useFetchStreams: false,
+          });
+        } catch {
+          db = firestore.getFirestore(app);
+        }
+        firestore.onSnapshot(firestore.doc(db, "users", uid), (snapshot) => {
+          if (snapshot.exists()) return;
+          clearLocalUser();
+          if (!location.pathname.endsWith("/login.html")) {
+            window.location.href = "login.html";
+          }
+        });
+      })
+      .catch((error) => {
+        console.error("[FeatureAccess] Deleted account watcher failed:", error);
+      });
+  }
+
   window.FeatureAccess = {
     OWNER_EMAIL,
     isAdminUser,
@@ -231,8 +285,12 @@
     initComingSoonPanel,
     initLockedFooterLinks,
     initLoginNotice,
+    clearLocalUser,
+    startDeletedAccountWatcher,
     updateDeleteAccountLink,
     bindLockedTrigger,
     t,
   };
+
+  startDeletedAccountWatcher();
 })();

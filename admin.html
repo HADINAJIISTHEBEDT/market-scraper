@@ -189,6 +189,8 @@
     <section class="panel-section" id="panel-users">
       <h2 id="usersTitle">Signed-in users</h2>
       <p id="usersLoading" class="empty-msg">Loading users...</p>
+      <h3 id="deleteRequestsTitle">Delete requests</h3>
+      <div id="deleteRequestsList"></div>
       <div id="usersList"></div>
     </section>
   </div>
@@ -244,7 +246,8 @@
         allOrders: "Tum siparisler", loading: "Yukleniyor...", noOrders: "Henuz siparis yok.", noUsers: "Henuz kullanici yok.", noTiles: "Henuz kart yok.",
         preparing: "Hazirlaniyor", onTheWay: "Yolda", delivered: "Teslim edildi", unknown: "Bilinmiyor",
         updateStatus: "Durumu guncelle", delete: "Sil", saveUser: "Kullaniciyi kaydet", updated: "Guncellendi",
-        saved: "Kaydedildi", removed: "Silindi", id: "ID", role: "Rol", name: "Ad", phone: "Telefon", address: "Adres", email: "E-posta"
+        saved: "Kaydedildi", removed: "Silindi", id: "ID", role: "Rol", name: "Ad", phone: "Telefon", address: "Adres", email: "E-posta",
+        deleteRequestsTitle: "Hesap silme istekleri", noDeleteRequests: "Henuz silme istegi yok.", requestedAt: "Istek tarihi", markRequestDone: "Tamamlandi olarak isaretle"
       },
       en: {
         adminTitle: "Admin Panel", backLink: "Back to App", deniedTitle: "Access Denied",
@@ -260,7 +263,8 @@
         allOrders: "All orders", loading: "Loading...", noOrders: "No orders yet.", noUsers: "No users yet.", noTiles: "No tiles yet.",
         preparing: "Preparing", onTheWay: "On the way", delivered: "Delivered", unknown: "Unknown",
         updateStatus: "Update status", delete: "Delete", saveUser: "Save user", updated: "Updated",
-        saved: "Saved", removed: "Removed", id: "ID", role: "Role", name: "Name", phone: "Phone", address: "Address", email: "Email"
+        saved: "Saved", removed: "Removed", id: "ID", role: "Role", name: "Name", phone: "Phone", address: "Address", email: "Email",
+        deleteRequestsTitle: "Account delete requests", noDeleteRequests: "No delete requests yet.", requestedAt: "Requested at", markRequestDone: "Mark request done"
       },
       ar: {
         adminTitle: "لوحة الإدارة", backLink: "العودة إلى التطبيق", deniedTitle: "تم رفض الوصول",
@@ -276,7 +280,8 @@
         allOrders: "كل الطلبات", loading: "جار التحميل...", noOrders: "لا توجد طلبات بعد.", noUsers: "لا يوجد مستخدمون بعد.", noTiles: "لا توجد بطاقات بعد.",
         preparing: "قيد التحضير", onTheWay: "في الطريق", delivered: "تم التسليم", unknown: "غير معروف",
         updateStatus: "تحديث الحالة", delete: "حذف", saveUser: "حفظ المستخدم", updated: "تم التحديث",
-        saved: "تم الحفظ", removed: "تم الحذف", id: "المعرف", role: "الدور", name: "الاسم", phone: "الهاتف", address: "العنوان", email: "البريد الإلكتروني"
+        saved: "تم الحفظ", removed: "تم الحذف", id: "المعرف", role: "الدور", name: "الاسم", phone: "الهاتف", address: "العنوان", email: "البريد الإلكتروني",
+        deleteRequestsTitle: "طلبات حذف الحساب", noDeleteRequests: "لا توجد طلبات حذف بعد.", requestedAt: "تاريخ الطلب", markRequestDone: "وضع علامة مكتمل"
       }
     };
 
@@ -293,6 +298,7 @@
     let currentLang = localStorage.getItem("app_lang") || "tr";
     let currentOrders = [];
     let currentUsers = [];
+    let currentDeleteRequests = [];
     let currentTiles = [];
     let currentSettings = {
       featuresUnlocked: false,
@@ -437,7 +443,7 @@
         heroTitleLabel: "heroTitleLabel", heroSubtitleLabel: "heroSubtitleLabel",
         saveSettingsBtn: "saveSettings", homepageTitle: "homepageTitle", homepageHelp: "homepageHelp", addTileTitle: "addTileTitle",
         tileLabelLabel: "tileLabel", tileImageLabel: "tileImage", addTileBtn: "addTile", saveTilesBtn: "saveHomepage",
-        ordersTitle: "allOrders", usersTitle: "users"
+        ordersTitle: "allOrders", usersTitle: "users", deleteRequestsTitle: "deleteRequestsTitle"
       };
       Object.entries(textIds).forEach(([id, key]) => {
         const el = document.getElementById(id);
@@ -445,6 +451,7 @@
       });
       renderOrders(currentOrders);
       renderUsers(currentUsers);
+      renderDeleteRequests(currentDeleteRequests);
       renderTilesEditor();
     }
 
@@ -587,6 +594,32 @@
       `).join("");
     }
 
+    function renderDeleteRequests(requests) {
+      currentDeleteRequests = requests;
+      const root = document.getElementById("deleteRequestsList");
+      if (!root) return;
+      const pending = requests.filter((request) => request.status !== "completed");
+      if (!pending.length) {
+        root.innerHTML = `<p class="empty-msg">${escapeHtml(t("noDeleteRequests"))}</p>`;
+        return;
+      }
+      root.innerHTML = pending.map((request) => `
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">${escapeHtml(request.email || t("unknown"))}</div>
+              <div class="card-meta">${escapeHtml(request.name || "")}</div>
+              <div class="card-meta">${escapeHtml(t("requestedAt"))}: ${escapeHtml(formatDate(request.requestedAt))}</div>
+            </div>
+          </div>
+          <div class="actions-row">
+            <button class="btn-danger" type="button" onclick="deleteUser('${request.id}')">${escapeHtml(t("delete"))}</button>
+            <button class="btn-secondary" type="button" onclick="markDeleteRequestDone('${request.id}')">${escapeHtml(t("markRequestDone"))}</button>
+          </div>
+        </div>
+      `).join("");
+    }
+
     function renderOrders(orders) {
       currentOrders = orders;
       updateStats(orders, currentUsers);
@@ -650,8 +683,22 @@
     };
 
     window.deleteUser = async function(userId) {
+      await setDoc(doc(db, "deleteRequests", userId), {
+        status: "completed",
+        completedAt: new Date().toISOString(),
+        completedBy: localStorage.getItem("user_email") || OWNER_EMAIL,
+      }, { merge: true });
       await deleteDoc(doc(db, "users", userId));
       showToast(t("removed"));
+    };
+
+    window.markDeleteRequestDone = async function(userId) {
+      await setDoc(doc(db, "deleteRequests", userId), {
+        status: "completed",
+        completedAt: new Date().toISOString(),
+        completedBy: localStorage.getItem("user_email") || OWNER_EMAIL,
+      }, { merge: true });
+      showToast(t("updated"));
     };
 
     document.querySelectorAll(".tab-btn").forEach((button) => {
@@ -721,6 +768,10 @@
 
       onSnapshot(query(collection(db, "users"), orderBy("lastLoginAt", "desc")), (snapshot) => {
         renderUsers(snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() })));
+      });
+
+      onSnapshot(query(collection(db, "deleteRequests"), orderBy("requestedAt", "desc")), (snapshot) => {
+        renderDeleteRequests(snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() })));
       });
     }
   </script>
