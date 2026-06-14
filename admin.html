@@ -623,7 +623,7 @@
       currentDeleteRequests = requests;
       const root = document.getElementById("deleteRequestsList");
       if (!root) return;
-      const pending = requests.filter((request) => request.status !== "completed");
+      const pending = requests.filter((request) => request.status !== "completed" || (!request.emailQueuedAt && !request.emailSentAt));
       if (!pending.length) {
         root.innerHTML = `<p class="empty-msg">${escapeHtml(t("noDeleteRequests"))}</p>`;
         return;
@@ -649,7 +649,7 @@
     function renderInbox(requests) {
       const root = document.getElementById("inboxList");
       if (!root) return;
-      const messages = requests.filter((request) => request.status !== "completed" && String(request.message || "").trim());
+      const messages = requests.filter((request) => String(request.message || "").trim() && !request.emailQueuedAt && !request.emailSentAt);
       if (!messages.length) {
         root.innerHTML = `<p class="empty-msg">${escapeHtml(t("noInboxMessages"))}</p>`;
         return;
@@ -839,9 +839,10 @@ Pazar Fiyatı Admin`;
 
     window.markDeleteRequestDone = async function(userId) {
       await setDoc(doc(db, "deleteRequests", userId), {
-        status: "completed",
-        completedAt: new Date().toISOString(),
-        completedBy: localStorage.getItem("user_email") || OWNER_EMAIL,
+        status: "done-pending-email",
+        doneMarkedAt: new Date().toISOString(),
+        doneMarkedBy: localStorage.getItem("user_email") || OWNER_EMAIL,
+        messagePreservedUntilEmail: true,
       }, { merge: true });
       showToast(t("updated"));
     };
