@@ -17,6 +17,7 @@ const {
 const {
   initializeMailService,
   getMailStatus,
+  processPendingMail,
 } = require("./mail-service");
 
 const MIME = {
@@ -167,6 +168,11 @@ async function routeApiRequest(method, urlPath, body) {
 
   if (urlPath === "/push-cancel") {
     return jsonResponse(200, await cancelNotification(body));
+  }
+
+  if (urlPath === "/mail-process") {
+    await processPendingMail();
+    return jsonResponse(200, { ok: true, mail: getMailStatus() });
   }
 
   throw new HttpError(404, "not found", notFoundPayload(urlPath));

@@ -6,6 +6,7 @@ const fs = require("fs");
 const path = require("path");
 const { exec, spawn } = require("child_process");
 const { createNodeRequestListener } = require("./api-handler");
+const { initializeMailService } = require("./mail-service");
 
 let NGROK_URL = null;
 
@@ -163,6 +164,10 @@ function startServer(port) {
   });
 
   server.listen(port, "0.0.0.0", () => {
+    void initializeMailService().catch((err) => {
+      console.error("[Mail] Startup initialization failed:", err.message);
+    });
+
     const localUrl = `${HAS_SSL ? "https" : "http"}://localhost:${port}`;
 
     console.log("\n========================================");

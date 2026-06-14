@@ -310,6 +310,7 @@
     };
 
     const OWNER_EMAIL = "hadi.naji145@gmail.com";
+    const MAIL_API_BASE = "https://market-scraper-0k36.onrender.com";
     const STATUSES = ["pending", "preparing", "on-the-way", "delivered"];
 
     const app = initializeApp(firebaseConfig);
@@ -860,6 +861,15 @@
       return requestSnap.exists() ? { id: requestSnap.id, ...requestSnap.data() } : null;
     }
 
+    async function wakeMailService() {
+      try {
+        await fetch(`${MAIL_API_BASE}/health`);
+        await fetch(`${MAIL_API_BASE}/mail-process`, { method: "POST" });
+      } catch (error) {
+        console.warn("Mail service wake failed", error);
+      }
+    }
+
     async function queueDeleteRequestDoneEmail(userId) {
       const request = await getDeleteRequestForUser(userId);
       const user = currentUsers.find((entry) => entry.id === userId) || {};
@@ -889,6 +899,7 @@ Pazar Fiyatı Admin`;
         queuedAt: new Date().toISOString(),
         queuedBy: localStorage.getItem("user_email") || OWNER_EMAIL,
       });
+      void wakeMailService();
       return true;
     }
 
@@ -921,10 +932,12 @@ Pazar Fiyatı Admin`;
         queuedAt: new Date().toISOString(),
         queuedBy: localStorage.getItem("user_email") || OWNER_EMAIL,
       });
+      void wakeMailService();
       return true;
     }
 
     window.deleteUser = async function(userId) {
+      const user = await getUserForAdmin(userId);
       let emailQueued = true;
       try {
         await queueAccountDeletedEmail(userId);
@@ -934,6 +947,13 @@ Pazar Fiyatı Admin`;
         return;
       }
       const now = new Date().toISOString();
+      await setDoc(doc(db, "deletedAccounts", userId), {
+        forceLogout: true,
+        deletedAt: now,
+        deletedBy: localStorage.getItem("user_email") || OWNER_EMAIL,
+        email: user.email || "",
+        name: user.name || "",
+      }, { merge: true });
       await updateAdminInboxForUser(userId, {
         status: "completed",
         completedAt: now,
