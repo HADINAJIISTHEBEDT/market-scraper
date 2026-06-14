@@ -134,14 +134,27 @@
         }
         setStatus(t("sending"));
         try {
+          const message = document.getElementById("requestMessage").value.trim();
+          const requestedAt = new Date().toISOString();
           await setDoc(doc(db, "deleteRequests", userUid), {
             userId: userUid,
             email: userEmail,
             name: userName || "",
-            message: document.getElementById("requestMessage").value.trim(),
+            message,
             status: "pending",
-            requestedAt: new Date().toISOString(),
+            requestedAt,
           }, { merge: true });
+          if (message) {
+            await setDoc(doc(db, "adminInbox", userUid), {
+              userId: userUid,
+              email: userEmail,
+              name: userName || "",
+              message,
+              status: "pending",
+              requestedAt,
+              source: "delete-request",
+            }, { merge: true });
+          }
           setStatus(t("sent"));
         } catch (error) {
           setStatus(`${t("failed")}: ${error.message}`, true);

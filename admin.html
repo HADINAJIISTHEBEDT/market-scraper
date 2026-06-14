@@ -323,6 +323,7 @@
     let currentOrders = [];
     let currentUsers = [];
     let currentDeleteRequests = [];
+    let currentInboxMessages = [];
     let currentTiles = [];
     let currentSettings = {
       featuresUnlocked: false,
@@ -476,7 +477,7 @@
       renderOrders(currentOrders);
       renderUsers(currentUsers);
       renderDeleteRequests(currentDeleteRequests);
-      renderInbox(currentDeleteRequests);
+      renderInbox(currentInboxMessages);
       renderTilesEditor();
     }
 
@@ -669,37 +670,38 @@
       `).join("");
     }
 
-    function renderInbox(requests) {
+    function renderInbox(messages) {
       const root = document.getElementById("inboxList");
       if (!root) return;
-      const messages = requests.filter((request) => String(request.message || "").trim());
-      if (!messages.length) {
+      const entries = messages.filter((entry) => String(entry.message || "").trim());
+      if (!entries.length) {
         root.innerHTML = `<p class="empty-msg">${escapeHtml(t("noInboxMessages"))}</p>`;
         return;
       }
-      root.innerHTML = messages.map((request) => {
-        const status = getInboxStatus(request);
-        const emailSent = Boolean(request.doneEmailQueuedAt || request.emailQueuedAt || request.emailSentAt);
+      root.innerHTML = entries.map((entry) => {
+        const status = getInboxStatus(entry);
+        const emailSent = Boolean(entry.doneEmailQueuedAt || entry.accountDeletedEmailQueuedAt || entry.emailSentAt);
+        const userId = entry.userId || entry.id;
         const actionsHtml = status === "pending" ? `
           <div class="actions-row">
-            <button class="btn-danger" type="button" onclick="deleteUser('${request.id}')">${escapeHtml(t("delete"))}</button>
-            <button class="btn-secondary" type="button" onclick="markDeleteRequestDone('${request.id}')">${escapeHtml(t("markRequestDone"))}</button>
+            <button class="btn-danger" type="button" onclick="deleteUser('${userId}')">${escapeHtml(t("delete"))}</button>
+            <button class="btn-secondary" type="button" onclick="markDeleteRequestDone('${userId}')">${escapeHtml(t("markRequestDone"))}</button>
           </div>
         ` : "";
         return `
         <div class="card">
           <div class="card-header">
             <div>
-              <div class="card-title">${escapeHtml(request.email || t("unknown"))}</div>
-              <div class="card-meta">${escapeHtml(request.name || "")}</div>
-              <div class="card-meta">${escapeHtml(t("requestedAt"))}: ${escapeHtml(formatDate(request.requestedAt))}</div>
+              <div class="card-title">${escapeHtml(entry.email || t("unknown"))}</div>
+              <div class="card-meta">${escapeHtml(entry.name || "")}</div>
+              <div class="card-meta">${escapeHtml(t("requestedAt"))}: ${escapeHtml(formatDate(entry.requestedAt))}</div>
               <div class="card-meta">
                 <span class="status-badge ${inboxStatusClass(status)}">${escapeHtml(inboxStatusLabel(status))}</span>
                 ${emailSent ? `<span class="status-badge status-done">${escapeHtml(t("inboxEmailSent"))}</span>` : ""}
               </div>
             </div>
           </div>
-          <div class="message-box">${escapeHtml(request.message)}</div>
+          <div class="message-box">${escapeHtml(entry.message)}</div>
           ${actionsHtml}
         </div>
       `;
@@ -812,6 +814,44 @@
       showToast(t("updated"));
     };
 
+    async function updateAdminInboxForUser(userId, updates) {
+      const inboxRef = doc(db, "adminInbox", userId);
+      const inboxSnap = await getDoc(inboxRef);
+      if (!inboxSnap.exists()) return;
+      const data = inboxSnap.data();
+      await setDoc(inboxRef, {
+        ...updates,
+        userId,
+        message: data.message || "",
+        email: data.email || "",
+        name: data.name || "",
+        requestedAt: data.requestedAt || updates.requestedAt || new Date().toISOString(),
+      }, { merge: true });
+    }
+
+    const legacyInboxMigrated = new Set();
+
+    async function ensureLegacyInboxEntry(request) {
+      const message = String(request.message || "").trim();
+      if (!message) return;
+      const inboxRef = doc(db, "adminInbox", request.id);
+      const inboxSnap = await getDoc(inboxRef);
+      if (inboxSnap.exists()) return;
+      await setDoc(inboxRef, {
+        userId: request.id,
+        email: request.email || "",
+        name: request.name || "",
+        message,
+        status: getInboxStatus(request),
+        requestedAt: request.requestedAt || new Date().toISOString(),
+        source: "legacy-delete-request",
+        doneMarkedAt: request.doneMarkedAt || null,
+        completedAt: request.completedAt || null,
+        doneEmailQueuedAt: request.doneEmailQueuedAt || null,
+        accountDeletedEmailQueuedAt: request.emailQueuedAt || null,
+      });
+    }
+
     async function getDeleteRequestForUser(userId) {
       const cachedRequest = currentDeleteRequests.find((request) => request.id === userId);
       if (cachedRequest) return cachedRequest;
@@ -884,7 +924,6 @@ Pazar Fiyatı Admin`;
     }
 
     window.deleteUser = async function(userId) {
-      const request = await getDeleteRequestForUser(userId);
       let emailQueued = true;
       try {
         await queueAccountDeletedEmail(userId);
@@ -893,24 +932,24 @@ Pazar Fiyatı Admin`;
         showToast(`${t("emailQueueFailed")}: ${error.message}`);
         return;
       }
+      const now = new Date().toISOString();
+      await updateAdminInboxForUser(userId, {
+        status: "completed",
+        completedAt: now,
+        accountDeletedEmailQueuedAt: now,
+      });
       await setDoc(doc(db, "deleteRequests", userId), {
         status: "completed",
-        completedAt: new Date().toISOString(),
+        completedAt: now,
         completedBy: localStorage.getItem("user_email") || OWNER_EMAIL,
-        email: request?.email || "",
-        name: request?.name || "",
-        message: request?.message || "",
-        requestedAt: request?.requestedAt || new Date().toISOString(),
-        inboxPreserved: true,
         emailQueued,
-        emailQueuedAt: emailQueued ? new Date().toISOString() : null,
+        emailQueuedAt: emailQueued ? now : null,
       }, { merge: true });
       await deleteDoc(doc(db, "users", userId));
       showToast(emailQueued ? `${t("removed")} - ${t("emailQueued")}` : t("removed"));
     };
 
     window.markDeleteRequestDone = async function(userId) {
-      const request = await getDeleteRequestForUser(userId);
       try {
         await queueDeleteRequestDoneEmail(userId);
       } catch (error) {
@@ -918,16 +957,17 @@ Pazar Fiyatı Admin`;
         showToast(`${t("emailQueueFailed")}: ${error.message}`);
         return;
       }
+      const now = new Date().toISOString();
+      await updateAdminInboxForUser(userId, {
+        status: "done",
+        doneMarkedAt: now,
+        doneEmailQueuedAt: now,
+      });
       await setDoc(doc(db, "deleteRequests", userId), {
         status: "done",
-        doneMarkedAt: new Date().toISOString(),
+        doneMarkedAt: now,
         doneMarkedBy: localStorage.getItem("user_email") || OWNER_EMAIL,
-        email: request?.email || "",
-        name: request?.name || "",
-        message: request?.message || "",
-        requestedAt: request?.requestedAt || new Date().toISOString(),
-        inboxPreserved: true,
-        doneEmailQueuedAt: new Date().toISOString(),
+        doneEmailQueuedAt: now,
       }, { merge: true });
       showToast(`${t("updated")} - ${t("emailQueued")}`);
     };
@@ -1004,7 +1044,18 @@ Pazar Fiyatı Admin`;
       onSnapshot(query(collection(db, "deleteRequests"), orderBy("requestedAt", "desc")), (snapshot) => {
         const requests = snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() }));
         renderDeleteRequests(requests);
-        renderInbox(requests);
+        requests.forEach((request) => {
+          if (legacyInboxMigrated.has(request.id)) return;
+          legacyInboxMigrated.add(request.id);
+          ensureLegacyInboxEntry(request).catch((error) => {
+            console.error("Legacy inbox archive failed", error);
+          });
+        });
+      });
+
+      onSnapshot(query(collection(db, "adminInbox"), orderBy("requestedAt", "desc")), (snapshot) => {
+        currentInboxMessages = snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() }));
+        renderInbox(currentInboxMessages);
       });
     }
   </script>
