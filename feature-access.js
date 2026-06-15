@@ -21,7 +21,6 @@
       pageLockBack: "Ana sayfaya don",
       blockedTitle: "Erisim engellendi",
       blockedAccountBody: `Admin tarafindan engellendiniz. Bunun bir yanlis anlama oldugunu dusunuyorsaniz ${OWNER_EMAIL} hesabina e-posta gonderin.`,
-      deletedAccountBody: "Hesabiniz admin tarafindan kalici olarak silindi ve admin panelinden kaldirildi.",
     },
     en: {
       modalTitle: "Coming soon",
@@ -40,7 +39,6 @@
       pageLockBack: "Back to home",
       blockedTitle: "Access blocked",
       blockedAccountBody: `You were blocked by the admin. If you think this is a misunderstanding, send an email to ${OWNER_EMAIL}.`,
-      deletedAccountBody: "Your account was permanently deleted by the admin and removed from the admin panel.",
     },
     ar: {
       modalTitle: "قريباً",
@@ -59,7 +57,6 @@
       pageLockBack: "العودة إلى الرئيسية",
       blockedTitle: "تم حظر الوصول",
       blockedAccountBody: `تم حظرك من قبل المسؤول. إذا كنت تعتقد أن هذا سوء فهم، أرسل بريداً إلكترونياً إلى ${OWNER_EMAIL}.`,
-      deletedAccountBody: "تم حذف حسابك نهائياً من قبل المسؤول وإزالته من لوحة الإدارة.",
     },
   };
 
@@ -284,65 +281,6 @@
     sessionStorage.removeItem("blocked_account_notice");
   }
 
-  function showDeletedAccountNotice() {
-    const message = sessionStorage.getItem("deleted_account_notice");
-    if (!message) return;
-    const status = document.getElementById("authStatus");
-    if (status) {
-      status.textContent = message;
-      status.className = "status-box error";
-    } else {
-      alert(message);
-    }
-    sessionStorage.removeItem("deleted_account_notice");
-  }
-
-  async function signOutFirebaseAuth() {
-    try {
-      const [{ getApps, initializeApp }, { getAuth, signOut }] = await Promise.all([
-        import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"),
-        import("https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js"),
-      ]);
-      const config = {
-        apiKey: "AIzaSyA4ZmYg5sTs4gU1Nm25s7of6oqJ4xGpR28",
-        authDomain: "st-business-86a9b.firebaseapp.com",
-        projectId: "st-business-86a9b",
-        storageBucket: "st-business-86a9b.firebasestorage.app",
-        messagingSenderId: "472603409840",
-        appId: "1:472603409840:web:30127c81e74c3b3c4e2a75",
-      };
-      const app = getApps()[0] || initializeApp(config);
-      const auth = getAuth(app);
-      if (auth.currentUser) {
-        await signOut(auth);
-      }
-    } catch (error) {
-      console.error("[FeatureAccess] Firebase sign-out failed:", error);
-    }
-  }
-
-  function handleDeletedAccount() {
-    const uid = localStorage.getItem("user_uid") || "unknown";
-    if (sessionStorage.getItem("account_deletion_forced") === uid) {
-      return;
-    }
-    sessionStorage.setItem("account_deletion_forced", uid);
-    const message = t("deletedAccountBody");
-    sessionStorage.setItem("deleted_account_notice", message);
-    clearLocalUser();
-    void signOutFirebaseAuth();
-    if (typeof window.doLogout === "function") {
-      window.doLogout();
-    } else if (typeof window.updateNavbar === "function") {
-      window.updateNavbar();
-    }
-    if (location.pathname.endsWith("/login.html")) {
-      showDeletedAccountNotice();
-      return;
-    }
-    window.location.href = "login.html";
-  }
-
   function handleBlockedAccess() {
     const message = t("blockedAccountBody");
     sessionStorage.setItem("blocked_account_notice", message);
@@ -385,20 +323,11 @@
           const data = snapshot.exists() ? snapshot.data() : null;
           if (data?.blocked) {
             handleBlockedAccess();
-            return;
-          }
-          if (!snapshot.exists()) {
-            handleDeletedAccount();
-          }
-        });
-        firestore.onSnapshot(firestore.doc(db, "deletedAccounts", uid), (snapshot) => {
-          if (snapshot.exists() && snapshot.data()?.forceLogout) {
-            handleDeletedAccount();
           }
         });
       })
       .catch((error) => {
-        console.error("[FeatureAccess] Deleted account watcher failed:", error);
+        console.error("[FeatureAccess] User status watcher failed:", error);
       });
   }
 
@@ -456,8 +385,6 @@
     initLoginNotice,
     clearLocalUser,
     showBlockedAccountNotice,
-    showDeletedAccountNotice,
-    handleDeletedAccount,
     startDeletedAccountWatcher,
     updateDeleteAccountLink,
     bindLockedTrigger,
@@ -467,7 +394,4 @@
   getDeviceId();
   startDeletedAccountWatcher();
   startBlockedDeviceWatcher();
-  if (location.pathname.endsWith("/login.html")) {
-    showDeletedAccountNotice();
-  }
 })();

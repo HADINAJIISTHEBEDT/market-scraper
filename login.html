@@ -431,6 +431,7 @@
     import {
       arrayUnion,
       doc,
+      deleteDoc,
       getDoc,
       initializeFirestore,
       setDoc
@@ -465,7 +466,6 @@
         errorNetwork: "Ag hatasi var. Internet baglantisini kontrol edip tekrar deneyin.",
         errorCancelled: "Ayni anda birden fazla giris denemesi yapildi. Tekrar deneyin.",
         blockedAccount: "Admin tarafindan engellendiniz. Bunun bir yanlis anlama oldugunu dusunuyorsaniz hadi.naji145@gmail.com hesabina e-posta gonderin.",
-        accountPermanentlyDeleted: "Bu hesap admin tarafindan kalici olarak silindi ve tekrar kullanilamaz.",
         errorProfileLoad: "Hesap acildi fakat profil verisi okunamadi.",
         errorProfileSave: "Hesap acildi fakat profil verisi kaydedilemedi."
       },
@@ -496,7 +496,6 @@
         errorNetwork: "Network error. Check your connection and try again.",
         errorCancelled: "Multiple sign-in attempts were started. Try again.",
         blockedAccount: "You were blocked by the admin. If you think this is a misunderstanding, send an email to hadi.naji145@gmail.com.",
-        accountPermanentlyDeleted: "This account was permanently deleted by the admin and cannot be used again.",
         errorProfileLoad: "The account signed in, but the profile data could not be loaded.",
         errorProfileSave: "The account signed in, but the profile data could not be saved."
       },
@@ -527,7 +526,6 @@
         errorNetwork: "يوجد خطأ في الشبكة. تحقق من الاتصال ثم حاول مرة أخرى.",
         errorCancelled: "تم بدء أكثر من محاولة تسجيل دخول. حاول مرة أخرى.",
         blockedAccount: "تم حظرك من قبل المسؤول. إذا كنت تعتقد أن هذا سوء فهم، أرسل بريداً إلكترونياً إلى hadi.naji145@gmail.com.",
-        accountPermanentlyDeleted: "تم حذف هذا الحساب نهائياً من قبل المسؤول ولا يمكن استخدامه مرة أخرى.",
         errorProfileLoad: "تم تسجيل الدخول لكن تعذر تحميل بيانات الملف الشخصي.",
         errorProfileSave: "تم تسجيل الدخول لكن تعذر حفظ بيانات الملف الشخصي."
       }
@@ -640,15 +638,6 @@
       }
     }
 
-    async function isPermanentlyDeletedAccount(uid) {
-      const deletedSnap = await withTimeout(
-        getDoc(doc(db, "deletedAccounts", uid)),
-        8000,
-        "Delete status check timed out.",
-      );
-      return deletedSnap.exists() && deletedSnap.data()?.permanentlyDeleted === true;
-    }
-
     async function syncUserRecord(user) {
       const userRef = doc(db, "users", user.uid);
       const snap = await withTimeout(getDoc(userRef), 8000, "Profile load timed out.");
@@ -671,6 +660,13 @@
       if (deviceId) {
         await withTimeout(setDoc(userRef, { deviceIds: arrayUnion(deviceId) }, { merge: true }), 8000, "Device save timed out.");
       }
+      try {
+        await deleteDoc(doc(db, "deletedAccounts", user.uid));
+      } catch (error) {
+        console.warn("Could not clear deleted account marker", error);
+      }
+      sessionStorage.removeItem("account_deletion_forced");
+      sessionStorage.removeItem("deleted_account_notice");
       return mergedProfile;
     }
 
@@ -680,13 +676,6 @@
         if (!user.email || !/@gmail\.com$/i.test(user.email)) {
           await signOut(auth);
           setRawStatus(t("errorGoogleOnly"), true);
-          return;
-        }
-
-        if (!isOwnerEmail(user.email) && await isPermanentlyDeletedAccount(user.uid)) {
-          await signOut(auth);
-          window.FeatureAccess?.clearLocalUser?.();
-          setRawStatus(t("accountPermanentlyDeleted"), true);
           return;
         }
 
