@@ -106,3 +106,10 @@ export function groupItemsByCategory(items) {
   });
   return groups;
 }
+
+export function computeOrderTotal(items) {
+  return (Array.isArray(items) ? items : []).reduce((sum, item) => {
+    if (item && item.available === false) return sum;
+    return sum + (Number(item.price) || 0) * (Number(item.qty) || 1);
+  }, 0);
+}

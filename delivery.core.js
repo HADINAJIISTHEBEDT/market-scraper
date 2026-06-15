@@ -1,16 +1,6 @@
 ﻿(function () {
   "use strict";
 
-  if (!window.FIREBASE_CONFIG) {
-    showBootError("Config missing. Keep firebase-config.global.js in the same folder.");
-    return;
-  }
-
-  if (typeof firebase === "undefined") {
-    showBootError("Firebase failed to load. Check your internet connection.");
-    return;
-  }
-
   const OL = window.OrderLifecycle || {};
   const ORDER_STATUSES = OL.ORDER_STATUSES || ["waiting", "on-the-way", "arrived"];
   const normalizeOrderStatus = OL.normalizeOrderStatus || function (s) { return s || "waiting"; };
@@ -89,6 +79,11 @@
       voiceCall: "Musteriyi ara",
       videoCall: "Goruntulu ara",
       chatDisabled: "Siparis kapandi",
+      marketPanelLink: "Market paneli",
+      bootErrorConfig: "Yapilandirma eksik. firebase-config.global.js dosyasini ayni klasorde tutun.",
+      bootErrorFirebase: "Firebase yuklenemedi. Internet baglantinizi kontrol edin.",
+      bootErrorOrders: "Siparisler yuklenemedi.",
+      categoryGeneral: "Genel",
     },
     en: {
       pageTitle: "Driver tracking",
@@ -140,73 +135,71 @@
       voiceCall: "Call customer",
       videoCall: "Video call",
       chatDisabled: "Order closed",
+      marketPanelLink: "Market panel",
+      bootErrorConfig: "Config missing. Keep firebase-config.global.js in the same folder.",
+      bootErrorFirebase: "Firebase failed to load. Check your internet connection.",
+      bootErrorOrders: "Could not load orders.",
+      categoryGeneral: "General",
     },
     ar: {
-      pageTitle: "ØªØªØ¨Ø¹ Ø§Ù„Ø³Ø§Ø¦Ù‚",
-      pageHelp: "Ø´Ø§Ø±Ùƒ GPS Ø§Ù„Ù…Ø¨Ø§Ø´Ø± Ù„Ù„ØªØ³Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ù†Ø´Ø·Ø© ÙˆØ­Ø¯Ù‘Ø« Ø­Ø§Ù„Ø© Ø§Ù„Ø·Ù„Ø¨.",
-      driverPhoneTitle: "Ù‡Ø§ØªÙ Ø§Ù„Ø³Ø§Ø¦Ù‚",
-      driverPhoneHelp: "Ø£Ø¯Ø®Ù„ Ø±Ù‚Ù… Ù‡Ø§ØªÙÙƒ Ù„Ø±Ø¤ÙŠØ© Ø§Ù„Ø·Ù„Ø¨Ø§Øª Ø§Ù„Ù…Ø¹ÙŠÙ†Ø© Ù„Ùƒ.",
-      driverPhonePlaceholder: "Ø±Ù‚Ù… Ù‡Ø§ØªÙÙƒ",
-      driverPhoneSave: "Ù…ØªØ§Ø¨Ø¹Ø©",
-      marketOnly: "ØµÙØ­Ø© Ø§Ù„Ø³Ø§Ø¦Ù‚ Ù‡Ø°Ù‡ Ù…Ø®ØµØµØ© Ù„Ø³ÙˆÙ‚Ùƒ ÙÙ‚Ø·.",
-      wrongMarket: "Ø³ÙˆÙ‚ ØºÙŠØ± ØµØ§Ù„Ø­. Ø§ÙØªØ­ ØµÙØ­Ø© Ø§Ù„Ø³Ø§Ø¦Ù‚ Ù…Ù† Ù„ÙˆØ­Ø© Ø§Ù„Ø³ÙˆÙ‚.",
-      ordersTitle: "Ø§Ù„ØªØ³Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ù†Ø´Ø·Ø©",
-      noOrders: "Ù„Ø§ ØªÙˆØ¬Ø¯ Ø·Ù„Ø¨Ø§Øª Ù†Ø´Ø·Ø©.",
-      noOrdersForPhone: "Ù„Ø§ ØªÙˆØ¬Ø¯ Ø·Ù„Ø¨Ø§Øª Ù†Ø´Ø·Ø© Ù„Ù‡Ø°Ø§ Ø§Ù„Ø±Ù‚Ù…. Ø£Ø¯Ø®Ù„ Ù†ÙØ³ Ø§Ù„Ø±Ù‚Ù… Ù…Ù† Ù„ÙˆØ­Ø© Ø§Ù„Ø³ÙˆÙ‚.",
-      selectOrder: "Ø§Ø®ØªØ± Ù„Ù„ØªØªØ¨Ø¹",
-      activeOrder: "Ø§Ù„Ø·Ù„Ø¨ Ø§Ù„Ù†Ø´Ø·",
-      orderNumber: "Ø±Ù‚Ù… Ø§Ù„Ø·Ù„Ø¨",
-      customer: "Ø§Ù„Ø¹Ù…ÙŠÙ„",
-      market: "Ø§Ù„Ø³ÙˆÙ‚",
-      phone: "Ø§Ù„Ù‡Ø§ØªÙ",
-      address: "Ø§Ù„Ø¹Ù†ÙˆØ§Ù†",
-      payment: "Ø§Ù„Ø¯ÙØ¹",
-      payCash: "Ù†Ù‚Ø¯Ø§Ù‹ Ø¹Ù†Ø¯ Ø§Ù„ØªØ³Ù„ÙŠÙ…",
-      payCard: "Ø¨Ø·Ø§Ù‚Ø©",
-      cardLast4: "Ø¢Ø®Ø± 4 Ø£Ø±Ù‚Ø§Ù…",
-      cardName: "Ø§Ø³Ù… Ø­Ø§Ù…Ù„ Ø§Ù„Ø¨Ø·Ø§Ù‚Ø©",
-      cardExpiry: "ØªØ§Ø±ÙŠØ® Ø§Ù„Ø§Ù†ØªÙ‡Ø§Ø¡",
-      available: "Ù…ØªÙˆÙØ±",
-      unavailable: "ØºÙŠØ± Ù…ØªÙˆÙØ±",
-      waiting: "Ù‚ÙŠØ¯ Ø§Ù„ØªØ­Ø¶ÙŠØ±",
-      onTheWay: "ÙÙŠ Ø§Ù„Ø·Ø±ÙŠÙ‚",
-      arrived: "ØªÙ… Ø§Ù„ØªØ³Ù„ÙŠÙ…",
-      driver: "Ø§Ù„Ø³Ø§Ø¦Ù‚",
-      updateStatus: "ØªØ­Ø¯ÙŠØ« Ø§Ù„Ø­Ø§Ù„Ø©",
-      startTracking: "Ø¨Ø¯Ø¡ Ø§Ù„ØªØªØ¨Ø¹ Ø§Ù„Ù…Ø¨Ø§Ø´Ø±",
-      stopTracking: "Ø¥ÙŠÙ‚Ø§Ù Ø§Ù„ØªØªØ¨Ø¹",
-      trackingLive: "ÙŠØªÙ… Ù…Ø´Ø§Ø±ÙƒØ© Ø§Ù„Ù…ÙˆÙ‚Ø¹ Ø§Ù„Ù…Ø¨Ø§Ø´Ø±",
-      trackingStopped: "ØªÙ… Ø¥ÙŠÙ‚Ø§Ù Ø§Ù„ØªØªØ¨Ø¹",
-      lastUpdate: "Ø¢Ø®Ø± ØªØ­Ø¯ÙŠØ«",
-      openMap: "ÙØªØ­ Ø§Ù„Ø®Ø±ÙŠØ·Ø©",
-      locationUnavailable: "Ø§Ù„Ù…ÙˆÙ‚Ø¹ ØºÙŠØ± Ù…ØªØ§Ø­",
-      updated: "ØªÙ… Ø§Ù„ØªØ­Ø¯ÙŠØ«",
-      unknown: "ØºÙŠØ± Ù…Ø¹Ø±ÙˆÙ",
-      closeOrder: "Ø¥ØºÙ„Ø§Ù‚ Ø§Ù„Ø·Ù„Ø¨",
-      closed: "ØªÙ… Ø¥ØºÙ„Ø§Ù‚ Ø§Ù„Ø·Ù„Ø¨",
-      orderClosed: "Ø§ÙƒØªÙ…Ù„ Ø§Ù„Ø·Ù„Ø¨ ÙˆØ£ÙØºÙ„Ù‚",
-      chatTitle: "Ø§Ù„Ø¯Ø±Ø¯Ø´Ø© Ù…Ø¹ Ø§Ù„Ø¹Ù…ÙŠÙ„",
-      chatPlaceholder: "Ø§ÙƒØªØ¨ Ø±Ø³Ø§Ù„Ø© Ù„Ù„Ø¹Ù…ÙŠÙ„...",
-      send: "Ø¥Ø±Ø³Ø§Ù„",
-      voiceCall: "Ø§ØªØµÙ„ Ø¨Ø§Ù„Ø¹Ù…ÙŠÙ„",
-      videoCall: "Ù…ÙƒØ§Ù„Ù…Ø© ÙÙŠØ¯ÙŠÙˆ",
-      chatDisabled: "ØªÙ… Ø¥ØºÙ„Ø§Ù‚ Ø§Ù„Ø·Ù„Ø¨",
+      pageTitle: "تتبع السائق",
+      pageHelp: "شارك GPS المباشر للتسليمات النشطة وحدّث حالة الطلب.",
+      driverPhoneTitle: "هاتف السائق",
+      driverPhoneHelp: "أدخل رقم هاتفك لرؤية الطلبات المعينة لك.",
+      driverPhonePlaceholder: "رقم هاتفك",
+      driverPhoneSave: "متابعة",
+      marketOnly: "صفحة السائق هذه مخصصة لسوقك فقط.",
+      wrongMarket: "سوق غير صالح. افتح صفحة السائق من لوحة السوق.",
+      ordersTitle: "التسليمات النشطة",
+      noOrders: "لا توجد طلبات نشطة.",
+      noOrdersForPhone: "لا توجد طلبات نشطة لهذا الرقم. أدخل نفس الرقم من لوحة السوق.",
+      selectOrder: "اختر للتتبع",
+      activeOrder: "الطلب النشط",
+      orderNumber: "رقم الطلب",
+      customer: "العميل",
+      market: "السوق",
+      phone: "الهاتف",
+      address: "العنوان",
+      payment: "الدفع",
+      payCash: "نقداً عند التسليم",
+      payCard: "بطاقة",
+      cardLast4: "آخر 4 أرقام",
+      cardName: "اسم حامل البطاقة",
+      cardExpiry: "تاريخ الانتهاء",
+      available: "متوفر",
+      unavailable: "غير متوفر",
+      waiting: "قيد التحضير",
+      onTheWay: "في الطريق",
+      arrived: "تم التسليم",
+      driver: "السائق",
+      updateStatus: "تحديث الحالة",
+      startTracking: "بدء التتبع المباشر",
+      stopTracking: "إيقاف التتبع",
+      trackingLive: "يتم مشاركة الموقع المباشر",
+      trackingStopped: "تم إيقاف التتبع",
+      lastUpdate: "آخر تحديث",
+      openMap: "فتح الخريطة",
+      locationUnavailable: "الموقع غير متاح",
+      updated: "تم التحديث",
+      unknown: "غير معروف",
+      closeOrder: "إغلاق الطلب",
+      closed: "تم إغلاق الطلب",
+      orderClosed: "اكتمل الطلب وأُغلق",
+      chatTitle: "الدردشة مع العميل",
+      chatPlaceholder: "اكتب رسالة للعميل...",
+      send: "إرسال",
+      voiceCall: "اتصل بالعميل",
+      videoCall: "مكالمة فيديو",
+      chatDisabled: "تم إغلاق الطلب",
+      marketPanelLink: "لوحة السوق",
+      bootErrorConfig: "الإعدادات ناقصة. احتفظ بملف firebase-config.global.js في نفس المجلد.",
+      bootErrorFirebase: "تعذر تحميل Firebase. تحقق من اتصال الإنترنت.",
+      bootErrorOrders: "تعذر تحميل الطلبات.",
+      categoryGeneral: "عام",
     },
   };
 
-  if (!firebase.apps.length) {
-    firebase.initializeApp(window.FIREBASE_CONFIG);
-  }
-  const db = firebase.firestore();
-  try { db.settings({ experimentalForceLongPolling: true, merge: true }); } catch (e) {}
-
   let currentLang = localStorage.getItem("app_lang") || "tr";
-  let currentOrders = [];
-  let allMarketOrders = [];
-  let activeOrderId = "";
-  let geoWatchId = null;
-  let chatUnsub = null;
-  let driverDisplayName = "";
 
   function showBootError(message) {
     const help = document.getElementById("pageHelp");
@@ -216,6 +209,29 @@
   function t(key) {
     return (I18N[currentLang] && I18N[currentLang][key]) || I18N.tr[key] || key;
   }
+
+  if (!window.FIREBASE_CONFIG) {
+    showBootError(t("bootErrorConfig"));
+    return;
+  }
+
+  if (typeof firebase === "undefined") {
+    showBootError(t("bootErrorFirebase"));
+    return;
+  }
+
+  if (!firebase.apps.length) {
+    firebase.initializeApp(window.FIREBASE_CONFIG);
+  }
+  const db = firebase.firestore();
+  try { db.settings({ experimentalForceLongPolling: true, merge: true }); } catch (e) {}
+
+  let currentOrders = [];
+  let allMarketOrders = [];
+  let activeOrderId = "";
+  let geoWatchId = null;
+  let chatUnsub = null;
+  let driverDisplayName = "";
 
   function escapeHtml(text) {
     return String(text).replace(/[&<>"']/g, function (char) {
@@ -308,7 +324,7 @@
       const role = msg.senderRole === "driver" ? "driver" : "customer";
       return (
         '<div class="chat-msg ' + role + '">' +
-        '<div class="chat-msg-meta">' + escapeHtml(msg.senderName || t("unknown")) + " Â· " +
+        '<div class="chat-msg-meta">' + escapeHtml(msg.senderName || t("unknown")) + " · " +
         escapeHtml(formatDate(msg.createdAt)) + "</div>" +
         "<div>" + escapeHtml(msg.text || "") + "</div></div>"
       );
@@ -423,12 +439,13 @@
       var rows = group.entries.map(function (entry) {
         var item = entry.item;
         var available = item.available !== false;
+        var lineTotal = available ? (Number(item.price) || 0) * (Number(item.qty) || 1) : 0;
         return (
           '<div class="order-item-row' + (available ? "" : " item-unavailable") + '">' +
           "<span>" + escapeHtml(item.name) + " x " + (item.qty || 1) + "</span>" +
           '<span class="avail-badge ' + (available ? "avail-yes" : "avail-no") + '">' +
           escapeHtml(available ? t("available") : t("unavailable")) + "</span>" +
-          "<span>" + formatPrice((item.price || 0) * (item.qty || 1)) + "</span>" +
+          "<span>" + formatPrice(lineTotal) + "</span>" +
           "</div>"
         );
       }).join("");
@@ -540,10 +557,10 @@
       return (
         '<div class="card">' +
         '<div class="card-title">' + escapeHtml(order.userName || t("unknown")) +
-        (orderNo ? " Â· " + escapeHtml(orderNo) : "") + "</div>" +
+        (orderNo ? " · " + escapeHtml(orderNo) : "") + "</div>" +
         '<div class="card-meta">' + escapeHtml(getMarketLabel(order.marketId || order.marketName)) +
-        " Â· " + escapeHtml(statusLabel(order.status)) +
-        " Â· " + escapeHtml(formatDate(order.createdAt)) + "</div>" +
+        " · " + escapeHtml(statusLabel(order.status)) +
+        " · " + escapeHtml(formatDate(order.createdAt)) + "</div>" +
         '<div class="actions-row">' +
         '<button class="btn-primary" type="button" data-driver-action="select-order" data-order-id="' +
         escapeHtml(order.id) + '">' + escapeHtml(t("selectOrder")) + "</button>" +
@@ -730,7 +747,12 @@
         applyOrdersSnapshot(snapshot);
       }, function (fallbackError) {
         console.error("Orders fallback listener failed", fallbackError);
-        showBootError(fallbackError.message || "Could not load orders.");
+        showBootError(fallbackError.message || t("bootErrorOrders"));
+      });
+    });
+  }
+})();
+ssage || t("bootErrorOrders"));
       });
     });
   }

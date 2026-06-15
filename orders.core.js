@@ -18,6 +18,12 @@
   const normalizeOrderStatus = OL.normalizeOrderStatus;
   const orderNumberDisplay = OL.orderNumberDisplay;
   const groupItemsByCategory = OL.groupItemsByCategory;
+  const computeOrderTotal = OL.computeOrderTotal || function (items) {
+    return (Array.isArray(items) ? items : []).reduce(function (sum, item) {
+      if (item && item.available === false) return sum;
+      return sum + (Number(item.price) || 0) * (Number(item.qty) || 1);
+    }, 0);
+  };
   const isOrderClosed = OL.isOrderClosed;
   const isOrderCommunicationActive = OL.isOrderCommunicationActive;
   const hasAssignedDriver = OL.hasAssignedDriver;
@@ -446,13 +452,14 @@
         const rows = group.entries.map(function (entry) {
           const item = entry.item;
           const available = item.available !== false;
+          const lineTotal = available ? (Number(item.price) || 0) * (Number(item.qty) || 1) : 0;
           return (
             '<div class="order-item-row' + (available ? "" : " item-unavailable") + '">' +
             "<span>" + escapeHtml(item.name) + " x " + (item.qty || 1) + "</span>" +
             "<span>" +
             '<span class="avail-badge ' + (available ? "avail-yes" : "avail-no") + '">' +
             escapeHtml(available ? t("available") : t("unavailable")) + "</span> " +
-            formatPrice((item.price || 0) * (item.qty || 1)) +
+            formatPrice(lineTotal) +
             "</span></div>"
           );
         }).join("");
@@ -475,7 +482,7 @@
           escapeHtml(getMarketLabel(order.marketId || order.marketName)) + "</div>" +
         '<span class="status-badge ' + statusClass(order.status) + '">' +
           escapeHtml(statusLabel(order.status)) + "</span></div>" +
-        '<div class="order-total">' + formatPrice(order.totalPrice) + "</div></div>" +
+        '<div class="order-total">' + formatPrice(computeOrderTotal(items)) + "</div></div>" +
         '<div class="order-items">' + itemsHtml + "</div>" +
         renderTrack(order.status) +
         (showDriver ? driverHtml(order) : "") +

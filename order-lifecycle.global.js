@@ -145,6 +145,13 @@
     return db.collection("orderChats").doc(String(orderId || "")).collection("messages");
   }
 
+  function computeOrderTotal(items) {
+    return (Array.isArray(items) ? items : []).reduce(function (sum, item) {
+      if (item && item.available === false) return sum;
+      return sum + (Number(item.price) || 0) * (Number(item.qty) || 1);
+    }, 0);
+  }
+
   function groupItemsByCategory(items) {
     var groups = [];
     var map = new Map();
@@ -180,6 +187,7 @@
     getVideoCallRoom: getVideoCallRoom,
     getVideoCallUrl: getVideoCallUrl,
     orderChatCollection: orderChatCollection,
+    computeOrderTotal: computeOrderTotal,
     writeOrderInboxNotifications: writeOrderInboxNotifications,
   };
 })();

@@ -61,6 +61,14 @@
       inboxEmpty: "Yeni bildirim yok.",
       inboxFeedback: "Musteri geri bildirimi",
       inboxClosed: "Siparis kapatildi",
+      pending: "Beklemede",
+      panelLoading: "{market} paneli yukleniyor...",
+      deniedTitle: "Panel yuklenemedi",
+      deniedMessageDefault: "Tum dosyalarin ayni klasorde oldugundan emin olun.",
+      categoryGeneral: "Genel",
+      bootErrorConfig: "Yapilandirma eksik. firebase-config.global.js dosyasini ayni klasorde tutun ve dogrudan market sayfasini acin (bim.html, sok.html vb.).",
+      bootErrorFirebase: "Firebase yuklenemedi. Internet baglantinizi kontrol edin.",
+      bootErrorOrders: "Siparisler yuklenemedi.",
     },
     en: {
       driverLink: "Driver",
@@ -107,6 +115,14 @@
       inboxEmpty: "No new notifications.",
       inboxFeedback: "Customer feedback",
       inboxClosed: "Order closed",
+      pending: "Pending",
+      panelLoading: "Loading {market} panel...",
+      deniedTitle: "Panel could not load",
+      deniedMessageDefault: "Check that all files are in the same folder.",
+      categoryGeneral: "General",
+      bootErrorConfig: "Config missing. Keep firebase-config.global.js in the same folder and open this market page directly (bim.html, sok.html, etc.).",
+      bootErrorFirebase: "Firebase failed to load. Check your internet connection.",
+      bootErrorOrders: "Could not load orders.",
     },
     ar: {
       driverLink: "السائق",
@@ -153,6 +169,14 @@
       inboxEmpty: "لا توجد إشعارات جديدة.",
       inboxFeedback: "ملاحظات العميل",
       inboxClosed: "تم إغلاق الطلب",
+      pending: "قيد الانتظار",
+      panelLoading: "جاري تحميل لوحة {market}...",
+      deniedTitle: "تعذر تحميل اللوحة",
+      deniedMessageDefault: "تأكد من أن جميع الملفات في نفس المجلد.",
+      categoryGeneral: "عام",
+      bootErrorConfig: "الإعدادات ناقصة. احتفظ بملف firebase-config.global.js في نفس المجلد وافتح صفحة السوق مباشرة.",
+      bootErrorFirebase: "تعذر تحميل Firebase. تحقق من اتصال الإنترنت.",
+      bootErrorOrders: "تعذر تحميل الطلبات.",
     },
   };
 
@@ -162,6 +186,12 @@
   const orderNumberDisplay = OL.orderNumberDisplay || function () { return ""; };
   const groupItemsByCategory = OL.groupItemsByCategory || function (items) {
     return [{ category: "General", entries: (items || []).map(function (item, index) { return { item: item, index: index }; }) }];
+  };
+  const computeOrderTotal = OL.computeOrderTotal || function (items) {
+    return (Array.isArray(items) ? items : []).reduce(function (sum, item) {
+      if (item && item.available === false) return sum;
+      return sum + (Number(item.price) || 0) * (Number(item.qty) || 1);
+    }, 0);
   };
   const isOrderClosed = OL.isOrderClosed || function () { return false; };
   const isOrderCommunicationActive = OL.isOrderCommunicationActive || function () { return true; };
@@ -270,11 +300,12 @@
         const item = entry.item;
         const itemIndex = entry.index;
         const available = item.available !== false;
+        const lineTotal = available ? (Number(item.price) || 0) * (Number(item.qty) || 1) : 0;
         return `
           <div class="order-item-row ${available ? "" : "item-unavailable"}">
             <div>
               <div>${escapeHtml(item.name)} x ${item.qty || 1}</div>
-              <div class="card-meta">${formatPrice((item.price || 0) * (item.qty || 1))}</div>
+              <div class="card-meta">${formatPrice(lineTotal)}</div>
             </div>
             <span class="avail-badge ${available ? "avail-yes" : "avail-no"}">${escapeHtml(available ? t("available") : t("unavailable"))}</span>
             <button class="btn-small btn-secondary" type="button"
@@ -541,7 +572,7 @@
               <div class="card-meta">${orderNo ? `${escapeHtml(t("orderNumber"))}: ${escapeHtml(orderNo)} · ` : ""}${escapeHtml(formatDate(order.createdAt))}</div>
               <span class="status-badge ${statusClass(currentStatus)}">${escapeHtml(statusLabel(order.status))}</span>
             </div>
-            <div class="card-title">${formatPrice(order.totalPrice)}</div>
+            <div class="card-title">${formatPrice(computeOrderTotal(items))}</div>
           </div>
           <div class="profile-box">
             <strong>${escapeHtml(t("customerProfile"))}</strong>
@@ -597,7 +628,12 @@
     const items = Array.isArray(order.items) ? order.items.map((item) => ({ ...item })) : [];
     if (!items[itemIndex]) return;
     items[itemIndex].available = makeAvailable;
-    await db.collection("orders").doc(orderId).update({ items, updatedAt: new Date().toISOString() });
+    const totalPrice = computeOrderTotal(items);
+    await db.collection("orders").doc(orderId).update({
+      items,
+      totalPrice,
+      updatedAt: new Date().toISOString(),
+    });
     showToast(t("updated"));
   }
 

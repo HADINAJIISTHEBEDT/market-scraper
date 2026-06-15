@@ -269,7 +269,7 @@
       throw new Error("Missing global config");
     }
 
-    const { ORDER_STATUSES, normalizeOrderStatus, orderNumberDisplay, isOrderClosed, normalizePhone, hasAssignedDriver } = window.OrderLifecycle;
+    const { ORDER_STATUSES, normalizeOrderStatus, orderNumberDisplay, isOrderClosed, normalizePhone, hasAssignedDriver, computeOrderTotal } = window.OrderLifecycle;
     const { MARKETS, orderMatchesMarket, getMarketLabel } = window.MarketsConfig;
 
     const firebaseConfig = window.FIREBASE_CONFIG;
@@ -1000,7 +1000,7 @@
                 <div class="card-meta">${escapeHtml(formatPaymentSummary(order))}</div>
                 <div class="card-meta">${escapeHtml(t("driver"))}: ${escapeHtml(driverText)}</div>
               </div>
-              <div class="card-title">${formatPrice(order.totalPrice)}</div>
+              <div class="card-title">${formatPrice(computeOrderTotal(order.items))}</div>
             </div>
             <div>${itemsHtml}</div>
             <div class="chat-box" id="admin-chat-${escapeHtml(order.id)}"></div>
@@ -1143,7 +1143,7 @@
                 <div class="card-meta">${escapeHtml(t("driver"))}: ${escapeHtml(driver.name || t("unknown"))}${driver.phone ? " · " + escapeHtml(driver.phone) : ""}</div>
                 <span class="status-badge status-${closed ? "completed" : currentStatus.replace(/\s+/g, "-")}">${escapeHtml(statusLabel(order.status))}</span>
               </div>
-              <div class="card-title">${formatPrice(order.totalPrice)}</div>
+              <div class="card-title">${formatPrice(computeOrderTotal(order.items))}</div>
             </div>
             <div>${itemsHtml}</div>
             <div class="actions-row">

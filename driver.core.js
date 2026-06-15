@@ -420,12 +420,13 @@
       var rows = group.entries.map(function (entry) {
         var item = entry.item;
         var available = item.available !== false;
+        var lineTotal = available ? (Number(item.price) || 0) * (Number(item.qty) || 1) : 0;
         return (
           '<div class="order-item-row' + (available ? "" : " item-unavailable") + '">' +
           "<span>" + escapeHtml(item.name) + " x " + (item.qty || 1) + "</span>" +
           '<span class="avail-badge ' + (available ? "avail-yes" : "avail-no") + '">' +
           escapeHtml(available ? t("available") : t("unavailable")) + "</span>" +
-          "<span>" + formatPrice((item.price || 0) * (item.qty || 1)) + "</span>" +
+          "<span>" + formatPrice(lineTotal) + "</span>" +
           "</div>"
         );
       }).join("");
