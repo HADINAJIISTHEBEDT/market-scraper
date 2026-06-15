@@ -96,6 +96,41 @@
     return normalizePhone(order.driver && order.driver.phone) === phone;
   }
 
+  function hasAssignedDriver(order) {
+    var driver = order && order.driver;
+    return !!(driver && (driver.name || driver.phone || driver.driverId));
+  }
+
+  function isOrderCommunicationActive(order) {
+    if (!order || isOrderClosed(order.status)) return false;
+    if (!hasAssignedDriver(order)) return false;
+    var status = normalizeOrderStatus(order.status);
+    return status === "on-the-way" || status === "arrived";
+  }
+
+  function formatTelHref(phone) {
+    var digits = normalizePhone(phone);
+    if (!digits) return "";
+    if (digits.length === 10 && digits.charAt(0) === "5") return "tel:+90" + digits;
+    if (digits.length === 11 && digits.charAt(0) === "0") return "tel:+9" + digits;
+    if (digits.indexOf("90") === 0) return "tel:+" + digits;
+    return "tel:+" + digits;
+  }
+
+  function getVideoCallRoom(orderId) {
+    return "marketfiyati-" + String(orderId || "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 48);
+  }
+
+  function getVideoCallUrl(orderId, displayName) {
+    var room = getVideoCallRoom(orderId);
+    var name = encodeURIComponent(String(displayName || "Guest").slice(0, 40));
+    return "https://meet.jit.si/" + room + "#userInfo.displayName=" + name;
+  }
+
+  function orderChatCollection(db, orderId) {
+    return db.collection("orderChats").doc(String(orderId || "")).collection("messages");
+  }
+
   function groupItemsByCategory(items) {
     var groups = [];
     var map = new Map();
@@ -124,6 +159,12 @@
     orderAssignedToDriver: orderAssignedToDriver,
     groupItemsByCategory: groupItemsByCategory,
     isOrderClosed: isOrderClosed,
+    hasAssignedDriver: hasAssignedDriver,
+    isOrderCommunicationActive: isOrderCommunicationActive,
+    formatTelHref: formatTelHref,
+    getVideoCallRoom: getVideoCallRoom,
+    getVideoCallUrl: getVideoCallUrl,
+    orderChatCollection: orderChatCollection,
     writeOrderInboxNotifications: writeOrderInboxNotifications,
   };
 })();

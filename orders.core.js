@@ -19,6 +19,11 @@
   const orderNumberDisplay = OL.orderNumberDisplay;
   const groupItemsByCategory = OL.groupItemsByCategory;
   const isOrderClosed = OL.isOrderClosed;
+  const isOrderCommunicationActive = OL.isOrderCommunicationActive;
+  const hasAssignedDriver = OL.hasAssignedDriver;
+  const formatTelHref = OL.formatTelHref;
+  const getVideoCallUrl = OL.getVideoCallUrl;
+  const orderChatCollection = OL.orderChatCollection;
   const writeOrderInboxNotifications = OL.writeOrderInboxNotifications;
 
   const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(window.FIREBASE_CONFIG);
@@ -39,10 +44,15 @@
       available: "Mevcut",
       unavailable: "Yok",
       driver: "Surucu",
+      driverPhone: "Surucu tel",
       trackDriver: "Surucuyu haritada ac",
       driverWaiting: "Surucu konumu henuz paylasilmadi",
-      chatTitle: "Market ile sohbet",
-      chatPlaceholder: "Market'e mesaj yazin...",
+      voiceCall: "Sesli ara",
+      videoCall: "Goruntulu ara",
+      chatTitle: "Surucu ile sohbet",
+      chatPlaceholder: "Surucuye mesaj yazin...",
+      chatDisabled: "Siparis kapandi — sohbet ve aramalar devre disi",
+      chatWaiting: "Surucu atandiginda sohbet acilir",
       send: "Gonder",
       market: "Market",
       unknown: "Bilinmiyor",
@@ -65,10 +75,15 @@
       available: "Available",
       unavailable: "Unavailable",
       driver: "Driver",
+      driverPhone: "Driver phone",
       trackDriver: "Open driver on map",
       driverWaiting: "Driver location not shared yet",
-      chatTitle: "Chat with market",
-      chatPlaceholder: "Message the market...",
+      voiceCall: "Voice call",
+      videoCall: "Video call",
+      chatTitle: "Chat with driver",
+      chatPlaceholder: "Message the driver...",
+      chatDisabled: "Order closed — chat and calls disabled",
+      chatWaiting: "Chat opens when a driver is assigned",
       send: "Send",
       market: "Market",
       unknown: "Unknown",
@@ -91,10 +106,15 @@
       available: "متوفر",
       unavailable: "غير متوفر",
       driver: "السائق",
+      driverPhone: "هاتف السائق",
       trackDriver: "فتح السائق على الخريطة",
       driverWaiting: "لم يتم مشاركة موقع السائق بعد",
-      chatTitle: "الدردشة مع السوق",
-      chatPlaceholder: "اكتب رسالة للسوق...",
+      voiceCall: "مكالمة صوتية",
+      videoCall: "مكالمة فيديو",
+      chatTitle: "الدردشة مع السائق",
+      chatPlaceholder: "اكتب رسالة للسائق...",
+      chatDisabled: "تم إغلاق الطلب — الدردشة والمكالمات معطلة",
+      chatWaiting: "تفتح الدردشة عند تعيين سائق",
       send: "إرسال",
       market: "السوق",
       unknown: "غير معروف",
@@ -179,27 +199,37 @@
     const driver = order.driver || {};
     const loc = order.driverLocation;
     const normalized = normalizeOrderStatus(order.status);
+    const closed = isOrderClosed(order.status);
+    const commActive = isOrderCommunicationActive(order);
     let track = "<div>" + escapeHtml(t("driverWaiting")) + "</div>";
     if (loc && loc.lat != null && loc.lng != null) {
       const url = "https://www.google.com/maps?q=" + encodeURIComponent(loc.lat) + "," + encodeURIComponent(loc.lng);
       track = '<a href="' + url + '" target="_blank" rel="noopener">' + escapeHtml(t("trackDriver")) + "</a>";
     }
+    const phoneDisplay = driver.phone ? escapeHtml(driver.phone) : escapeHtml(t("unknown"));
+    const telHref = formatTelHref(driver.phone);
+    let callRow = "";
+    if (commActive && telHref) {
+      callRow =
+        '<div class="call-row">' +
+        '<a class="btn-call" href="' + escapeHtml(telHref) + '">' + escapeHtml(t("voiceCall")) + "</a>" +
+        '<button class="btn-video" type="button" data-order-action="video-call" data-order-id="' +
+        escapeHtml(order.id) + '">' + escapeHtml(t("videoCall")) + "</button></div>";
+    }
     return (
       '<div class="driver-box">' +
-      "<strong>" + escapeHtml(t("driver")) + "</strong>" +
-      (driver.name ? escapeHtml(driver.name) + "<br>" : "") +
-      '<span class="status-badge ' + statusClass(normalized) + '">' + escapeHtml(statusLabel(order.status)) + "</span><br>" +
-      track +
+      "<strong>" + escapeHtml(t("driver")) + ":</strong> " +
+      escapeHtml(driver.name || t("unknown")) + "<br>" +
+      '<span class="driver-phone">' + escapeHtml(t("driverPhone")) + ": " + phoneDisplay + "</span><br>" +
+      '<span class="status-badge ' + statusClass(closed ? "closed" : normalized) + '">' +
+        escapeHtml(statusLabel(order.status)) + "</span><br>" +
+      track + callRow +
       "</div>"
     );
   }
 
   function feedbackHtml(order) {
-    if (isOrderClosed(order.status)) {
-      return '<div class="feedback-box feedback-closed">' + escapeHtml(t("orderClosed")) + "</div>";
-    }
-    const normalized = normalizeOrderStatus(order.status);
-    if (normalized !== "arrived") return "";
+    if (!isOrderClosed(order.status)) return "";
     if (order.feedbackSubmitted) {
       return '<div class="feedback-box feedback-thanks">' + escapeHtml(t("feedbackThanks")) + "</div>";
     }
@@ -214,11 +244,46 @@
     );
   }
 
+  function chatRoleClass(role) {
+    if (role === "driver") return "driver";
+    if (role === "market") return "market";
+    return "customer";
+  }
+
+  function chatPanelHtml(order) {
+    const closed = isOrderClosed(order.status);
+    const commActive = isOrderCommunicationActive(order);
+    if (closed) {
+      return (
+        '<div class="chat-panel chat-disabled">' +
+        '<div class="order-date" style="padding:10px;">' + escapeHtml(t("chatDisabled")) + "</div>" +
+        '<div class="chat-messages" id="chat-messages-' + escapeHtml(order.id) + '"></div></div>'
+      );
+    }
+    if (!commActive) {
+      return (
+        '<div class="chat-panel chat-disabled">' +
+        '<div class="order-date" style="padding:10px;">' + escapeHtml(t("chatWaiting")) + "</div></div>"
+      );
+    }
+    return (
+      '<div class="chat-panel">' +
+      '<div class="order-date" style="padding:10px 10px 0;">' + escapeHtml(t("chatTitle")) + "</div>" +
+      '<div class="chat-messages" id="chat-messages-' + escapeHtml(order.id) + '"></div>' +
+      '<div class="chat-compose">' +
+      '<input class="chat-input" id="chat-input-' + escapeHtml(order.id) + '" placeholder="' +
+        escapeHtml(t("chatPlaceholder")) + '" />' +
+      '<button class="btn-send" type="button" data-order-action="send-chat" data-order-id="' +
+        escapeHtml(order.id) + '">' + escapeHtml(t("send")) + "</button>" +
+      "</div></div>"
+    );
+  }
+
   function renderChatMessages(orderId, messages) {
     const root = document.getElementById("chat-messages-" + orderId);
     if (!root) return;
     root.innerHTML = messages.map(function (msg) {
-      const role = msg.senderRole === "market" ? "market" : "customer";
+      const role = chatRoleClass(msg.senderRole);
       return (
         '<div class="chat-msg ' + role + '">' +
         '<div class="chat-msg-meta">' + escapeHtml(msg.senderName || t("unknown")) + " · " +
@@ -229,9 +294,11 @@
     root.scrollTop = root.scrollHeight;
   }
 
-  function bindChatListener(orderId) {
+  function bindChatListener(order) {
+    const orderId = order.id;
     if (chatUnsubscribers.has(orderId)) return;
-    const unsub = db.collection("orderChats").doc(orderId).collection("messages")
+    if (!isOrderCommunicationActive(order) && !isOrderClosed(order.status)) return;
+    const unsub = orderChatCollection(db, orderId)
       .orderBy("createdAt", "asc")
       .onSnapshot(function (snapshot) {
         const messages = snapshot.docs.map(function (entry) {
@@ -252,10 +319,12 @@
   }
 
   function sendChatMessage(orderId) {
+    const order = currentOrders.find(function (entry) { return entry.id === orderId; });
+    if (!order || !isOrderCommunicationActive(order)) return;
     const input = document.getElementById("chat-input-" + orderId);
     const text = String(input && input.value || "").trim();
     if (!text) return;
-    db.collection("orderChats").doc(orderId).collection("messages").add({
+    orderChatCollection(db, orderId).add({
       senderId: userUid,
       senderRole: "customer",
       senderName: userName || t("unknown"),
@@ -266,6 +335,13 @@
     }).catch(function (error) {
       console.error("Chat send failed", error);
     });
+  }
+
+  function startVideoCall(orderId) {
+    const order = currentOrders.find(function (entry) { return entry.id === orderId; });
+    if (!order || !isOrderCommunicationActive(order)) return;
+    const url = getVideoCallUrl(orderId, userName || "Customer");
+    window.open(url, "marketfiyati-video-" + orderId, "noopener,noreferrer,width=960,height=640");
   }
 
   function submitFeedback(orderId) {
@@ -332,7 +408,7 @@
       }).join("");
 
       const normalizedStatus = normalizeOrderStatus(order.status);
-      const showDriver = normalizedStatus !== "waiting" || !!(order.driver && (order.driver.name || order.driver.phone));
+      const showDriver = hasAssignedDriver(order) || normalizedStatus !== "waiting";
       const orderNo = orderNumberDisplay(order);
 
       return (
@@ -350,21 +426,18 @@
         '<div class="order-items">' + itemsHtml + "</div>" +
         renderTrack(order.status) +
         (showDriver ? driverHtml(order) : "") +
+        chatPanelHtml(order) +
         feedbackHtml(order) +
-        '<div class="chat-panel">' +
-        '<div class="order-date" style="padding:10px 10px 0;">' + escapeHtml(t("chatTitle")) + "</div>" +
-        '<div class="chat-messages" id="chat-messages-' + escapeHtml(order.id) + '"></div>' +
-        '<div class="chat-compose">' +
-        '<input class="chat-input" id="chat-input-' + escapeHtml(order.id) + '" placeholder="' +
-          escapeHtml(t("chatPlaceholder")) + '" />' +
-        '<button class="btn-send" type="button" data-order-action="send-chat" data-order-id="' +
-          escapeHtml(order.id) + '">' + escapeHtml(t("send")) + "</button>" +
-        "</div></div></div>"
+        "</div>"
       );
     }).join("");
 
     clearChatListeners(activeIds);
-    orders.forEach(function (order) { bindChatListener(order.id); });
+    orders.forEach(function (order) {
+      if (isOrderCommunicationActive(order) || isOrderClosed(order.status)) {
+        bindChatListener(order);
+      }
+    });
   }
 
   function bindEvents() {
@@ -382,6 +455,8 @@
         sendChatMessage(button.dataset.orderId || "");
       } else if (button.dataset.orderAction === "submit-feedback") {
         submitFeedback(button.dataset.orderId || "");
+      } else if (button.dataset.orderAction === "video-call") {
+        startVideoCall(button.dataset.orderId || "");
       }
     });
 

@@ -18,6 +18,12 @@
   const orderMatchesMarket = OL.orderMatchesMarket || function () { return true; };
   const orderAssignedToDriver = OL.orderAssignedToDriver || function () { return true; };
   const isOrderClosed = OL.isOrderClosed || function () { return false; };
+  const isOrderCommunicationActive = OL.isOrderCommunicationActive || function () { return false; };
+  const formatTelHref = OL.formatTelHref || function () { return ""; };
+  const getVideoCallUrl = OL.getVideoCallUrl || function () { return ""; };
+  const orderChatCollection = OL.orderChatCollection || function (db, id) {
+    return db.collection("orderChats").doc(id).collection("messages");
+  };
   const writeOrderInboxNotifications = OL.writeOrderInboxNotifications || function () { return Promise.resolve(); };
   const groupItemsByCategory = OL.groupItemsByCategory || function (items) {
     return [{ category: "General", entries: (items || []).map(function (item, index) { return { item: item, index: index }; }) }];
@@ -58,6 +64,7 @@
       waiting: "Siparis hazirlaniyor",
       onTheWay: "Yolda",
       arrived: "Teslim edildi",
+      driver: "Surucu",
       updateStatus: "Durumu guncelle",
       startTracking: "Canli takibi baslat",
       stopTracking: "Takibi durdur",
@@ -71,6 +78,12 @@
       closeOrder: "Siparisi kapat",
       closed: "Siparis kapatildi",
       orderClosed: "Siparis tamamlandi ve kapatildi",
+      chatTitle: "Musteri ile sohbet",
+      chatPlaceholder: "Musteriye mesaj yazin...",
+      send: "Gonder",
+      voiceCall: "Musteriyi ara",
+      videoCall: "Goruntulu ara",
+      chatDisabled: "Siparis kapandi",
     },
     en: {
       pageTitle: "Driver tracking",
@@ -101,6 +114,7 @@
       waiting: "Waiting / preparing",
       onTheWay: "On the way",
       arrived: "Arrived",
+      driver: "Driver",
       updateStatus: "Update status",
       startTracking: "Start live tracking",
       stopTracking: "Stop tracking",
@@ -114,6 +128,12 @@
       closeOrder: "Close order",
       closed: "Order closed",
       orderClosed: "Order completed and closed",
+      chatTitle: "Chat with customer",
+      chatPlaceholder: "Message the customer...",
+      send: "Send",
+      voiceCall: "Call customer",
+      videoCall: "Video call",
+      chatDisabled: "Order closed",
     },
     ar: {
       pageTitle: "تتبع السائق",
@@ -144,6 +164,7 @@
       waiting: "قيد التحضير",
       onTheWay: "في الطريق",
       arrived: "تم التسليم",
+      driver: "السائق",
       updateStatus: "تحديث الحالة",
       startTracking: "بدء التتبع المباشر",
       stopTracking: "إيقاف التتبع",
@@ -157,6 +178,12 @@
       closeOrder: "إغلاق الطلب",
       closed: "تم إغلاق الطلب",
       orderClosed: "اكتمل الطلب وأُغلق",
+      chatTitle: "الدردشة مع العميل",
+      chatPlaceholder: "اكتب رسالة للعميل...",
+      send: "إرسال",
+      voiceCall: "اتصل بالعميل",
+      videoCall: "مكالمة فيديو",
+      chatDisabled: "تم إغلاق الطلب",
     },
   };
 
@@ -170,6 +197,8 @@
   let allMarketOrders = [];
   let activeOrderId = "";
   let geoWatchId = null;
+  let chatUnsub = null;
+  let driverDisplayName = "";
 
   function showBootError(message) {
     const help = document.getElementById("pageHelp");
@@ -248,7 +277,107 @@
     document.getElementById("updateStatusBtn").textContent = t("updateStatus");
     const closeBtn = document.getElementById("closeOrderBtn");
     if (closeBtn) closeBtn.textContent = t("closeOrder");
+    const chatTitle = document.getElementById("driverChatTitle");
+    if (chatTitle) chatTitle.textContent = t("chatTitle");
+    const chatInput = document.getElementById("driverChatInput");
+    if (chatInput) chatInput.placeholder = t("chatPlaceholder");
+    const chatSend = document.getElementById("driverChatSend");
+    if (chatSend) chatSend.textContent = t("send");
     document.title = t("pageTitle");
+  }
+
+  function clearDriverChatListener() {
+    if (chatUnsub) {
+      chatUnsub();
+      chatUnsub = null;
+    }
+  }
+
+  function renderDriverChatMessages(messages) {
+    const root = document.getElementById("driverChatMessages");
+    if (!root) return;
+    root.innerHTML = messages.map(function (msg) {
+      const role = msg.senderRole === "driver" ? "driver" : "customer";
+      return (
+        '<div class="chat-msg ' + role + '">' +
+        '<div class="chat-msg-meta">' + escapeHtml(msg.senderName || t("unknown")) + " · " +
+        escapeHtml(formatDate(msg.createdAt)) + "</div>" +
+        "<div>" + escapeHtml(msg.text || "") + "</div></div>"
+      );
+    }).join("");
+    root.scrollTop = root.scrollHeight;
+  }
+
+  function bindDriverChatListener(order) {
+    clearDriverChatListener();
+    if (!order || !order.id) return;
+    if (!isOrderCommunicationActive(order) && !isOrderClosed(order.status)) return;
+    chatUnsub = orderChatCollection(db, order.id)
+      .orderBy("createdAt", "asc")
+      .onSnapshot(function (snapshot) {
+        renderDriverChatMessages(snapshot.docs.map(function (entry) {
+          return Object.assign({ id: entry.id }, entry.data());
+        }));
+      });
+  }
+
+  function renderDriverCommunication(order) {
+    const callRow = document.getElementById("driverCallRow");
+    const chatPanel = document.getElementById("driverChatPanel");
+    const chatCompose = chatPanel && chatPanel.querySelector(".chat-compose");
+    if (!callRow || !chatPanel) return;
+
+    if (!order || isOrderClosed(order.status)) {
+      callRow.hidden = true;
+      chatPanel.hidden = false;
+      chatPanel.classList.add("chat-disabled");
+      if (chatCompose) chatCompose.style.display = "none";
+      const chatTitle = document.getElementById("driverChatTitle");
+      if (chatTitle) chatTitle.textContent = t("chatDisabled");
+      bindDriverChatListener(order);
+      return;
+    }
+
+    const commActive = isOrderCommunicationActive(order);
+    callRow.hidden = !commActive;
+    chatPanel.hidden = !commActive && !isOrderClosed(order.status);
+    chatPanel.classList.toggle("chat-disabled", !commActive);
+    if (chatCompose) chatCompose.style.display = commActive ? "" : "none";
+
+    if (commActive) {
+      const telHref = formatTelHref(order.userPhone);
+      callRow.innerHTML =
+        (telHref ? '<a class="btn-call" href="' + escapeHtml(telHref) + '">' + escapeHtml(t("voiceCall")) + "</a>" : "") +
+        '<button class="btn-video" type="button" id="driverVideoCallBtn">' + escapeHtml(t("videoCall")) + "</button>";
+      const videoBtn = document.getElementById("driverVideoCallBtn");
+      if (videoBtn) {
+        videoBtn.onclick = function () {
+          window.open(getVideoCallUrl(order.id, driverDisplayName || "Driver"), "marketfiyati-video-" + order.id, "noopener,noreferrer,width=960,height=640");
+        };
+      }
+      bindDriverChatListener(order);
+    } else {
+      clearDriverChatListener();
+    }
+  }
+
+  function sendDriverChatMessage() {
+    const order = currentOrders.find(function (entry) { return entry.id === activeOrderId; });
+    if (!order || !isOrderCommunicationActive(order)) return;
+    const input = document.getElementById("driverChatInput");
+    const text = String(input && input.value || "").trim();
+    if (!text) return;
+    orderChatCollection(db, activeOrderId).add({
+      senderId: driverPhone || "driver",
+      senderRole: "driver",
+      senderName: driverDisplayName || t("driver"),
+      text: text,
+      createdAt: new Date().toISOString(),
+    }).then(function () {
+      if (input) input.value = "";
+    }).catch(function (error) {
+      console.error("Driver chat send failed", error);
+    });
   }
 
   function renderLocationBox(order) {
@@ -343,11 +472,13 @@
     document.getElementById("activeOrderItems").innerHTML = itemsHtml;
     document.getElementById("driverStatusSelect").innerHTML = statusOptions;
     renderLocationBox(order);
+    driverDisplayName = (order.driver && order.driver.name) || t("driver");
     const closeBtn = document.getElementById("closeOrderBtn");
     if (closeBtn) {
       const arrived = normalizeOrderStatus(order.status) === "arrived";
       closeBtn.hidden = !arrived || isOrderClosed(order.status);
     }
+    renderDriverCommunication(order);
   }
 
   function renderOrders(orders) {
@@ -363,6 +494,7 @@
       root.innerHTML = '<p class="empty-msg">' + escapeHtml(t("noOrders")) + "</p>";
       document.getElementById("activeOrderCard").hidden = true;
       activeOrderId = "";
+      clearDriverChatListener();
       return;
     }
 
@@ -466,6 +598,10 @@
     if (!activeOrderId) return;
     const order = currentOrders.find(function (entry) { return entry.id === activeOrderId; });
     if (!order) return;
+    if (normalizeOrderStatus(order.status) !== "arrived") {
+      alert(t("updateStatus"));
+      return;
+    }
     const now = new Date().toISOString();
     const orderId = activeOrderId;
     db.collection("orders").doc(orderId).update({
@@ -486,6 +622,7 @@
     }).then(function () {
       activeOrderId = "";
       stopTracking();
+      clearDriverChatListener();
       alert(t("closed"));
       renderOrders(allMarketOrders);
     }).catch(function (error) {
@@ -498,6 +635,13 @@
   document.getElementById("stopTrackingBtn").addEventListener("click", stopTracking);
   document.getElementById("updateStatusBtn").addEventListener("click", updateDriverStatus);
   document.getElementById("closeOrderBtn").addEventListener("click", closeOrder);
+  document.getElementById("driverChatSend").addEventListener("click", sendDriverChatMessage);
+  document.getElementById("driverChatInput").addEventListener("keydown", function (event) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      sendDriverChatMessage();
+    }
+  });
 
   document.body.addEventListener("click", function (event) {
     const button = event.target.closest("[data-driver-action]");

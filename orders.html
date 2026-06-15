@@ -85,6 +85,18 @@
     }
     .feedback-thanks { color: #166534; font-weight: 600; }
     .feedback-closed { color: #475569; font-weight: 600; }
+    .call-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .btn-call, .btn-video {
+      padding: 8px 14px; border: none; border-radius: 8px; font: inherit; font-weight: 700;
+      cursor: pointer; text-decoration: none; display: inline-block;
+    }
+    .btn-call { background: #16a34a; color: #fff; }
+    .btn-video { background: #7c3aed; color: #fff; }
+    .btn-call:disabled, .btn-video:disabled { opacity: .45; cursor: not-allowed; }
+    .chat-msg.driver { background: #fef3c7; color: #92400e; justify-self: start; }
+    .chat-disabled { opacity: .65; }
+    .chat-disabled .chat-compose { display: none; }
+    .driver-phone { font-size: 14px; color: #334155; margin-top: 4px; }
   </style>
 </head>
 <body>

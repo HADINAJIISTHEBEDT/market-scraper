@@ -84,6 +84,7 @@
     .chat-msg { margin-bottom: 8px; padding: 8px 10px; border-radius: 10px; font-size: 13px; max-width: 90%; }
     .chat-msg.customer { background: #dbeafe; margin-right: auto; }
     .chat-msg.market { background: #dcfce7; margin-left: auto; }
+    .chat-msg.driver { background: #fef3c7; margin-right: auto; }
     .chat-msg-meta { font-size: 11px; color: #64748b; margin-bottom: 4px; }
     .market-stat { border-left: 4px solid #2563eb; }
   </style>
@@ -217,6 +218,13 @@
       </label>
       <h3 id="marketOrdersTitle" style="margin-top:18px;">Market orders</h3>
       <div id="marketOrdersList"></div>
+      <h3 id="adminDriversTitle" style="margin-top:24px;">Market drivers</h3>
+      <p class="help" id="adminDriversHelp">Manage saved drivers per market.</p>
+      <label>
+        <span id="adminDriverMarketLabel">Market</span>
+        <select id="adminDriverMarketSelect" class="status-select"></select>
+      </label>
+      <div id="adminDriversPanel"></div>
     </section>
 
     <section class="panel-section" id="panel-inbox">
@@ -261,7 +269,7 @@
       throw new Error("Missing global config");
     }
 
-    const { ORDER_STATUSES, normalizeOrderStatus, orderNumberDisplay } = window.OrderLifecycle;
+    const { ORDER_STATUSES, normalizeOrderStatus, orderNumberDisplay, isOrderClosed, normalizePhone, hasAssignedDriver } = window.OrderLifecycle;
     const { MARKETS, orderMatchesMarket, getMarketLabel } = window.MarketsConfig;
 
     const firebaseConfig = window.FIREBASE_CONFIG;
@@ -279,7 +287,8 @@
         saveSettings: "Ayarlari kaydet", saving: "Kaydediliyor...", saveFailed: "Firebase'e kaydedilemedi", homepageTitle: "Ana sayfa kartlari", homepageHelp: "Ana sayfada gorunen kategori kartlarini ekleyin, duzenleyin veya kaldirin.",
         addTileTitle: "Kart ekle", tileLabel: "Etiket", tileImage: "Gorsel URL", addTile: "Kart ekle", saveHomepage: "Ana sayfayi kaydet",
         allOrders: "Tum siparisler", loading: "Yukleniyor...", noOrders: "Henuz siparis yok.", noUsers: "Henuz kullanici yok.", noTiles: "Henuz kart yok.",
-        waiting: "Siparis hazirlaniyor", onTheWay: "Yolda", arrived: "Teslim edildi", orderNumber: "Siparis no", unknown: "Bilinmiyor",
+        waiting: "Siparis hazirlaniyor", onTheWay: "Yolda", arrived: "Teslim edildi", orderClosed: "Siparis kapatildi", orderNumber: "Siparis no", unknown: "Bilinmiyor",
+        driver: "Surucu", reassignDriver: "Surucu ata", chatHistory: "Sohbet gecmisi", savedDrivers: "Kayitli suruculer", addDriver: "Surucu ekle", driverName: "Surucu adi", driverPhone: "Surucu telefonu",
         updateStatus: "Durumu guncelle", delete: "Sil", saveUser: "Kullaniciyi kaydet", updated: "Guncellendi",
         saved: "Kaydedildi", removed: "Silindi", id: "ID", role: "Rol", name: "Ad", phone: "Telefon", address: "Adres", email: "E-posta",
         deleteRequestsTitle: "Hesap silme istekleri", noDeleteRequests: "Henuz silme istegi yok.", requestedAt: "Istek tarihi", markRequestDone: "Tamamlandi olarak isaretle",
@@ -304,7 +313,8 @@
         saveSettings: "Save settings", saving: "Saving...", saveFailed: "Could not save to Firebase", homepageTitle: "Homepage tiles", homepageHelp: "Add, edit, or remove category tiles shown on the homepage.",
         addTileTitle: "Add tile", tileLabel: "Label", tileImage: "Image URL", addTile: "Add tile", saveHomepage: "Save homepage",
         allOrders: "All orders", loading: "Loading...", noOrders: "No orders yet.", noUsers: "No users yet.", noTiles: "No tiles yet.",
-        waiting: "Waiting / preparing", onTheWay: "On the way", arrived: "Arrived", orderNumber: "Order no", unknown: "Unknown",
+        waiting: "Waiting / preparing", onTheWay: "On the way", arrived: "Arrived", orderClosed: "Order closed", orderNumber: "Order no", unknown: "Unknown",
+        driver: "Driver", reassignDriver: "Assign driver", chatHistory: "Chat history", savedDrivers: "Saved drivers", addDriver: "Add driver", driverName: "Driver name", driverPhone: "Driver phone",
         updateStatus: "Update status", delete: "Delete", saveUser: "Save user", updated: "Updated",
         saved: "Saved", removed: "Removed", id: "ID", role: "Role", name: "Name", phone: "Phone", address: "Address", email: "Email",
         deleteRequestsTitle: "Account delete requests", noDeleteRequests: "No delete requests yet.", requestedAt: "Requested at", markRequestDone: "Mark request done",
@@ -329,7 +339,8 @@
         saveSettings: "حفظ الإعدادات", saving: "جار الحفظ...", saveFailed: "تعذر الحفظ في Firebase", homepageTitle: "بطاقات الصفحة الرئيسية", homepageHelp: "أضف أو عدّل أو احذف بطاقات الفئات في الصفحة الرئيسية.",
         addTileTitle: "إضافة بطاقة", tileLabel: "التسمية", tileImage: "رابط الصورة", addTile: "إضافة بطاقة", saveHomepage: "حفظ الصفحة الرئيسية",
         allOrders: "كل الطلبات", loading: "جار التحميل...", noOrders: "لا توجد طلبات بعد.", noUsers: "لا يوجد مستخدمون بعد.", noTiles: "لا توجد بطاقات بعد.",
-        waiting: "قيد التحضير", onTheWay: "في الطريق", arrived: "تم التسليم", orderNumber: "رقم الطلب", unknown: "غير معروف",
+        waiting: "قيد التحضير", onTheWay: "في الطريق", arrived: "تم التسليم", orderClosed: "تم إغلاق الطلب", orderNumber: "رقم الطلب", unknown: "غير معروف",
+        driver: "السائق", reassignDriver: "تعيين السائق", chatHistory: "سجل الدردشة", savedDrivers: "السائقون المحفوظون", addDriver: "إضافة سائق", driverName: "اسم السائق", driverPhone: "هاتف السائق",
         updateStatus: "تحديث الحالة", delete: "حذف", saveUser: "حفظ المستخدم", updated: "تم التحديث",
         saved: "تم الحفظ", removed: "تم الحذف", id: "المعرف", role: "الدور", name: "الاسم", phone: "الهاتف", address: "العنوان", email: "البريد الإلكتروني",
         deleteRequestsTitle: "طلبات حذف الحساب", noDeleteRequests: "لا توجد طلبات حذف بعد.", requestedAt: "تاريخ الطلب", markRequestDone: "وضع علامة مكتمل",
@@ -362,7 +373,10 @@
     let currentInboxMessages = [];
     const recentlyDeletedUserIds = new Set();
     let currentMarketFilter = "all";
+    let currentAdminDriverMarket = MARKETS[0]?.key || "bim";
+    let adminMarketDrivers = [];
     const marketChatUnsubs = new Map();
+    const adminOrderChatUnsubs = new Map();
     let currentTiles = [];
     let currentSettings = {
       featuresUnlocked: false,
@@ -484,6 +498,7 @@
     }
 
     function statusLabel(status) {
+      if (isOrderClosed(status)) return t("orderClosed");
       const normalized = normalizeOrderStatus(status);
       return {
         waiting: t("waiting"),
@@ -508,7 +523,8 @@
         saveSettingsBtn: "saveSettings", homepageTitle: "homepageTitle", homepageHelp: "homepageHelp", addTileTitle: "addTileTitle",
         tileLabelLabel: "tileLabel", tileImageLabel: "tileImage", addTileBtn: "addTile", saveTilesBtn: "saveHomepage",
         ordersTitle: "allOrders", usersTitle: "users", deleteRequestsTitle: "deleteRequestsTitle", inboxTitle: "inboxTitle", inboxHelp: "inboxHelp",
-        tabMarkets: "tabMarkets", marketsTitle: "marketsTitle", marketsHelp: "marketsHelp", marketFilterLabel: "marketFilterLabel", marketOrdersTitle: "marketOrdersTitle"
+        tabMarkets: "tabMarkets", marketsTitle: "marketsTitle", marketsHelp: "marketsHelp", marketFilterLabel: "marketFilterLabel", marketOrdersTitle: "marketOrdersTitle",
+        adminDriversTitle: "savedDrivers", adminDriversHelp: "marketsHelp", adminDriverMarketLabel: "marketFilterLabel"
       };
       Object.entries(textIds).forEach(([id, key]) => {
         const el = document.getElementById(id);
@@ -879,7 +895,7 @@
         return;
       }
       root.innerHTML = messages.map((msg) => {
-        const role = msg.senderRole === "market" ? "market" : "customer";
+        const role = msg.senderRole === "driver" ? "driver" : msg.senderRole === "market" ? "market" : "customer";
         return `
           <div class="chat-msg ${role}">
             <div class="chat-msg-meta">${escapeHtml(msg.senderName || t("unknown"))} · ${escapeHtml(formatDate(msg.createdAt))}</div>
@@ -967,10 +983,12 @@
             </div>
           `;
         }).join("");
-        const driver = order.driver || order.driverLocation || {};
-        const driverText = driver.location
-          ? `${Number(driver.location.lat || 0).toFixed(4)}, ${Number(driver.location.lng || 0).toFixed(4)}`
-          : driver.name || t("unknown");
+        const driver = order.driver || {};
+        const driverText = driver.name
+          ? `${driver.name}${driver.phone ? " · " + driver.phone : ""}`
+          : (order.driverLocation && order.driverLocation.lat != null
+            ? `${Number(order.driverLocation.lat).toFixed(4)}, ${Number(order.driverLocation.lng).toFixed(4)}`
+            : t("unknown"));
         const orderNo = orderNumberDisplay(order);
         return `
           <div class="card">
@@ -980,7 +998,7 @@
                 <div class="card-meta">${orderNo ? `${escapeHtml(t("orderNumber"))}: ${escapeHtml(orderNo)} · ` : ""}${escapeHtml(formatDate(order.createdAt))} · ${escapeHtml(statusLabel(order.status))}</div>
                 <div class="card-meta">${escapeHtml(order.userPhone || "")} · ${escapeHtml(order.userAddress || "")}</div>
                 <div class="card-meta">${escapeHtml(formatPaymentSummary(order))}</div>
-                <div class="card-meta">${escapeHtml(t("onTheWay"))}: ${escapeHtml(driverText)}</div>
+                <div class="card-meta">${escapeHtml(t("driver"))}: ${escapeHtml(driverText)}</div>
               </div>
               <div class="card-title">${formatPrice(order.totalPrice)}</div>
             </div>
@@ -994,17 +1012,113 @@
       activeIds.forEach((orderId) => bindAdminMarketChat(orderId));
     }
 
+    function bindAdminOrderChat(orderId) {
+      if (adminOrderChatUnsubs.has(orderId)) return;
+      const q = query(
+        collection(db, "orderChats", orderId, "messages"),
+        orderBy("createdAt", "asc")
+      );
+      const unsub = onSnapshot(q, (snapshot) => {
+        renderAdminChatMessages(orderId, snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() })));
+      });
+      adminOrderChatUnsubs.set(orderId, unsub);
+    }
+
+    function clearAdminOrderChats(activeOrderIds) {
+      for (const [orderId, unsub] of adminOrderChatUnsubs.entries()) {
+        if (!activeOrderIds.has(orderId)) {
+          unsub();
+          adminOrderChatUnsubs.delete(orderId);
+        }
+      }
+    }
+
+    async function loadAdminMarketDrivers(marketId) {
+      currentAdminDriverMarket = marketId || currentAdminDriverMarket;
+      try {
+        const snap = await getDoc(doc(db, "marketDrivers", currentAdminDriverMarket));
+        adminMarketDrivers = snap.exists() && Array.isArray(snap.data().drivers) ? snap.data().drivers : [];
+      } catch (error) {
+        console.warn("Admin market drivers load failed", error);
+        adminMarketDrivers = [];
+      }
+      renderAdminDriversPanel();
+    }
+
+    function renderAdminDriversPanel() {
+      const root = document.getElementById("adminDriversPanel");
+      const select = document.getElementById("adminDriverMarketSelect");
+      if (!root || !select) return;
+      if (!select.dataset.ready) {
+        select.dataset.ready = "1";
+        select.innerHTML = MARKETS.map((market) =>
+          `<option value="${escapeHtml(market.key)}">${escapeHtml(market.label)}</option>`
+        ).join("");
+        select.value = currentAdminDriverMarket;
+        select.addEventListener("change", (event) => {
+          loadAdminMarketDrivers(String(event.target.value || MARKETS[0].key));
+        });
+      }
+      const rows = adminMarketDrivers.map((driver) =>
+        `<div class="order-item-row"><span>${escapeHtml(driver.name || t("unknown"))} · ${escapeHtml(driver.phone || "")}</span></div>`
+      ).join("");
+      root.innerHTML = `
+        <div class="card" style="margin-top:12px;">
+          <div class="card-title">${escapeHtml(t("savedDrivers"))} · ${escapeHtml(getMarketLabel(currentAdminDriverMarket))}</div>
+          ${rows || `<p class="empty-msg">${escapeHtml(t("unknown"))}</p>`}
+          <div class="form-grid" style="margin-top:12px;">
+            <input class="field-input" id="adminNewDriverName" placeholder="${escapeHtml(t("driverName"))}" />
+            <input class="field-input" id="adminNewDriverPhone" placeholder="${escapeHtml(t("driverPhone"))}" />
+            <button class="btn-primary" type="button" data-admin-action="add-market-driver">${escapeHtml(t("addDriver"))}</button>
+          </div>
+        </div>
+      `;
+    }
+
+    async function addAdminMarketDriver() {
+      const name = document.getElementById("adminNewDriverName")?.value.trim() || "";
+      const phoneRaw = document.getElementById("adminNewDriverPhone")?.value.trim() || "";
+      const phone = normalizePhone(phoneRaw) || phoneRaw;
+      if (!name || !phone) return;
+      adminMarketDrivers.push({ id: "drv_" + Date.now().toString(36), name, phone });
+      await setDoc(doc(db, "marketDrivers", currentAdminDriverMarket), {
+        marketId: currentAdminDriverMarket,
+        drivers: adminMarketDrivers,
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
+      renderAdminDriversPanel();
+      showToast(t("updated"));
+    }
+
+    async function reassignOrderDriver(orderId) {
+      const name = document.getElementById(`admin-driver-name-${orderId}`)?.value.trim() || "";
+      const phoneRaw = document.getElementById(`admin-driver-phone-${orderId}`)?.value.trim() || "";
+      const phone = normalizePhone(phoneRaw) || phoneRaw;
+      if (!name || !phone) return;
+      await updateDoc(doc(db, "orders", orderId), {
+        status: "on-the-way",
+        driver: { name, phone },
+        driverAssignedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      showToast(t("updated"));
+    }
+
     function renderOrders(orders) {
       currentOrders = orders;
       updateStats(orders, currentUsers);
       renderMarketsOverview(orders);
+      loadAdminMarketDrivers(currentAdminDriverMarket);
       const root = document.getElementById("ordersList");
       document.getElementById("ordersLoading").style.display = "none";
       if (!orders.length) {
         root.innerHTML = `<p class="empty-msg">${escapeHtml(t("noOrders"))}</p>`;
+        clearAdminOrderChats(new Set());
         return;
       }
-      root.innerHTML = orders.map((order) => {
+      const sorted = orders.slice().sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+      const activeIds = new Set(sorted.slice(0, 40).map((order) => order.id));
+      root.innerHTML = sorted.slice(0, 40).map((order) => {
         const items = Array.isArray(order.items) ? order.items : [];
         const itemsHtml = items.map((item) => `
           <div class="order-item-row">
@@ -1014,15 +1128,20 @@
         `).join("");
         const orderNo = orderNumberDisplay(order);
         const currentStatus = normalizeOrderStatus(order.status);
-        const statusOptions = STATUSES.map((status) =>
-          `<option value="${status}" ${currentStatus === status ? "selected" : ""}>${escapeHtml(statusLabel(status))}</option>`
+        const closed = isOrderClosed(order.status);
+        const statusOptions = [...STATUSES, ...(closed ? ["closed"] : [])].map((status) =>
+          `<option value="${status}" ${(closed ? status === "closed" : currentStatus === status) ? "selected" : ""}>${escapeHtml(statusLabel(status))}</option>`
         ).join("");
+        const driver = order.driver || {};
         return `
           <div class="card">
             <div class="card-header">
               <div>
                 <div class="card-title">${escapeHtml(order.userName || t("unknown"))}${orderNo ? ` · ${escapeHtml(orderNo)}` : ""}</div>
-                <div class="card-meta">${orderNo ? `${escapeHtml(t("orderNumber"))}: ${escapeHtml(orderNo)} · ` : ""}${escapeHtml(formatDate(order.createdAt))} · ${escapeHtml(t("id"))}: ${escapeHtml(String(order.id).slice(0, 8))}</div>
+                <div class="card-meta">${orderNo ? `${escapeHtml(t("orderNumber"))}: ${escapeHtml(orderNo)} · ` : ""}${escapeHtml(formatDate(order.createdAt))} · ${escapeHtml(getMarketLabel(order.marketId || order.marketName))}</div>
+                <div class="card-meta">${escapeHtml(t("phone"))}: ${escapeHtml(order.userPhone || t("unknown"))} · ${escapeHtml(order.userAddress || t("unknown"))}</div>
+                <div class="card-meta">${escapeHtml(t("driver"))}: ${escapeHtml(driver.name || t("unknown"))}${driver.phone ? " · " + escapeHtml(driver.phone) : ""}</div>
+                <span class="status-badge status-${closed ? "completed" : currentStatus.replace(/\s+/g, "-")}">${escapeHtml(statusLabel(order.status))}</span>
               </div>
               <div class="card-title">${formatPrice(order.totalPrice)}</div>
             </div>
@@ -1032,9 +1151,19 @@
               <button class="btn-update" type="button" data-admin-action="update-order" data-order-id="${escapeHtml(order.id)}">${escapeHtml(t("updateStatus"))}</button>
               <button class="btn-danger" type="button" data-admin-action="delete-order" data-order-id="${escapeHtml(order.id)}">${escapeHtml(t("delete"))}</button>
             </div>
+            ${closed ? "" : `
+            <div class="form-grid" style="margin-top:10px;">
+              <input class="field-input" id="admin-driver-name-${escapeHtml(order.id)}" placeholder="${escapeHtml(t("driverName"))}" value="${escapeHtml(driver.name || "")}" />
+              <input class="field-input" id="admin-driver-phone-${escapeHtml(order.id)}" placeholder="${escapeHtml(t("driverPhone"))}" value="${escapeHtml(driver.phone || "")}" />
+              <button class="btn-secondary" type="button" data-admin-action="reassign-driver" data-order-id="${escapeHtml(order.id)}">${escapeHtml(t("reassignDriver"))}</button>
+            </div>`}
+            <div class="card-meta" style="margin-top:10px;">${escapeHtml(t("chatHistory"))}</div>
+            <div class="chat-box" id="admin-chat-${escapeHtml(order.id)}"></div>
           </div>
         `;
       }).join("");
+      clearAdminOrderChats(activeIds);
+      activeIds.forEach((orderId) => bindAdminOrderChat(orderId));
     }
 
     window.updateStatus = async function(orderId) {
@@ -1409,6 +1538,8 @@ Pazar Fiyatı Admin`;
           else if (action === "unblock-user") await window.setUserBlocked(userId, false);
           else if (action === "update-order") await window.updateStatus(orderId);
           else if (action === "delete-order") await window.deleteOrder(orderId);
+          else if (action === "reassign-driver") await reassignOrderDriver(orderId);
+          else if (action === "add-market-driver") await addAdminMarketDriver();
         } catch (error) {
           console.error("Admin action failed", action, error);
           showToast(`${t("saveFailed")}: ${error.message}`, true);

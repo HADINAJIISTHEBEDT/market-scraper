@@ -78,6 +78,7 @@ body { max-width: 1100px; margin: 0 auto; padding: 24px; background: #f8fafc; }
 }
 .chat-msg.market { background: #dbeafe; color: #1e3a8a; justify-self: start; }
 .chat-msg.customer { background: #fff; border: 1px solid #e2e8f0; justify-self: end; }
+.chat-msg.driver { background: #fef3c7; color: #92400e; justify-self: start; }
 .chat-msg-meta { font-size: 11px; color: #64748b; margin-bottom: 2px; }
 .chat-compose { display: flex; gap: 8px; padding: 10px; border-top: 1px solid #e5e7eb; }
 .chat-input { flex: 1; }

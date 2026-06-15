@@ -44,6 +44,9 @@
       driverPhone: "Surucu telefonu",
       assignDriver: "Surucu ata ve yola cikar",
       trackDriver: "Surucuyu takip et",
+      savedDrivers: "Kayitli suruculer",
+      addDriver: "Surucu ekle",
+      selectDriver: "Surucu sec",
       chatTitle: "Canli sohbet",
       chatPlaceholder: "Musteriye mesaj yazin...",
       send: "Gonder",
@@ -86,6 +89,9 @@
       driverPhone: "Driver phone",
       assignDriver: "Assign driver & send",
       trackDriver: "Track driver",
+      savedDrivers: "Saved drivers",
+      addDriver: "Add driver",
+      selectDriver: "Select driver",
       chatTitle: "Live chat",
       chatPlaceholder: "Message the customer...",
       send: "Send",
@@ -128,6 +134,9 @@
       driverPhone: "هاتف السائق",
       assignDriver: "تعيين السائق وإرساله",
       trackDriver: "تتبع السائق",
+      savedDrivers: "السائقون المحفوظون",
+      addDriver: "إضافة سائق",
+      selectDriver: "اختر السائق",
       chatTitle: "دردشة مباشرة",
       chatPlaceholder: "اكتب رسالة للعميل...",
       send: "إرسال",
@@ -151,9 +160,16 @@
   const groupItemsByCategory = OL.groupItemsByCategory || function (items) {
     return [{ category: "General", entries: (items || []).map(function (item, index) { return { item: item, index: index }; }) }];
   };
+  const isOrderClosed = OL.isOrderClosed || function () { return false; };
+  const isOrderCommunicationActive = OL.isOrderCommunicationActive || function () { return true; };
+  const orderChatCollection = OL.orderChatCollection || function (db, id) {
+    return db.collection("orderChats").doc(id).collection("messages");
+  };
+  const normalizePhone = OL.normalizePhone || function (v) { return String(v || "").replace(/\D/g, ""); };
   let currentLang = localStorage.getItem("app_lang") || "tr";
   let currentOrders = [];
   let currentInboxEntries = [];
+  let marketDrivers = [];
   const userCache = new Map();
   const chatUnsubscribers = new Map();
 
@@ -310,7 +326,7 @@
       return;
     }
     root.innerHTML = messages.map((msg) => {
-      const role = msg.senderRole === "market" ? "market" : "customer";
+      const role = msg.senderRole === "driver" ? "driver" : msg.senderRole === "market" ? "market" : "customer";
       return `
         <div class="chat-msg ${role}">
           <div class="chat-msg-meta">${escapeHtml(msg.senderName || t("unknown"))} · ${escapeHtml(formatDate(msg.createdAt))}</div>
@@ -321,9 +337,11 @@
     root.scrollTop = root.scrollHeight;
   }
 
-  function bindChatListener(orderId) {
+  function bindChatListener(order) {
+    const orderId = order.id;
     if (chatUnsubscribers.has(orderId)) return;
-    const unsub = db.collection("orderChats").doc(orderId).collection("messages")
+    if (!isOrderCommunicationActive(order) && !isOrderClosed(order.status)) return;
+    const unsub = orderChatCollection(db, orderId)
       .orderBy("createdAt", "asc")
       .onSnapshot((snapshot) => {
         renderChatMessages(orderId, snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() })));
@@ -345,6 +363,74 @@
     if (type === "order_closed") return t("inboxClosed");
     if (type === "order_feedback") return t("inboxFeedback");
     return t("inboxTitle");
+  }
+
+  function driverSelectOptions(selectedId) {
+    const options = [`<option value="">${escapeHtml(t("selectDriver"))}</option>`];
+    marketDrivers.forEach((driver) => {
+      const selected = driver.id === selectedId ? " selected" : "";
+      options.push(`<option value="${escapeHtml(driver.id)}"${selected}>${escapeHtml(driver.name || t("unknown"))} · ${escapeHtml(driver.phone || "")}</option>`);
+    });
+    return options.join("");
+  }
+
+  function renderDriversPanel() {
+    let root = document.getElementById("marketDriversPanel");
+    if (!root) {
+      root = document.createElement("div");
+      root.id = "marketDriversPanel";
+      root.className = "card";
+      const ordersList = document.getElementById("ordersList");
+      if (ordersList && ordersList.parentNode) {
+        ordersList.parentNode.insertBefore(root, ordersList);
+      }
+    }
+    const rows = marketDrivers.map((driver) => (
+      `<div class="order-item-row"><span>${escapeHtml(driver.name || t("unknown"))} · ${escapeHtml(driver.phone || "")}</span></div>`
+    )).join("");
+    root.innerHTML = `
+      <div class="card-title">${escapeHtml(t("savedDrivers"))}</div>
+      ${rows || `<p class="card-meta">${escapeHtml(t("unknown"))}</p>`}
+      <div class="driver-fields" style="margin-top:10px;display:grid;gap:8px;">
+        <input class="field-input" id="newDriverName" placeholder="${escapeHtml(t("driverName"))}" />
+        <input class="field-input" id="newDriverPhone" placeholder="${escapeHtml(t("driverPhone"))}" />
+        <button class="btn-secondary" type="button" data-market-action="add-driver">${escapeHtml(t("addDriver"))}</button>
+      </div>
+    `;
+  }
+
+  async function loadMarketDrivers() {
+    try {
+      const snap = await db.collection("marketDrivers").doc(MARKET_ID).get();
+      marketDrivers = snap.exists && Array.isArray(snap.data().drivers) ? snap.data().drivers : [];
+    } catch (error) {
+      console.warn("Market drivers load failed", error);
+      marketDrivers = [];
+    }
+    renderDriversPanel();
+  }
+
+  async function saveMarketDrivers() {
+    await db.collection("marketDrivers").doc(MARKET_ID).set({
+      marketId: MARKET_ID,
+      drivers: marketDrivers,
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
+    renderDriversPanel();
+  }
+
+  async function addMarketDriver() {
+    const name = document.getElementById("newDriverName")?.value.trim() || "";
+    const phoneRaw = document.getElementById("newDriverPhone")?.value.trim() || "";
+    const phone = normalizePhone(phoneRaw) || phoneRaw;
+    if (!name || !phone) return;
+    const id = "drv_" + Date.now().toString(36);
+    marketDrivers.push({ id, name, phone });
+    await saveMarketDrivers();
+    document.getElementById("newDriverName").value = "";
+    document.getElementById("newDriverPhone").value = "";
+    showToast(t("updated"));
+    renderOrders(currentOrders);
   }
 
   function renderMarketInbox(entries) {
@@ -445,28 +531,34 @@
           <div class="driver-box">
             <strong>${escapeHtml(t("driver"))}</strong>
             <div class="driver-fields">
+              <select class="field-input" id="driver-select-${escapeHtml(order.id)}" data-market-action="pick-driver" data-order-id="${escapeHtml(order.id)}">${driverSelectOptions(driver.driverId || "")}</select>
               <input class="field-input" id="driver-name-${escapeHtml(order.id)}" placeholder="${escapeHtml(t("driverName"))}" value="${escapeHtml(driver.name || "")}" />
               <input class="field-input" id="driver-phone-${escapeHtml(order.id)}" placeholder="${escapeHtml(t("driverPhone"))}" value="${escapeHtml(driver.phone || "")}" />
             </div>
             <div class="actions-row">
-              <button class="btn-primary" type="button" data-market-action="assign-driver" data-order-id="${escapeHtml(order.id)}">${escapeHtml(t("assignDriver"))}</button>
+              <button class="btn-primary" type="button" data-market-action="assign-driver" data-order-id="${escapeHtml(order.id)}" ${isOrderClosed(order.status) ? "disabled" : ""}>${escapeHtml(t("assignDriver"))}</button>
               ${driverTrack}
             </div>
           </div>
-          <div class="chat-panel">
+          ${isOrderClosed(order.status) ? `<div class="card-meta" style="margin-top:10px;">${escapeHtml(t("inboxClosed"))}</div>` : `
+          <div class="chat-panel${isOrderCommunicationActive(order) ? "" : " chat-disabled"}">
             <div class="card-meta" style="padding:10px 10px 0;">${escapeHtml(t("chatTitle"))}</div>
             <div class="chat-messages" id="chat-messages-${escapeHtml(order.id)}"></div>
-            <div class="chat-compose">
+            <div class="chat-compose" ${isOrderCommunicationActive(order) ? "" : 'style="display:none"'}>
               <input class="chat-input" id="chat-input-${escapeHtml(order.id)}" placeholder="${escapeHtml(t("chatPlaceholder"))}" />
               <button class="btn-primary" type="button" data-market-action="send-chat" data-order-id="${escapeHtml(order.id)}">${escapeHtml(t("send"))}</button>
             </div>
-          </div>
+          </div>`}
         </div>
       `;
     }).join("");
 
     clearChatListeners(activeIds);
-    filtered.forEach((order) => bindChatListener(order.id));
+    filtered.forEach((order) => {
+      if (isOrderCommunicationActive(order) || isOrderClosed(order.status)) {
+        bindChatListener(order);
+      }
+    });
   }
 
   async function toggleItemAvailability(orderId, itemIndex, makeAvailable) {
@@ -487,13 +579,29 @@
   }
 
   async function assignDriver(orderId) {
-    const name = document.getElementById(`driver-name-${orderId}`)?.value.trim() || "";
-    const phone = document.getElementById(`driver-phone-${orderId}`)?.value.trim() || "";
-    const OL = window.OrderLifecycle || {};
-    const normalizePhone = OL.normalizePhone || function (v) { return String(v || "").replace(/\D/g, ""); };
+    const select = document.getElementById(`driver-select-${orderId}`);
+    const selectedId = select ? select.value : "";
+    let name = document.getElementById(`driver-name-${orderId}`)?.value.trim() || "";
+    let phone = document.getElementById(`driver-phone-${orderId}`)?.value.trim() || "";
+    let driverId = "";
+    if (selectedId) {
+      const saved = marketDrivers.find((entry) => entry.id === selectedId);
+      if (saved) {
+        name = saved.name || name;
+        phone = saved.phone || phone;
+        driverId = saved.id;
+      }
+    }
+    phone = normalizePhone(phone) || phone;
+    if (!name || !phone) return;
+    if (!driverId && !marketDrivers.some((entry) => normalizePhone(entry.phone) === phone)) {
+      driverId = "drv_" + Date.now().toString(36);
+      marketDrivers.push({ id: driverId, name, phone });
+      await saveMarketDrivers();
+    }
     await db.collection("orders").doc(orderId).update({
       status: "on-the-way",
-      driver: { name, phone: normalizePhone(phone) || phone },
+      driver: { driverId, name, phone },
       driverAssignedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
@@ -501,10 +609,12 @@
   }
 
   async function sendChatMessage(orderId) {
+    const order = currentOrders.find((entry) => entry.id === orderId);
+    if (!order || !isOrderCommunicationActive(order)) return;
     const input = document.getElementById(`chat-input-${orderId}`);
     const text = String(input?.value || "").trim();
     if (!text) return;
-    await db.collection("orderChats").doc(orderId).collection("messages").add({
+    await orderChatCollection(db, orderId).add({
       senderId: localStorage.getItem("user_uid") || "market",
       senderRole: "market",
       senderName: localStorage.getItem("user_name") || MARKET_LABEL,
@@ -531,6 +641,8 @@
           await updateOrderStatus(orderId);
         } else if (action === "assign-driver") {
           await assignDriver(orderId);
+        } else if (action === "add-driver") {
+          await addMarketDriver();
         } else if (action === "send-chat") {
           await sendChatMessage(orderId);
         }
@@ -538,6 +650,17 @@
         console.error("Market action failed", action, error);
         showToast(`${t("unknown")}: ${error.message}`);
       }
+    });
+    root.addEventListener("change", (event) => {
+      const select = event.target.closest("[data-market-action='pick-driver']");
+      if (!select) return;
+      const orderId = select.dataset.orderId || "";
+      const saved = marketDrivers.find((entry) => entry.id === select.value);
+      if (!saved) return;
+      const nameInput = document.getElementById(`driver-name-${orderId}`);
+      const phoneInput = document.getElementById(`driver-phone-${orderId}`);
+      if (nameInput) nameInput.value = saved.name || "";
+      if (phoneInput) phoneInput.value = saved.phone || "";
     });
     root.addEventListener("keydown", async (event) => {
       if (event.key !== "Enter") return;
@@ -583,6 +706,7 @@
       renderMarketInbox(currentInboxEntries);
     });
     startMarketInboxListener();
+    loadMarketDrivers();
     db.collection("orders").where("marketId", "==", MARKET_ID).onSnapshot((snapshot) => {
       const orders = snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() }));
       renderOrders(orders.filter((order) => orderMatchesMarket(order, MARKET_ID)));
