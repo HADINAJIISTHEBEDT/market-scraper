@@ -665,6 +665,7 @@
       } catch (error) {
         console.warn("Could not clear deleted account marker", error);
       }
+      sessionStorage.removeItem("admin_delete_logout_handled");
       sessionStorage.removeItem("account_deletion_forced");
       sessionStorage.removeItem("deleted_account_notice");
       return mergedProfile;

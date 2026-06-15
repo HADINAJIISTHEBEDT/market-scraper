@@ -21,6 +21,7 @@
       pageLockBack: "Ana sayfaya don",
       blockedTitle: "Erisim engellendi",
       blockedAccountBody: `Admin tarafindan engellendiniz. Bunun bir yanlis anlama oldugunu dusunuyorsaniz ${OWNER_EMAIL} hesabina e-posta gonderin.`,
+      deletedAccountBody: "Hesabiniz admin tarafindan silindi. Tekrar giris yapabilirsiniz.",
     },
     en: {
       modalTitle: "Coming soon",
@@ -39,6 +40,7 @@
       pageLockBack: "Back to home",
       blockedTitle: "Access blocked",
       blockedAccountBody: `You were blocked by the admin. If you think this is a misunderstanding, send an email to ${OWNER_EMAIL}.`,
+      deletedAccountBody: "Your account was deleted by the admin. You can sign in again anytime.",
     },
     ar: {
       modalTitle: "قريباً",
@@ -57,6 +59,7 @@
       pageLockBack: "العودة إلى الرئيسية",
       blockedTitle: "تم حظر الوصول",
       blockedAccountBody: `تم حظرك من قبل المسؤول. إذا كنت تعتقد أن هذا سوء فهم، أرسل بريداً إلكترونياً إلى ${OWNER_EMAIL}.`,
+      deletedAccountBody: "تم حذف حسابك من قبل المسؤول. يمكنك تسجيل الدخول مرة أخرى في أي وقت.",
     },
   };
 
@@ -281,6 +284,45 @@
     sessionStorage.removeItem("blocked_account_notice");
   }
 
+  async function signOutFirebaseAuth() {
+    try {
+      const [{ getApps, initializeApp }, { getAuth, signOut }] = await Promise.all([
+        import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"),
+        import("https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js"),
+      ]);
+      const config = {
+        apiKey: "AIzaSyA4ZmYg5sTs4gU1Nm25s7of6oqJ4xGpR28",
+        authDomain: "st-business-86a9b.firebaseapp.com",
+        projectId: "st-business-86a9b",
+        storageBucket: "st-business-86a9b.firebasestorage.app",
+        messagingSenderId: "472603409840",
+        appId: "1:472603409840:web:30127c81e74c3b3c4e2a75",
+      };
+      const app = getApps()[0] || initializeApp(config);
+      const auth = getAuth(app);
+      if (auth.currentUser) {
+        await signOut(auth);
+      }
+    } catch (error) {
+      console.error("[FeatureAccess] Firebase sign-out failed:", error);
+    }
+  }
+
+  function handleAdminDeletedLogout() {
+    const uid = localStorage.getItem("user_uid") || "";
+    if (!uid || sessionStorage.getItem("admin_delete_logout_handled") === uid) {
+      return;
+    }
+    sessionStorage.setItem("admin_delete_logout_handled", uid);
+    clearLocalUser();
+    void signOutFirebaseAuth();
+    if (typeof window.doLogout === "function") {
+      window.doLogout();
+    } else if (typeof window.updateNavbar === "function") {
+      window.updateNavbar();
+    }
+  }
+
   function handleBlockedAccess() {
     const message = t("blockedAccountBody");
     sessionStorage.setItem("blocked_account_notice", message);
@@ -323,6 +365,15 @@
           const data = snapshot.exists() ? snapshot.data() : null;
           if (data?.blocked) {
             handleBlockedAccess();
+            return;
+          }
+          if (!snapshot.exists()) {
+            handleAdminDeletedLogout();
+          }
+        });
+        firestore.onSnapshot(firestore.doc(db, "deletedAccounts", uid), (snapshot) => {
+          if (snapshot.exists() && snapshot.data()?.forceLogout) {
+            handleAdminDeletedLogout();
           }
         });
       })

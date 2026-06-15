@@ -905,8 +905,9 @@ Pazar Fiyatı Admin`;
 
     async function queueAccountDeletedEmail(userId) {
       const request = await getDeleteRequestForUser(userId);
+      if (!request) return false;
       const user = currentUsers.find((entry) => entry.id === userId) || {};
-      const email = request?.email || user.email || "";
+      const email = request.email || user.email || "";
       if (!email) throw new Error("No Gmail found for this delete request.");
 
       const name = request?.name || user.name || email;
@@ -938,36 +939,47 @@ Pazar Fiyatı Admin`;
 
     window.deleteUser = async function(userId) {
       const user = await getUserForAdmin(userId);
+      const request = await getDeleteRequestForUser(userId);
+      const hasDeleteRequest = Boolean(request);
       let emailQueued = false;
-      try {
-        await queueAccountDeletedEmail(userId);
-        emailQueued = true;
-      } catch (error) {
-        console.error("Account deletion email queue failed", error);
-        showToast(`${t("emailQueueFailed")}: ${error.message}`);
+      if (hasDeleteRequest) {
+        try {
+          emailQueued = await queueAccountDeletedEmail(userId);
+        } catch (error) {
+          console.error("Account deletion email queue failed", error);
+          showToast(`${t("emailQueueFailed")}: ${error.message}`);
+        }
       }
       const now = new Date().toISOString();
-      await updateAdminInboxForUser(userId, {
-        status: "completed",
-        completedAt: now,
-        accountDeletedEmailQueuedAt: emailQueued ? now : null,
-      });
-      await setDoc(doc(db, "deleteRequests", userId), {
-        status: "completed",
-        completedAt: now,
-        completedBy: localStorage.getItem("user_email") || OWNER_EMAIL,
-        emailQueued,
-        emailQueuedAt: emailQueued ? now : null,
+      await setDoc(doc(db, "deletedAccounts", userId), {
+        forceLogout: true,
+        deletedAt: now,
+        deletedBy: localStorage.getItem("user_email") || OWNER_EMAIL,
+        email: user.email || "",
+        name: user.name || "",
       }, { merge: true });
-      try {
-        await deleteDoc(doc(db, "deletedAccounts", userId));
-      } catch (error) {
-        console.warn("Could not clear deleted account marker", error);
+      if (hasDeleteRequest) {
+        await updateAdminInboxForUser(userId, {
+          status: "completed",
+          completedAt: now,
+          accountDeletedEmailQueuedAt: emailQueued ? now : null,
+        });
+        await setDoc(doc(db, "deleteRequests", userId), {
+          status: "completed",
+          completedAt: now,
+          completedBy: localStorage.getItem("user_email") || OWNER_EMAIL,
+          emailQueued,
+          emailQueuedAt: emailQueued ? now : null,
+        }, { merge: true });
       }
       await deleteDoc(doc(db, "users", userId));
       currentUsers = currentUsers.filter((entry) => entry.id !== userId);
       renderUsers(currentUsers);
-      showToast(emailQueued ? `${t("removed")} - ${t("emailQueued")}` : t("removed"));
+      if (emailQueued) {
+        showToast(`${t("removed")} - ${t("emailQueued")}`);
+      } else {
+        showToast(t("removed"));
+      }
     };
 
     window.markDeleteRequestDone = async function(userId) {
