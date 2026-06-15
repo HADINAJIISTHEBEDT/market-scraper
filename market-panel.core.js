@@ -655,7 +655,9 @@
     }
     await db.collection("orders").doc(orderId).update({
       status: "on-the-way",
-      driver: { driverId, name, phone },
+      marketId: MARKET_ID,
+      marketName: MARKET_LABEL,
+      driver: { driverId, name, phone: normalizePhone(phone) || phone },
       driverAssignedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });

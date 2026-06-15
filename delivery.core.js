@@ -27,11 +27,14 @@
     return [{ category: "General", entries: (items || []).map(function (item, index) { return { item: item, index: index }; }) }];
   };
   const getMarketLabel = window.MarketsConfig?.getMarketLabel || function (k) { return k || "Unknown"; };
+  const normalizeMarketKey = window.MarketsConfig?.normalizeMarketKey || function (value) {
+    return String(value || "").trim().toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
+  };
 
-  const MARKET_ID = String(
+  const MARKET_ID = normalizeMarketKey(
     window.DELIVERY_MARKET_ID || window.MARKET_ID || window.DRIVER_MARKET_ID ||
     new URLSearchParams(window.location.search).get("market") || ""
-  ).trim();
+  );
   function driverPhoneKey() { return "driver_phone_" + (MARKET_ID || "default"); }
   let driverPhone = localStorage.getItem(driverPhoneKey()) || "";
 
@@ -47,6 +50,7 @@
       wrongMarket: "Gecersiz market. Surucu sayfasini market panelinden acin.",
       ordersTitle: "Aktif teslimatlar",
       noOrders: "Aktif siparis yok.",
+      noOrdersForPhone: "Bu telefon numarasina atanmis aktif siparis yok. Market panelindeki numara ile ayni girin (or. 532... veya 0532...).",
       selectOrder: "Takip icin sec",
       activeOrder: "Aktif siparis",
       orderNumber: "Siparis no",
@@ -97,6 +101,7 @@
       wrongMarket: "Invalid market. Open the driver page from your market panel.",
       ordersTitle: "Active deliveries",
       noOrders: "No active orders.",
+      noOrdersForPhone: "No active orders for this phone. Enter the same number assigned in the market panel (e.g. 532... or 0532...).",
       selectOrder: "Select to track",
       activeOrder: "Active order",
       orderNumber: "Order no",
@@ -147,6 +152,7 @@
       wrongMarket: "Ø³ÙˆÙ‚ ØºÙŠØ± ØµØ§Ù„Ø­. Ø§ÙØªØ­ ØµÙØ­Ø© Ø§Ù„Ø³Ø§Ø¦Ù‚ Ù…Ù† Ù„ÙˆØ­Ø© Ø§Ù„Ø³ÙˆÙ‚.",
       ordersTitle: "Ø§Ù„ØªØ³Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ù†Ø´Ø·Ø©",
       noOrders: "Ù„Ø§ ØªÙˆØ¬Ø¯ Ø·Ù„Ø¨Ø§Øª Ù†Ø´Ø·Ø©.",
+      noOrdersForPhone: "Ù„Ø§ ØªÙˆØ¬Ø¯ Ø·Ù„Ø¨Ø§Øª Ù†Ø´Ø·Ø© Ù„Ù‡Ø°Ø§ Ø§Ù„Ø±Ù‚Ù…. Ø£Ø¯Ø®Ù„ Ù†ÙØ³ Ø§Ù„Ø±Ù‚Ù… Ù…Ù† Ù„ÙˆØ­Ø© Ø§Ù„Ø³ÙˆÙ‚.",
       selectOrder: "Ø§Ø®ØªØ± Ù„Ù„ØªØªØ¨Ø¹",
       activeOrder: "Ø§Ù„Ø·Ù„Ø¨ Ø§Ù„Ù†Ø´Ø·",
       orderNumber: "Ø±Ù‚Ù… Ø§Ù„Ø·Ù„Ø¨",
@@ -499,8 +505,14 @@
   }
 
   function renderOrders(orders) {
-    const active = orders.filter(function (order) {
-      return orderVisibleToDriver(order) && isActiveOrder(order);
+    const marketOrders = orders.filter(function (order) {
+      return orderMatchesMarket(order, MARKET_ID);
+    });
+    const assignedOrders = marketOrders.filter(function (order) {
+      return orderAssignedToDriver(order, driverPhone);
+    });
+    const active = assignedOrders.filter(function (order) {
+      return isActiveOrder(order);
     }).sort(function (a, b) {
       return String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || ""));
     });
@@ -508,7 +520,11 @@
     const root = document.getElementById("ordersList");
 
     if (!active.length) {
-      root.innerHTML = '<p class="empty-msg">' + escapeHtml(t("noOrders")) + "</p>";
+      var emptyMsg = t("noOrders");
+      if (marketOrders.length && !assignedOrders.length) {
+        emptyMsg = t("noOrdersForPhone");
+      }
+      root.innerHTML = '<p class="empty-msg">' + escapeHtml(emptyMsg) + "</p>";
       document.getElementById("activeOrderCard").hidden = true;
       activeOrderId = "";
       clearDriverChatListener();
@@ -695,16 +711,27 @@
   var savedPhoneInput = document.getElementById("driverPhoneInput");
   if (savedPhoneInput && driverPhone) savedPhoneInput.value = driverPhone;
 
+  function applyOrdersSnapshot(snapshot) {
+    allMarketOrders = snapshot.docs.map(function (entry) {
+      return Object.assign({ id: entry.id }, entry.data());
+    }).filter(function (order) {
+      return orderMatchesMarket(order, MARKET_ID);
+    });
+    renderOrders(allMarketOrders);
+    if (activeOrderId) renderActiveOrderDetails();
+  }
+
   if (MARKET_ID) {
     db.collection("orders").where("marketId", "==", MARKET_ID).onSnapshot(function (snapshot) {
-      allMarketOrders = snapshot.docs.map(function (entry) {
-        return { id: entry.id, ...entry.data() };
-      });
-      renderOrders(allMarketOrders);
-      if (activeOrderId) renderActiveOrderDetails();
+      applyOrdersSnapshot(snapshot);
     }, function (error) {
       console.error("Orders listener failed", error);
-      showBootError(error.message || "Could not load orders.");
+      db.collection("orders").onSnapshot(function (snapshot) {
+        applyOrdersSnapshot(snapshot);
+      }, function (fallbackError) {
+        console.error("Orders fallback listener failed", fallbackError);
+        showBootError(fallbackError.message || "Could not load orders.");
+      });
     });
   }
 })();

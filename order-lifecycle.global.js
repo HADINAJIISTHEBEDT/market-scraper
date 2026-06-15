@@ -87,13 +87,27 @@
   }
 
   function normalizePhone(value) {
-    return String(value || "").replace(/\D/g, "");
+    var digits = String(value || "").replace(/\D/g, "");
+    if (!digits) return "";
+    if (digits.length === 12 && digits.indexOf("90") === 0) digits = digits.slice(2);
+    if (digits.length === 11 && digits.charAt(0) === "0") digits = digits.slice(1);
+    return digits;
+  }
+
+  function phonesMatch(a, b) {
+    var left = normalizePhone(a);
+    var right = normalizePhone(b);
+    if (!left || !right) return false;
+    if (left === right) return true;
+    if (left.length >= 10 && right.length >= 10) {
+      return left.slice(-10) === right.slice(-10);
+    }
+    return false;
   }
 
   function orderAssignedToDriver(order, driverPhone) {
-    var phone = normalizePhone(driverPhone);
-    if (!phone) return false;
-    return normalizePhone(order.driver && order.driver.phone) === phone;
+    if (!driverPhone) return false;
+    return phonesMatch(order.driver && order.driver.phone, driverPhone);
   }
 
   function hasAssignedDriver(order) {
@@ -156,6 +170,7 @@
     normalizeMarketKey: normalizeMarketKey,
     orderMatchesMarket: orderMatchesMarket,
     normalizePhone: normalizePhone,
+    phonesMatch: phonesMatch,
     orderAssignedToDriver: orderAssignedToDriver,
     groupItemsByCategory: groupItemsByCategory,
     isOrderClosed: isOrderClosed,
