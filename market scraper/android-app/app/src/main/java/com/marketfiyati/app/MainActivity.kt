@@ -207,13 +207,23 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun configureAds() {
-        try {
-            MobileAds.initialize(this)
-            binding.bannerAdView.setAdSize(getAdaptiveBannerSize())
-            binding.bannerAdView.loadAd(AdRequest.Builder().build())
-        } catch (e: Exception) {
-            // Never let ad setup crash the app
-            binding.bannerAdView.visibility = android.view.View.GONE
+        binding.bannerAdView.visibility = android.view.View.GONE
+        binding.root.post {
+            try {
+                MobileAds.initialize(this) {
+                    runOnUiThread {
+                        try {
+                            binding.bannerAdView.setAdSize(getAdaptiveBannerSize())
+                            binding.bannerAdView.loadAd(AdRequest.Builder().build())
+                            binding.bannerAdView.visibility = android.view.View.VISIBLE
+                        } catch (_: Exception) {
+                            binding.bannerAdView.visibility = android.view.View.GONE
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+                binding.bannerAdView.visibility = android.view.View.GONE
+            }
         }
     }
 
@@ -223,7 +233,7 @@ class MainActivity : AppCompatActivity() {
         windowManager.defaultDisplay.getMetrics(displayMetrics)
         val density = displayMetrics.density
         val adWidthPixels = binding.root.width.takeIf { it > 0 } ?: displayMetrics.widthPixels
-        val adWidth = (adWidthPixels / density).toInt()
+        val adWidth = (adWidthPixels / density).toInt().coerceAtLeast(320)
         return AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(this, adWidth)
     }
 

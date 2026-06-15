@@ -13,6 +13,7 @@ import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.util.DisplayMetrics
 import android.webkit.GeolocationPermissions
 import android.webkit.JavascriptInterface
 import android.webkit.PermissionRequest
@@ -25,15 +26,14 @@ import android.webkit.WebViewClient
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
-import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+import com.google.android.gms.ads.AdRequest
+import com.google.android.gms.ads.AdSize
+import com.google.android.gms.ads.MobileAds
 import com.marketfiyati.app.databinding.ActivityMainBinding
-import org.json.JSONObject
-import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.Executors
@@ -86,6 +86,9 @@ class MainActivity : AppCompatActivity() {
         createUpdateChannel()
         configureWebView(binding.webView)
         configureRefresh()
+        binding.privacyPolicyLink.setOnClickListener {
+            binding.webView.loadUrl(getString(R.string.privacy_policy_url))
+        }
 
         if (savedInstanceState == null) {
             binding.webView.loadUrl(APP_URL)
@@ -93,7 +96,7 @@ class MainActivity : AppCompatActivity() {
             binding.webView.restoreState(savedInstanceState)
         }
 
-        // Check for app update on start
+        configureAds()
         checkForAppUpdate()
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
@@ -171,6 +174,24 @@ class MainActivity : AppCompatActivity() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 binding.swipeRefresh.isRefreshing = false
             }
+
+            override fun onReceivedError(
+                view: WebView?,
+                request: WebResourceRequest?,
+                error: android.webkit.WebResourceError?
+            ) {
+                super.onReceivedError(view, request, error)
+                if (request?.isForMainFrame == true) {
+                    binding.swipeRefresh.isRefreshing = false
+                    view?.loadDataWithBaseURL(
+                        null,
+                        OFFLINE_HTML,
+                        "text/html",
+                        "utf-8",
+                        null
+                    )
+                }
+            }
         }
     }
 
@@ -178,6 +199,37 @@ class MainActivity : AppCompatActivity() {
         binding.swipeRefresh.setOnRefreshListener {
             binding.webView.reload()
         }
+    }
+
+    private fun configureAds() {
+        binding.bannerAdView.visibility = android.view.View.GONE
+        binding.root.post {
+            try {
+                MobileAds.initialize(this) {
+                    runOnUiThread {
+                        try {
+                            binding.bannerAdView.setAdSize(getAdaptiveBannerSize())
+                            binding.bannerAdView.loadAd(AdRequest.Builder().build())
+                            binding.bannerAdView.visibility = android.view.View.VISIBLE
+                        } catch (_: Exception) {
+                            binding.bannerAdView.visibility = android.view.View.GONE
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+                binding.bannerAdView.visibility = android.view.View.GONE
+            }
+        }
+    }
+
+    private fun getAdaptiveBannerSize(): AdSize {
+        val displayMetrics = DisplayMetrics()
+        @Suppress("DEPRECATION")
+        windowManager.defaultDisplay.getMetrics(displayMetrics)
+        val density = displayMetrics.density
+        val adWidthPixels = binding.root.width.takeIf { it > 0 } ?: displayMetrics.widthPixels
+        val adWidth = (adWidthPixels / density).toInt().coerceAtLeast(320)
+        return AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(this, adWidth)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -202,12 +254,34 @@ class MainActivity : AppCompatActivity() {
         private const val PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.marketfiyati.app"
         private const val PREFS_NAME = "app_prefs"
         private const val LAST_VERSION_CHECK = "last_version_check"
-        private const val CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000L // 24 hours
+        private const val CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000L
+        private const val OFFLINE_HTML = """
+            <!DOCTYPE html><html><head><meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <style>
+              body{margin:0;font-family:sans-serif;background:#f7f8f4;color:#0d4d35;
+                   display:flex;min-height:100vh;align-items:center;justify-content:center;text-align:center}
+              .box{padding:24px;max-width:340px}
+              h1{font-size:20px;margin:0 0 8px}
+              p{font-size:15px;color:#555;line-height:1.4}
+              button{margin-top:18px;background:#1f7a5c;color:#fff;border:0;border-radius:8px;
+                     padding:12px 24px;font-size:16px}
+            </style></head><body><div class="box">
+              <h1>Bağlantı kurulamadı</h1>
+              <p>İnternet bağlantınızı kontrol edin ve tekrar deneyin.</p>
+              <button onclick="AndroidApp.reloadApp()">Tekrar Dene</button>
+            </div></body></html>
+        """
     }
 
     private inner class AndroidBridge {
         @JavascriptInterface
         fun isAndroidApp(): Boolean = true
+
+        @JavascriptInterface
+        fun reloadApp() {
+            runOnUiThread { binding.webView.loadUrl(APP_URL) }
+        }
 
         @JavascriptInterface
         fun isNotificationPermissionGranted(): Boolean = hasNotificationPermission()
@@ -234,7 +308,7 @@ class MainActivity : AppCompatActivity() {
         fun getAppVersion(): String {
             return try {
                 packageManager.getPackageInfo(packageName, 0).versionName ?: "1.0"
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 "1.0"
             }
         }
@@ -248,7 +322,7 @@ class MainActivity : AppCompatActivity() {
                     @Suppress("DEPRECATION")
                     packageManager.getPackageInfo(packageName, 0).versionCode
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 1
             }
         }
@@ -441,7 +515,7 @@ class MainActivity : AppCompatActivity() {
                         @Suppress("DEPRECATION")
                         packageManager.getPackageInfo(packageName, 0).versionCode
                     }
-                } catch (e: Exception) { 1 }
+                } catch (_: Exception) { 1 }
 
                 if (remoteVersionCode != null && remoteVersionCode > currentVersionCode) {
                     runOnUiThread {
@@ -452,7 +526,7 @@ class MainActivity : AppCompatActivity() {
                         )
                     }
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // Silently fail - check again next time
             }
         }
