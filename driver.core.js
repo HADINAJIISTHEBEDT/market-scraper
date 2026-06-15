@@ -28,10 +28,13 @@
   };
   const getMarketLabel = window.MarketsConfig?.getMarketLabel || function (k) { return k || "Unknown"; };
 
-  const MARKET_ID = String(
+  const normalizeMarketKey = window.MarketsConfig?.normalizeMarketKey || function (value) {
+    return String(value || "").trim().toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
+  };
+  const MARKET_ID = normalizeMarketKey(
     window.DELIVERY_MARKET_ID || window.MARKET_ID || window.DRIVER_MARKET_ID ||
     new URLSearchParams(window.location.search).get("market") || ""
-  ).trim();
+  );
   function driverPhoneKey() { return "driver_phone_" + (MARKET_ID || "default"); }
   let driverPhone = localStorage.getItem(driverPhoneKey()) || "";
 
