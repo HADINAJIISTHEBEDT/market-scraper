@@ -91,6 +91,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
     import firebaseConfig from "./firebase-config.js";
+    import { resolveOrderMarketId, getMarketLabel } from "./markets-config.js";
 
     await window.AppSettings.ready();
     if (!window.FeatureAccess?.guardPage()) {
@@ -295,10 +296,22 @@
       const cardNumber = String(document.getElementById("cardNumber")?.value || "").replace(/\D/g, "");
 
       try {
+        const marketId = resolveOrderMarketId(cart);
+        const marketName = getMarketLabel(marketId);
+        const orderItems = cart.map((item) => ({
+          ...item,
+          available: item.available !== false,
+        }));
+
         await addDoc(collection(db, "orders"), {
           userId: userUid,
           userName: userName || t("unknown"),
-          items: cart,
+          userEmail: localStorage.getItem("user_email") || "",
+          userPhone: localStorage.getItem("user_phone") || "",
+          userAddress: localStorage.getItem("user_address") || "",
+          marketId,
+          marketName,
+          items: orderItems,
           totalPrice: total,
           paymentMethod,
           paymentSummary: paymentMethod === "card" ? {

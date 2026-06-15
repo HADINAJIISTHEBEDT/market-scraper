@@ -60,6 +60,18 @@
       {
         "source": "/delete-account",
         "destination": "/delete-account.html"
+      },
+      {
+        "source": "/markets",
+        "destination": "/markets.html"
+      },
+      {
+        "source": "/market",
+        "destination": "/market.html"
+      },
+      {
+        "source": "/driver",
+        "destination": "/driver.html"
       }
     ],
     "headers": [

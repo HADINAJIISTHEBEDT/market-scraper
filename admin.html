@@ -80,6 +80,12 @@
       border-radius: 10px; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.2); display: none; z-index: 20;
     }
     .empty-msg { color: #64748b; text-align: center; padding: 24px 0; }
+    .chat-box { margin-top: 10px; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px; max-height: 180px; overflow-y: auto; background: #f8fafc; }
+    .chat-msg { margin-bottom: 8px; padding: 8px 10px; border-radius: 10px; font-size: 13px; max-width: 90%; }
+    .chat-msg.customer { background: #dbeafe; margin-right: auto; }
+    .chat-msg.market { background: #dcfce7; margin-left: auto; }
+    .chat-msg-meta { font-size: 11px; color: #64748b; margin-bottom: 4px; }
+    .market-stat { border-left: 4px solid #2563eb; }
   </style>
 </head>
 <body>
@@ -119,6 +125,7 @@
       <button class="tab-btn" data-tab="homepage" id="tabHomepage">Homepage</button>
       <button class="tab-btn" data-tab="orders" id="tabOrders">Orders</button>
       <button class="tab-btn" data-tab="users" id="tabUsers">Users</button>
+      <button class="tab-btn" data-tab="markets" id="tabMarkets">Markets</button>
       <button class="tab-btn" data-tab="inbox" id="tabInbox">Inbox</button>
     </div>
 
@@ -200,9 +207,21 @@
       <div id="usersList"></div>
     </section>
 
+    <section class="panel-section" id="panel-markets">
+      <h2 id="marketsTitle">Markets overview</h2>
+      <p class="help" id="marketsHelp">Track orders and live conversations from every market.</p>
+      <div class="stats-row" id="marketStatsRow"></div>
+      <label>
+        <span id="marketFilterLabel">Filter market</span>
+        <select id="marketFilterSelect" class="status-select"></select>
+      </label>
+      <h3 id="marketOrdersTitle" style="margin-top:18px;">Market orders</h3>
+      <div id="marketOrdersList"></div>
+    </section>
+
     <section class="panel-section" id="panel-inbox">
       <h2 id="inboxTitle">Inbox</h2>
-      <p class="help" id="inboxHelp">Messages from account deletion requests are saved here permanently and are never deleted.</p>
+      <p class="help" id="inboxHelp">Delete request messages are saved here. You can delete individual messages manually.</p>
       <div id="inboxList"></div>
     </section>
   </div>
@@ -231,8 +250,9 @@
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
     import {
       initializeFirestore, collection, query, orderBy, onSnapshot,
-      doc, updateDoc, getDoc, setDoc, deleteDoc
+      doc, updateDoc, getDoc, setDoc, deleteDoc, addDoc
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { MARKETS, orderMatchesMarket, getMarketLabel } from "./markets-config.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyA4ZmYg5sTs4gU1Nm25s7of6oqJ4xGpR28",
@@ -248,7 +268,7 @@
         adminTitle: "Admin Paneli", backLink: "Uygulamaya don", deniedTitle: "Erisim reddedildi",
         deniedMessage: "Bu sayfayi gormek icin admin olmalisiniz.", deniedBack: "Geri don",
         totalOrders: "Toplam siparis", pending: "Beklemede", users: "Kullanicilar", tiles: "Ana sayfa kartlari",
-        tabSettings: "Uygulama ayarlari", tabHomepage: "Ana sayfa", tabOrders: "Siparisler", tabUsers: "Kullanicilar", tabInbox: "Gelen kutusu",
+        tabSettings: "Uygulama ayarlari", tabHomepage: "Ana sayfa", tabOrders: "Siparisler", tabUsers: "Kullanicilar", tabMarkets: "Marketler", tabInbox: "Gelen kutusu",
         settingsTitle: "Genel uygulama ayarlari", settingsHelp: "Buradaki degisiklikler Firebase'e kaydedilir ve tum kullanicilara canli yansir.",
         featuresAccessLabel: "Giris, sepet, profil ve siparis erisimi", featuresLockOption: "Normal kullanicilar icin kilitle", featuresUnlockOption: "Tum kullanicilar icin ac",
         announcementLabel: "Duyuru bandi", appPauseModeLabel: "Uygulama durumu", appRunOption: "Uygulamayi normal kullanicilar icin calistir", appPauseOption: "Uygulamayi normal kullanicilar icin duraklat", commandMessageLabel: "Komut mesaji",
@@ -260,16 +280,20 @@
         updateStatus: "Durumu guncelle", delete: "Sil", saveUser: "Kullaniciyi kaydet", updated: "Guncellendi",
         saved: "Kaydedildi", removed: "Silindi", id: "ID", role: "Rol", name: "Ad", phone: "Telefon", address: "Adres", email: "E-posta",
         deleteRequestsTitle: "Hesap silme istekleri", noDeleteRequests: "Henuz silme istegi yok.", requestedAt: "Istek tarihi", markRequestDone: "Tamamlandi olarak isaretle",
-        inboxTitle: "Gelen kutusu", inboxHelp: "Hesap silme isteklerinden gelen mesajlar burada kalici olarak saklanir ve hicbir zaman silinmez.", noInboxMessages: "Henuz mesaj yok.", message: "Mesaj",
+        inboxTitle: "Gelen kutusu", inboxHelp: "Silme istegi mesajlari burada saklanir. Tek tek silebilirsiniz.", noInboxMessages: "Henuz mesaj yok.", message: "Mesaj", deleteMessage: "Mesaji sil",
+        marketsTitle: "Marketler", marketsHelp: "Tum marketlerden gelen siparisleri ve canli konusmalari takip edin.", marketFilterLabel: "Market filtrele", marketOrdersTitle: "Market siparisleri", noMarketOrders: "Bu market icin siparis yok.", chatTitle: "Canli sohbet", allMarkets: "Tum marketler", marketOrders: "Siparis", marketChats: "Mesaj", payment: "Odeme", available: "Mevcut", unavailable: "Yok",
         inboxDone: "Tamamlandi", inboxCompleted: "Hesap silindi", inboxEmailQueued: "E-posta siraya alindi", inboxEmailSent: "E-posta gonderildi", inboxEmailFailed: "E-posta gonderilemedi",
         emailQueued: "E-posta gonderim siraya alindi", emailQueueFailed: "E-posta siraya alinamadi", emailServerNotConfigured: "Render SMTP ayarlari eksik",
+        deleteUserFirst: "Once kullaniciyi silin, sonra tamamlandi olarak isaretleyin.",
+        inboxUserDeleted: "Kullanici silindi",
+        sendingEmail: "Gmail gonderiliyor...",
         block: "Engelle", unblock: "Engeli kaldir", blocked: "Engellendi"
       },
       en: {
         adminTitle: "Admin Panel", backLink: "Back to App", deniedTitle: "Access Denied",
         deniedMessage: "You must be an admin to view this page.", deniedBack: "Go back",
         totalOrders: "Total Orders", pending: "Pending", users: "Users", tiles: "Homepage tiles",
-        tabSettings: "App settings", tabHomepage: "Homepage", tabOrders: "Orders", tabUsers: "Users", tabInbox: "Inbox",
+        tabSettings: "App settings", tabHomepage: "Homepage", tabOrders: "Orders", tabUsers: "Users", tabMarkets: "Markets", tabInbox: "Inbox",
         settingsTitle: "Global app settings", settingsHelp: "Changes here are saved to Firebase and appear live for all users.",
         featuresAccessLabel: "Login, cart, profile, and orders access", featuresLockOption: "Lock for normal users", featuresUnlockOption: "Unlock for all users",
         announcementLabel: "Announcement banner", appPauseModeLabel: "App availability", appRunOption: "Run app for normal users", appPauseOption: "Pause app for normal users", commandMessageLabel: "Command message",
@@ -281,16 +305,20 @@
         updateStatus: "Update status", delete: "Delete", saveUser: "Save user", updated: "Updated",
         saved: "Saved", removed: "Removed", id: "ID", role: "Role", name: "Name", phone: "Phone", address: "Address", email: "Email",
         deleteRequestsTitle: "Account delete requests", noDeleteRequests: "No delete requests yet.", requestedAt: "Requested at", markRequestDone: "Mark request done",
-        inboxTitle: "Inbox", inboxHelp: "Messages from account deletion requests are saved here permanently and are never deleted.", noInboxMessages: "No messages yet.", message: "Message",
+        inboxTitle: "Inbox", inboxHelp: "Delete request messages are saved here. You can delete individual messages.", noInboxMessages: "No messages yet.", message: "Message", deleteMessage: "Delete message",
+        marketsTitle: "Markets overview", marketsHelp: "Track orders and live conversations from every market.", marketFilterLabel: "Filter market", marketOrdersTitle: "Market orders", noMarketOrders: "No orders for this market.", chatTitle: "Live chat", allMarkets: "All markets", marketOrders: "Orders", marketChats: "Messages", payment: "Payment", available: "Available", unavailable: "Unavailable",
         inboxDone: "Done", inboxCompleted: "Account deleted", inboxEmailQueued: "Email queued", inboxEmailSent: "Email sent", inboxEmailFailed: "Email failed",
         emailQueued: "Email send queued", emailQueueFailed: "Could not queue email", emailServerNotConfigured: "Render SMTP settings are missing",
+        deleteUserFirst: "Delete the user first, then mark the request done.",
+        inboxUserDeleted: "User deleted",
+        sendingEmail: "Sending Gmail...",
         block: "Block", unblock: "Unblock", blocked: "Blocked"
       },
       ar: {
         adminTitle: "لوحة الإدارة", backLink: "العودة إلى التطبيق", deniedTitle: "تم رفض الوصول",
         deniedMessage: "يجب أن تكون مسؤولا لعرض هذه الصفحة.", deniedBack: "رجوع",
         totalOrders: "إجمالي الطلبات", pending: "قيد الانتظار", users: "المستخدمون", tiles: "بطاقات الصفحة الرئيسية",
-        tabSettings: "إعدادات التطبيق", tabHomepage: "الصفحة الرئيسية", tabOrders: "الطلبات", tabUsers: "المستخدمون", tabInbox: "صندوق الوارد",
+        tabSettings: "إعدادات التطبيق", tabHomepage: "الصفحة الرئيسية", tabOrders: "الطلبات", tabUsers: "المستخدمون", tabMarkets: "الأسواق", tabInbox: "صندوق الوارد",
         settingsTitle: "إعدادات التطبيق العامة", settingsHelp: "يتم حفظ التغييرات في Firebase وتظهر مباشرة لجميع المستخدمين.",
         featuresAccessLabel: "الوصول إلى تسجيل الدخول والسلة والملف الشخصي والطلبات", featuresLockOption: "قفل للمستخدمين العاديين", featuresUnlockOption: "فتح لجميع المستخدمين",
         announcementLabel: "شريط الإعلان", appPauseModeLabel: "حالة التطبيق", appRunOption: "تشغيل التطبيق للمستخدمين العاديين", appPauseOption: "إيقاف التطبيق للمستخدمين العاديين", commandMessageLabel: "رسالة الأمر",
@@ -302,9 +330,13 @@
         updateStatus: "تحديث الحالة", delete: "حذف", saveUser: "حفظ المستخدم", updated: "تم التحديث",
         saved: "تم الحفظ", removed: "تم الحذف", id: "المعرف", role: "الدور", name: "الاسم", phone: "الهاتف", address: "العنوان", email: "البريد الإلكتروني",
         deleteRequestsTitle: "طلبات حذف الحساب", noDeleteRequests: "لا توجد طلبات حذف بعد.", requestedAt: "تاريخ الطلب", markRequestDone: "وضع علامة مكتمل",
-        inboxTitle: "صندوق الوارد", inboxHelp: "يتم حفظ رسائل طلبات حذف الحساب هنا بشكل دائم ولا يتم حذفها أبداً.", noInboxMessages: "لا توجد رسائل بعد.", message: "الرسالة",
+        inboxTitle: "صندوق الوارد", inboxHelp: "يتم حفظ رسائل طلبات الحذف هنا. يمكنك حذف الرسائل يدوياً.", noInboxMessages: "لا توجد رسائل بعد.", message: "الرسالة", deleteMessage: "حذف الرسالة",
+        marketsTitle: "نظرة عامة على الأسواق", marketsHelp: "تتبع الطلبات والمحادثات المباشرة من كل سوق.", marketFilterLabel: "تصفية السوق", marketOrdersTitle: "طلبات السوق", noMarketOrders: "لا توجد طلبات لهذا السوق.", chatTitle: "محادثة مباشرة", allMarkets: "كل الأسواق", marketOrders: "طلبات", marketChats: "رسائل", payment: "الدفع", available: "متوفر", unavailable: "غير متوفر",
         inboxDone: "مكتمل", inboxCompleted: "تم حذف الحساب", inboxEmailQueued: "تمت جدولة البريد", inboxEmailSent: "تم إرسال البريد", inboxEmailFailed: "فشل إرسال البريد",
         emailQueued: "تمت إضافة البريد الإلكتروني إلى قائمة الإرسال", emailQueueFailed: "تعذر إضافة البريد الإلكتروني إلى قائمة الإرسال", emailServerNotConfigured: "إعدادات SMTP على Render غير مكتملة",
+        deleteUserFirst: "احذف المستخدم أولاً، ثم ضع علامة مكتمل على الطلب.",
+        inboxUserDeleted: "تم حذف المستخدم",
+        sendingEmail: "جار إرسال Gmail...",
         block: "حظر", unblock: "إلغاء الحظر", blocked: "محظور"
       }
     };
@@ -325,6 +357,9 @@
     let currentUsers = [];
     let currentDeleteRequests = [];
     let currentInboxMessages = [];
+    const recentlyDeletedUserIds = new Set();
+    let currentMarketFilter = "all";
+    const marketChatUnsubs = new Map();
     let currentTiles = [];
     let currentSettings = {
       featuresUnlocked: false,
@@ -462,14 +497,15 @@
       const textIds = {
         adminTitle: "adminTitle", backLink: "backLink", deniedTitle: "deniedTitle", deniedMessage: "deniedMessage",
         deniedBack: "deniedBack", statTotalLabel: "totalOrders", statPendingLabel: "pending", statUsersLabel: "users",
-        statTilesLabel: "tiles", tabSettings: "tabSettings", tabHomepage: "tabHomepage", tabOrders: "tabOrders", tabUsers: "tabUsers", tabInbox: "tabInbox",
+        statTilesLabel: "tiles", tabSettings: "tabSettings", tabHomepage: "tabHomepage", tabOrders: "tabOrders", tabUsers: "tabUsers", tabMarkets: "tabMarkets", tabInbox: "tabInbox",
         settingsTitle: "settingsTitle", settingsHelp: "settingsHelp", featuresAccessLabel: "featuresAccessLabel",
         featuresLockOption: "featuresLockOption", featuresUnlockOption: "featuresUnlockOption",
         announcementLabel: "announcementLabel", appPauseModeLabel: "appPauseModeLabel", appRunOption: "appRunOption", appPauseOption: "appPauseOption", commandMessageLabel: "commandMessageLabel",
         heroTitleLabel: "heroTitleLabel", heroSubtitleLabel: "heroSubtitleLabel",
         saveSettingsBtn: "saveSettings", homepageTitle: "homepageTitle", homepageHelp: "homepageHelp", addTileTitle: "addTileTitle",
         tileLabelLabel: "tileLabel", tileImageLabel: "tileImage", addTileBtn: "addTile", saveTilesBtn: "saveHomepage",
-        ordersTitle: "allOrders", usersTitle: "users", deleteRequestsTitle: "deleteRequestsTitle", inboxTitle: "inboxTitle", inboxHelp: "inboxHelp"
+        ordersTitle: "allOrders", usersTitle: "users", deleteRequestsTitle: "deleteRequestsTitle", inboxTitle: "inboxTitle", inboxHelp: "inboxHelp",
+        tabMarkets: "tabMarkets", marketsTitle: "marketsTitle", marketsHelp: "marketsHelp", marketFilterLabel: "marketFilterLabel", marketOrdersTitle: "marketOrdersTitle"
       };
       Object.entries(textIds).forEach(([id, key]) => {
         const el = document.getElementById(id);
@@ -479,6 +515,7 @@
       renderUsers(currentUsers);
       renderDeleteRequests(currentDeleteRequests);
       renderInbox(currentInboxMessages);
+      renderMarketsOverview(currentOrders);
       renderTilesEditor();
     }
 
@@ -591,6 +628,7 @@
 
     function renderUsers(users) {
       currentUsers = users;
+      users.forEach((user) => recentlyDeletedUserIds.delete(user.id));
       updateStats(currentOrders, users);
       const root = document.getElementById("usersList");
       document.getElementById("usersLoading").style.display = "none";
@@ -614,11 +652,11 @@
             ${user.blocked ? `<div><span class="status-badge status-blocked">${escapeHtml(t("blocked"))}</span></div>` : ""}
             <div class="card-meta">${escapeHtml(formatDate(user.lastLoginAt || user.createdAt))}</div>
             <div class="actions-row">
-              <button class="btn-primary" type="button" onclick="saveUser('${user.id}')">${escapeHtml(t("saveUser"))}</button>
-              <button class="btn-danger" type="button" onclick="deleteUser('${user.id}')">${escapeHtml(t("delete"))}</button>
+              <button class="btn-primary" type="button" data-admin-action="save-user" data-user-id="${escapeHtml(user.id)}">${escapeHtml(t("saveUser"))}</button>
+              <button class="btn-danger" type="button" data-admin-action="delete-user" data-user-id="${escapeHtml(user.id)}">${escapeHtml(t("delete"))}</button>
               ${user.blocked
-                ? `<button class="btn-secondary" type="button" onclick="setUserBlocked('${user.id}', false)">${escapeHtml(t("unblock"))}</button>`
-                : `<button class="btn-warning" type="button" onclick="setUserBlocked('${user.id}', true)">${escapeHtml(t("block"))}</button>`
+                ? `<button class="btn-secondary" type="button" data-admin-action="unblock-user" data-user-id="${escapeHtml(user.id)}">${escapeHtml(t("unblock"))}</button>`
+                : `<button class="btn-warning" type="button" data-admin-action="block-user" data-user-id="${escapeHtml(user.id)}">${escapeHtml(t("block"))}</button>`
               }
             </div>
           </div>
@@ -626,56 +664,125 @@
       `).join("");
     }
 
+    function isUserRegistered(userId) {
+      if (recentlyDeletedUserIds.has(userId)) return false;
+      return currentUsers.some((user) => user.id === userId);
+    }
+
+    function getInboxEmailState(entry) {
+      if (entry.emailSentAt) return "sent";
+      if (String(entry.emailDeliveryError || "").trim()) return "failed";
+      if (entry.doneEmailQueuedAt || entry.accountDeletedEmailQueuedAt) return "queued";
+      return "";
+    }
+
+    function getInboxEntryIdForRequest(request) {
+      if (request?.inboxEntryId) return request.inboxEntryId;
+      if (!request?.id) return "";
+      const exact = currentInboxMessages.find((entry) => entry.id === request.inboxEntryId);
+      if (exact) return exact.id;
+      const legacy = currentInboxMessages.find((entry) => entry.id === request.id && (!entry.userId || entry.userId === request.id));
+      if (legacy) return legacy.id;
+      const userEntries = currentInboxMessages
+        .filter((entry) => (entry.userId || entry.id) === request.id)
+        .sort((a, b) => String(b.requestedAt || "").localeCompare(String(a.requestedAt || "")));
+      return userEntries[0]?.id || request.id;
+    }
+
+    function formatPaymentSummary(order) {
+      if (!order?.paymentSummary && !order?.paymentMethod) return t("unknown");
+      const summary = order.paymentSummary || {};
+      if (summary.type === "card" || order.paymentMethod === "card") {
+        const last4 = summary.last4 ? ` ****${summary.last4}` : "";
+        return `${t("payment")}: Card${last4}`;
+      }
+      return `${t("payment")}: Cash`;
+    }
+
     function getInboxStatus(request) {
       const status = String(request.status || "pending").toLowerCase();
-      if (status === "pending") return "pending";
-      if (status === "completed") return "completed";
       if (status === "done" || status === "done-pending-email") return "done";
+      if (status === "completed") return "completed";
+      if (status === "user-deleted" || request.userDeletedAt) return "user-deleted";
+      if (status === "pending") return "pending";
       if (request.doneMarkedAt) return "done";
       return "pending";
     }
 
+    function isActiveDeleteRequest(request) {
+      const status = getInboxStatus(request);
+      return (status === "pending" || status === "user-deleted") && String(request.message || "").trim().length > 0;
+    }
+
     function isPendingDeleteRequest(request) {
-      return getInboxStatus(request) === "pending" && String(request.message || "").trim().length > 0;
+      return isActiveDeleteRequest(request);
     }
 
     function inboxStatusLabel(status) {
       if (status === "completed") return t("inboxCompleted");
       if (status === "done") return t("inboxDone");
+      if (status === "user-deleted") return t("inboxUserDeleted");
       return t("pending");
     }
 
     function inboxStatusClass(status) {
       if (status === "completed") return "status-completed";
       if (status === "done") return "status-done";
+      if (status === "user-deleted") return "status-preparing";
       return "status-pending";
+    }
+
+    function refreshDeleteRequestViews(userId, updates, inboxEntryId) {
+      const entryId = inboxEntryId || getInboxEntryIdForRequest({ id: userId, ...updates });
+      currentDeleteRequests = currentDeleteRequests.map((entry) =>
+        entry.id === userId ? { ...entry, ...updates } : entry
+      );
+      currentInboxMessages = currentInboxMessages.map((entry) =>
+        entry.id === entryId ? { ...entry, ...updates } : entry
+      );
+      renderDeleteRequests(currentDeleteRequests);
+      renderInbox(currentInboxMessages);
+    }
+
+    function renderDeleteRequestActions(userId, status, inboxEntryId) {
+      const canDelete = isUserRegistered(userId);
+      const canMarkDone = status === "pending" || status === "user-deleted";
+      const inboxId = inboxEntryId || getInboxEntryIdForRequest({ id: userId });
+      return `
+        <div class="actions-row">
+          <button class="btn-danger" type="button" data-admin-action="delete-user" data-user-id="${escapeHtml(userId)}" data-inbox-id="${escapeHtml(inboxId)}" ${canDelete ? "" : "disabled"}>${escapeHtml(t("delete"))}</button>
+          <button class="btn-secondary" type="button" data-admin-action="mark-done" data-user-id="${escapeHtml(userId)}" data-inbox-id="${escapeHtml(inboxId)}" ${canMarkDone ? "" : "disabled"}>${escapeHtml(t("markRequestDone"))}</button>
+        </div>
+      `;
     }
 
     function renderDeleteRequests(requests) {
       currentDeleteRequests = requests;
       const root = document.getElementById("deleteRequestsList");
       if (!root) return;
-      const pending = requests.filter((request) => isPendingDeleteRequest(request));
+      const pending = requests.filter((request) => isActiveDeleteRequest(request));
       if (!pending.length) {
         root.innerHTML = `<p class="empty-msg">${escapeHtml(t("noDeleteRequests"))}</p>`;
         return;
       }
-      root.innerHTML = pending.map((request) => `
+      root.innerHTML = pending.map((request) => {
+        const status = getInboxStatus(request);
+        const inboxEntryId = getInboxEntryIdForRequest(request);
+        return `
         <div class="card">
           <div class="card-header">
             <div>
               <div class="card-title">${escapeHtml(request.email || t("unknown"))}</div>
               <div class="card-meta">${escapeHtml(request.name || "")}</div>
               <div class="card-meta">${escapeHtml(t("requestedAt"))}: ${escapeHtml(formatDate(request.requestedAt))}</div>
+              <div class="card-meta"><span class="status-badge ${inboxStatusClass(status)}">${escapeHtml(inboxStatusLabel(status))}</span></div>
               ${request.message ? `<div class="message-box"><strong>${escapeHtml(t("message"))}:</strong> ${escapeHtml(request.message)}</div>` : ""}
             </div>
           </div>
-          <div class="actions-row">
-            <button class="btn-danger" type="button" onclick="deleteUser('${request.id}')">${escapeHtml(t("delete"))}</button>
-            <button class="btn-secondary" type="button" onclick="markDeleteRequestDone('${request.id}')">${escapeHtml(t("markRequestDone"))}</button>
-          </div>
+          ${renderDeleteRequestActions(request.id, status, inboxEntryId)}
         </div>
-      `).join("");
+      `;
+      }).join("");
     }
 
     function renderInbox(messages) {
@@ -688,16 +795,19 @@
       }
       root.innerHTML = entries.map((entry) => {
         const status = getInboxStatus(entry);
-        const emailQueued = Boolean(entry.doneEmailQueuedAt || entry.accountDeletedEmailQueuedAt) && !entry.emailSentAt && !entry.emailDeliveryError;
-        const emailSent = Boolean(entry.emailSentAt);
-        const emailFailed = Boolean(String(entry.emailDeliveryError || "").trim());
+        const emailState = getInboxEmailState(entry);
         const userId = entry.userId || entry.id;
-        const actionsHtml = status === "pending" ? `
-          <div class="actions-row">
-            <button class="btn-danger" type="button" onclick="deleteUser('${userId}')">${escapeHtml(t("delete"))}</button>
-            <button class="btn-secondary" type="button" onclick="markDeleteRequestDone('${userId}')">${escapeHtml(t("markRequestDone"))}</button>
-          </div>
-        ` : "";
+        const inboxEntryId = entry.id;
+        const actionsHtml = (status === "pending" || status === "user-deleted")
+          ? renderDeleteRequestActions(userId, status, inboxEntryId)
+          : "";
+        const emailBadge = emailState === "sent"
+          ? `<span class="status-badge status-done">${escapeHtml(t("inboxEmailSent"))}</span>`
+          : emailState === "failed"
+            ? `<span class="status-badge status-blocked" title="${escapeHtml(entry.emailDeliveryError)}">${escapeHtml(t("inboxEmailFailed"))}</span>`
+            : emailState === "queued"
+              ? `<span class="status-badge status-preparing">${escapeHtml(t("inboxEmailQueued"))}</span>`
+              : "";
         return `
         <div class="card">
           <div class="card-header">
@@ -707,9 +817,10 @@
               <div class="card-meta">${escapeHtml(t("requestedAt"))}: ${escapeHtml(formatDate(entry.requestedAt))}</div>
               <div class="card-meta">
                 <span class="status-badge ${inboxStatusClass(status)}">${escapeHtml(inboxStatusLabel(status))}</span>
-                ${emailSent ? `<span class="status-badge status-done">${escapeHtml(t("inboxEmailSent"))}</span>` : emailFailed ? `<span class="status-badge status-blocked" title="${escapeHtml(entry.emailDeliveryError)}">${escapeHtml(t("inboxEmailFailed"))}</span>` : emailQueued ? `<span class="status-badge status-preparing">${escapeHtml(t("inboxEmailQueued"))}</span>` : ""}
+                ${emailBadge}
               </div>
             </div>
+            <button class="btn-danger" type="button" data-admin-action="delete-inbox" data-inbox-id="${escapeHtml(inboxEntryId)}">${escapeHtml(t("deleteMessage"))}</button>
           </div>
           <div class="message-box">${escapeHtml(entry.message)}</div>
           ${actionsHtml}
@@ -718,9 +829,132 @@
       }).join("");
     }
 
+    function renderAdminChatMessages(orderId, messages) {
+      const root = document.getElementById(`admin-chat-${orderId}`);
+      if (!root) return;
+      if (!messages.length) {
+        root.innerHTML = `<div class="card-meta">${escapeHtml(t("chatTitle"))}...</div>`;
+        return;
+      }
+      root.innerHTML = messages.map((msg) => {
+        const role = msg.senderRole === "market" ? "market" : "customer";
+        return `
+          <div class="chat-msg ${role}">
+            <div class="chat-msg-meta">${escapeHtml(msg.senderName || t("unknown"))} · ${escapeHtml(formatDate(msg.createdAt))}</div>
+            <div>${escapeHtml(msg.text || "")}</div>
+          </div>
+        `;
+      }).join("");
+      root.scrollTop = root.scrollHeight;
+    }
+
+    function bindAdminMarketChat(orderId) {
+      if (marketChatUnsubs.has(orderId)) return;
+      const q = query(
+        collection(db, "orderChats", orderId, "messages"),
+        orderBy("createdAt", "asc")
+      );
+      const unsub = onSnapshot(q, (snapshot) => {
+        renderAdminChatMessages(orderId, snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() })));
+      });
+      marketChatUnsubs.set(orderId, unsub);
+    }
+
+    function clearAdminMarketChats(activeOrderIds) {
+      for (const [orderId, unsub] of marketChatUnsubs.entries()) {
+        if (!activeOrderIds.has(orderId)) {
+          unsub();
+          marketChatUnsubs.delete(orderId);
+        }
+      }
+    }
+
+    function renderMarketsOverview(orders) {
+      const statsRoot = document.getElementById("marketStatsRow");
+      const ordersRoot = document.getElementById("marketOrdersList");
+      const filterSelect = document.getElementById("marketFilterSelect");
+      if (!statsRoot || !ordersRoot || !filterSelect) return;
+
+      if (!filterSelect.dataset.ready) {
+        filterSelect.dataset.ready = "1";
+        filterSelect.innerHTML = `<option value="all">${escapeHtml(t("allMarkets"))}</option>` +
+          MARKETS.map((market) => `<option value="${escapeHtml(market.key)}">${escapeHtml(market.label)}</option>`).join("");
+        filterSelect.value = currentMarketFilter;
+        filterSelect.addEventListener("change", (event) => {
+          currentMarketFilter = String(event.target.value || "all");
+          renderMarketsOverview(currentOrders);
+        });
+      }
+
+      const marketOrders = orders.filter((order) => {
+        const marketId = order.marketId || order.marketName;
+        return marketId || (Array.isArray(order.items) && order.items.some((item) => item.market));
+      });
+
+      statsRoot.innerHTML = MARKETS.map((market) => {
+        const count = marketOrders.filter((order) => orderMatchesMarket(order, market.key)).length;
+        return `
+          <div class="stat-box market-stat" style="border-left-color:${market.color}">
+            <div class="stat-num">${count}</div>
+            <div class="stat-label">${escapeHtml(market.label)} · ${escapeHtml(t("marketOrders"))}</div>
+          </div>
+        `;
+      }).join("");
+
+      const filtered = currentMarketFilter === "all"
+        ? marketOrders
+        : marketOrders.filter((order) => orderMatchesMarket(order, currentMarketFilter));
+
+      if (!filtered.length) {
+        ordersRoot.innerHTML = `<p class="empty-msg">${escapeHtml(t("noMarketOrders"))}</p>`;
+        clearAdminMarketChats(new Set());
+        return;
+      }
+
+      const sorted = filtered.slice().sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+      const activeIds = new Set(sorted.slice(0, 30).map((order) => order.id));
+
+      ordersRoot.innerHTML = sorted.slice(0, 30).map((order) => {
+        const items = Array.isArray(order.items) ? order.items : [];
+        const itemsHtml = items.map((item) => {
+          const available = item.available !== false;
+          return `
+            <div class="order-item-row">
+              <span>${escapeHtml(item.name)} x ${item.qty || 1}</span>
+              <span class="status-badge ${available ? "status-done" : "status-blocked"}">${escapeHtml(available ? t("available") : t("unavailable"))}</span>
+            </div>
+          `;
+        }).join("");
+        const driver = order.driver || order.driverLocation || {};
+        const driverText = driver.location
+          ? `${Number(driver.location.lat || 0).toFixed(4)}, ${Number(driver.location.lng || 0).toFixed(4)}`
+          : driver.name || t("unknown");
+        return `
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">${escapeHtml(getMarketLabel(order.marketId || order.marketName))} · ${escapeHtml(order.userName || t("unknown"))}</div>
+                <div class="card-meta">${escapeHtml(formatDate(order.createdAt))} · ${escapeHtml(statusLabel(order.status))}</div>
+                <div class="card-meta">${escapeHtml(order.userPhone || "")} · ${escapeHtml(order.userAddress || "")}</div>
+                <div class="card-meta">${escapeHtml(formatPaymentSummary(order))}</div>
+                <div class="card-meta">${escapeHtml(t("onTheWay"))}: ${escapeHtml(driverText)}</div>
+              </div>
+              <div class="card-title">${formatPrice(order.totalPrice)}</div>
+            </div>
+            <div>${itemsHtml}</div>
+            <div class="chat-box" id="admin-chat-${escapeHtml(order.id)}"></div>
+          </div>
+        `;
+      }).join("");
+
+      clearAdminMarketChats(activeIds);
+      activeIds.forEach((orderId) => bindAdminMarketChat(orderId));
+    }
+
     function renderOrders(orders) {
       currentOrders = orders;
       updateStats(orders, currentUsers);
+      renderMarketsOverview(orders);
       const root = document.getElementById("ordersList");
       document.getElementById("ordersLoading").style.display = "none";
       if (!orders.length) {
@@ -750,8 +984,8 @@
             <div>${itemsHtml}</div>
             <div class="actions-row">
               <select class="status-select" id="sel-${order.id}">${statusOptions}</select>
-              <button class="btn-update" type="button" onclick="updateStatus('${order.id}')">${escapeHtml(t("updateStatus"))}</button>
-              <button class="btn-danger" type="button" onclick="deleteOrder('${order.id}')">${escapeHtml(t("delete"))}</button>
+              <button class="btn-update" type="button" data-admin-action="update-order" data-order-id="${escapeHtml(order.id)}">${escapeHtml(t("updateStatus"))}</button>
+              <button class="btn-danger" type="button" data-admin-action="delete-order" data-order-id="${escapeHtml(order.id)}">${escapeHtml(t("delete"))}</button>
             </div>
           </div>
         `;
@@ -824,19 +1058,35 @@
       showToast(t("updated"));
     };
 
-    async function updateAdminInboxForUser(userId, updates) {
-      const inboxRef = doc(db, "adminInbox", userId);
+    async function syncAdminInboxEntry(inboxEntryId, updates, user, request) {
+      if (!inboxEntryId) return;
+      const inboxRef = doc(db, "adminInbox", inboxEntryId);
       const inboxSnap = await getDoc(inboxRef);
-      if (!inboxSnap.exists()) return;
-      const data = inboxSnap.data();
+      const existing = inboxSnap.exists() ? inboxSnap.data() : {};
+      const userId = updates.userId || request?.id || existing.userId || "";
+      const message = updates.message ?? existing.message ?? request?.message ?? "";
       await setDoc(inboxRef, {
-        ...updates,
         userId,
-        message: data.message || "",
-        email: data.email || "",
-        name: data.name || "",
-        requestedAt: data.requestedAt || updates.requestedAt || new Date().toISOString(),
+        email: updates.email || existing.email || request?.email || user?.email || "",
+        name: updates.name || existing.name || request?.name || user?.name || "",
+        message,
+        requestedAt: updates.requestedAt || existing.requestedAt || request?.requestedAt || new Date().toISOString(),
+        source: existing.source || updates.source || "delete-request",
+        ...updates,
+        message,
       }, { merge: true });
+    }
+
+    async function syncAdminInboxForUser(userId, updates, user, request) {
+      const inboxEntryId = getInboxEntryIdForRequest(request || { id: userId, inboxEntryId: updates.inboxEntryId });
+      await syncAdminInboxEntry(inboxEntryId, { userId, ...updates }, user, request);
+    }
+
+    async function updateAdminInboxForUser(userId, updates, inboxEntryId) {
+      const request = await getDeleteRequestForUser(userId);
+      const user = currentUsers.find((entry) => entry.id === userId) || null;
+      const entryId = inboxEntryId || getInboxEntryIdForRequest(request || { id: userId });
+      await syncAdminInboxEntry(entryId, { userId, ...updates }, user, request);
     }
 
     const legacyInboxMigrated = new Set();
@@ -869,13 +1119,14 @@
       return requestSnap.exists() ? { id: requestSnap.id, ...requestSnap.data() } : null;
     }
 
-    async function deliverEmailViaServer(userId, emailPayload) {
+    async function deliverEmailViaServerOnce(userId, emailPayload, inboxEntryId) {
       const response = await fetch(`${MAIL_API_BASE}/send-account-email`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...emailPayload,
           deleteRequestId: userId,
+          inboxEntryId: inboxEntryId || userId,
         }),
       });
       let data = {};
@@ -886,20 +1137,33 @@
       }
       if (!response.ok || !data.ok) {
         const errorMessage = data.error || data.mail?.reason || t("emailServerNotConfigured");
-        await updateAdminInboxForUser(userId, { emailDeliveryError: errorMessage });
         throw new Error(errorMessage);
       }
+      const sentAt = data.sentAt || new Date().toISOString();
       await updateAdminInboxForUser(userId, {
-        emailSentAt: data.sentAt || new Date().toISOString(),
+        emailSentAt: sentAt,
         emailDeliveryError: "",
-      });
-      return true;
+      }, inboxEntryId);
+      return sentAt;
+    }
+
+    async function deliverEmailViaServer(userId, emailPayload, inboxEntryId) {
+      await wakeMailService();
+      try {
+        return await deliverEmailViaServerOnce(userId, emailPayload, inboxEntryId);
+      } catch (firstError) {
+        await new Promise((resolve) => setTimeout(resolve, 2500));
+        await wakeMailService();
+        return await deliverEmailViaServerOnce(userId, emailPayload, inboxEntryId);
+      }
     }
 
     async function wakeMailService() {
       try {
-        await fetch(`${MAIL_API_BASE}/health`);
-        await fetch(`${MAIL_API_BASE}/mail-process`, { method: "POST" });
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 90000);
+        await fetch(`${MAIL_API_BASE}/health`, { signal: controller.signal });
+        clearTimeout(timeout);
       } catch (error) {
         console.warn("Mail service wake failed", error);
       }
@@ -934,18 +1198,19 @@ Pazar Fiyatı Admin`;
         queuedAt: new Date().toISOString(),
         queuedBy: localStorage.getItem("user_email") || OWNER_EMAIL,
       });
-      await deliverEmailViaServer(userId, { to: email, subject, text, html });
+      const inboxEntryId = getInboxEntryIdForRequest(request || { id: userId });
+      await deliverEmailViaServer(userId, { to: email, subject, text, html }, inboxEntryId);
       return true;
     }
 
-    async function queueAccountDeletedEmail(userId) {
-      const request = await getDeleteRequestForUser(userId);
+    async function queueAccountDeletedEmail(userId, requestOverride) {
+      const request = requestOverride || await getDeleteRequestForUser(userId);
       if (!request) return false;
       const user = currentUsers.find((entry) => entry.id === userId) || {};
       const email = request.email || user.email || "";
       if (!email) throw new Error("No Gmail found for this delete request.");
 
-      const name = request?.name || user.name || email;
+      const name = request.name || user.name || email;
       const subject = "Your Pazar Fiyatı account was deleted";
       const text = `Hello ${name},
 
@@ -961,85 +1226,150 @@ Pazar Fiyatı Admin`;
         <p>Pazar Fiyatı Admin</p>
       `;
 
+      const payload = { to: email, subject, text, html };
+      const inboxEntryId = getInboxEntryIdForRequest(request);
+      const sentAt = await deliverEmailViaServer(userId, payload, inboxEntryId);
       await setDoc(doc(db, "mail", `account-deleted-${userId}-${Date.now()}`), {
         to: email,
         message: { subject, text, html },
         deleteRequestId: userId,
+        inboxEntryId,
         queuedAt: new Date().toISOString(),
         queuedBy: localStorage.getItem("user_email") || OWNER_EMAIL,
+        delivery: { state: "SUCCESS" },
+        emailSentAt: sentAt,
       });
-      await deliverEmailViaServer(userId, { to: email, subject, text, html });
-      return true;
+      return sentAt;
     }
 
-    window.deleteUser = async function(userId) {
-      const user = await getUserForAdmin(userId);
-      const request = await getDeleteRequestForUser(userId);
-      const hasDeleteRequest = Boolean(request);
-      let emailQueued = false;
-      if (hasDeleteRequest) {
-        try {
-          emailQueued = await queueAccountDeletedEmail(userId);
-        } catch (error) {
-          console.error("Account deletion email queue failed", error);
-          showToast(`${t("emailQueueFailed")}: ${error.message}`);
-        }
-      }
+    async function removeUserAccount(userId, user, request) {
       const now = new Date().toISOString();
       await setDoc(doc(db, "deletedAccounts", userId), {
         forceLogout: true,
         deletedAt: now,
         deletedBy: localStorage.getItem("user_email") || OWNER_EMAIL,
-        email: user.email || "",
-        name: user.name || "",
+        email: user.email || request?.email || "",
+        name: user.name || request?.name || "",
       }, { merge: true });
-      if (hasDeleteRequest) {
-        await updateAdminInboxForUser(userId, {
-          status: "completed",
-          completedAt: now,
-        });
-        await setDoc(doc(db, "deleteRequests", userId), {
-          status: "completed",
-          completedAt: now,
-          completedBy: localStorage.getItem("user_email") || OWNER_EMAIL,
-          emailQueued,
-          emailQueuedAt: emailQueued ? now : null,
-        }, { merge: true });
-      }
       await deleteDoc(doc(db, "users", userId));
+      recentlyDeletedUserIds.add(userId);
       currentUsers = currentUsers.filter((entry) => entry.id !== userId);
+      if (request) {
+        const preserve = {
+          userDeletedAt: now,
+          status: "user-deleted",
+          message: request.message || "",
+          email: request.email || user.email || "",
+          name: request.name || user.name || "",
+          requestedAt: request.requestedAt || now,
+        };
+        await setDoc(doc(db, "deleteRequests", userId), preserve, { merge: true });
+        await syncAdminInboxForUser(userId, preserve, user, request);
+        refreshDeleteRequestViews(userId, preserve, getInboxEntryIdForRequest(request));
+      }
       renderUsers(currentUsers);
-      if (emailQueued) {
-        showToast(`${t("removed")} - ${t("inboxEmailSent")}`);
-      } else if (hasDeleteRequest) {
-        showToast(`${t("removed")} - ${t("inboxEmailFailed")}`);
-      } else {
+      return now;
+    }
+
+    window.deleteUser = async function(userId) {
+      try {
+        const user = await getUserForAdmin(userId);
+        const request = await getDeleteRequestForUser(userId);
+        await removeUserAccount(userId, user, request);
         showToast(t("removed"));
+      } catch (error) {
+        console.error("Delete user failed", error);
+        showToast(`${t("saveFailed")}: ${error.message}`, true);
       }
     };
 
-    window.markDeleteRequestDone = async function(userId) {
-      try {
-        await queueDeleteRequestDoneEmail(userId);
-      } catch (error) {
-        console.error("Delete request done email queue failed", error);
-        showToast(`${t("emailQueueFailed")}: ${error.message}`);
+    window.deleteInboxMessage = async function(inboxEntryId) {
+      if (!inboxEntryId) return;
+      await deleteDoc(doc(db, "adminInbox", inboxEntryId));
+      showToast(t("removed"));
+    };
+
+    window.markDeleteRequestDone = async function(userId, button, inboxEntryId) {
+      const request = await getDeleteRequestForUser(userId);
+      if (!request || !String(request.message || "").trim()) {
+        showToast(t("noDeleteRequests"), true);
         return;
       }
-      const now = new Date().toISOString();
-      await updateAdminInboxForUser(userId, {
-        status: "done",
-        doneMarkedAt: now,
-        doneEmailQueuedAt: now,
-      });
-      await setDoc(doc(db, "deleteRequests", userId), {
-        status: "done",
-        doneMarkedAt: now,
-        doneMarkedBy: localStorage.getItem("user_email") || OWNER_EMAIL,
-        doneEmailQueuedAt: now,
-      }, { merge: true });
-      showToast(`${t("updated")} - ${t("inboxEmailSent")}`);
+
+      const entryId = inboxEntryId || getInboxEntryIdForRequest(request);
+      const originalText = button ? button.textContent : "";
+      if (button) {
+        button.disabled = true;
+        button.textContent = t("sendingEmail");
+      }
+
+      try {
+        const mailWake = wakeMailService();
+        if (isUserRegistered(userId)) {
+          const user = await getUserForAdmin(userId);
+          await removeUserAccount(userId, user, request);
+        }
+        await mailWake;
+        const sentAt = await queueAccountDeletedEmail(userId, request);
+
+        const now = new Date().toISOString();
+        const doneUpdate = {
+          status: "done",
+          doneMarkedAt: now,
+          doneEmailQueuedAt: now,
+          emailSentAt: sentAt || now,
+          emailDeliveryError: "",
+          message: request.message || "",
+        };
+        await syncAdminInboxEntry(entryId, { userId, ...doneUpdate }, null, request);
+        await setDoc(doc(db, "deleteRequests", userId), {
+          ...doneUpdate,
+          doneMarkedBy: localStorage.getItem("user_email") || OWNER_EMAIL,
+        }, { merge: true });
+        refreshDeleteRequestViews(userId, doneUpdate, entryId);
+        showToast(`${t("updated")} - ${t("inboxEmailSent")}`);
+      } catch (error) {
+        console.error("Mark delete request done failed", error);
+        const entry = currentInboxMessages.find((item) => item.id === entryId);
+        if (entry?.emailSentAt) {
+          showToast(`${t("updated")} - ${t("inboxEmailSent")}`);
+          return;
+        }
+        await updateAdminInboxForUser(userId, { emailDeliveryError: error.message }, entryId);
+        showToast(`${t("emailQueueFailed")}: ${error.message}`, true);
+        if (button) {
+          button.disabled = false;
+          button.textContent = originalText || t("markRequestDone");
+        }
+      }
     };
+
+    function bindAdminActions() {
+      const root = document.getElementById("adminGuard");
+      if (!root || root.dataset.actionsBound === "1") return;
+      root.dataset.actionsBound = "1";
+      root.addEventListener("click", async (event) => {
+        const button = event.target.closest("[data-admin-action]");
+        if (!button || button.disabled) return;
+        const action = button.dataset.adminAction;
+        const userId = button.dataset.userId || "";
+        const orderId = button.dataset.orderId || "";
+        const inboxId = button.dataset.inboxId || "";
+        try {
+          if (action === "delete-user") await window.deleteUser(userId);
+          else if (action === "mark-done") await window.markDeleteRequestDone(userId, button, inboxId);
+          else if (action === "delete-inbox") await window.deleteInboxMessage(inboxId);
+          else if (action === "save-user") await window.saveUser(userId);
+          else if (action === "block-user") await window.setUserBlocked(userId, true);
+          else if (action === "unblock-user") await window.setUserBlocked(userId, false);
+          else if (action === "update-order") await window.updateStatus(orderId);
+          else if (action === "delete-order") await window.deleteOrder(orderId);
+        } catch (error) {
+          console.error("Admin action failed", action, error);
+          showToast(`${t("saveFailed")}: ${error.message}`, true);
+        }
+      });
+    }
 
     document.querySelectorAll(".tab-btn").forEach((button) => {
       button.addEventListener("click", () => {
@@ -1088,6 +1418,7 @@ Pazar Fiyatı Admin`;
     } else {
       document.getElementById("accessDenied").style.display = "none";
       document.getElementById("adminGuard").style.display = "block";
+      bindAdminActions();
 
       onSnapshot(doc(db, "appSettings", "global"), (snapshot) => {
         const data = snapshot.exists() ? snapshot.data() : {};

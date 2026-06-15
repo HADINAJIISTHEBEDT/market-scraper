@@ -84,9 +84,10 @@ function buildTransporter() {
   });
 }
 
-async function markInboxEmailSent(deleteRequestId, sentAt) {
-  if (!firestore || !deleteRequestId) return;
-  await firestore.doc(`adminInbox/${deleteRequestId}`).set(
+async function markInboxEmailSent(deleteRequestId, sentAt, inboxEntryId) {
+  const docId = String(inboxEntryId || deleteRequestId || "").trim();
+  if (!firestore || !docId) return;
+  await firestore.doc(`adminInbox/${docId}`).set(
     {
       emailSentAt: sentAt,
       emailDeliveryError: "",
@@ -95,9 +96,13 @@ async function markInboxEmailSent(deleteRequestId, sentAt) {
   );
 }
 
-async function markInboxEmailFailed(deleteRequestId, errorMessage) {
-  if (!firestore || !deleteRequestId) return;
-  await firestore.doc(`adminInbox/${deleteRequestId}`).set(
+async function markInboxEmailFailed(deleteRequestId, errorMessage, inboxEntryId) {
+  const docId = String(inboxEntryId || deleteRequestId || "").trim();
+  if (!firestore || !docId) return;
+  const ref = firestore.doc(`adminInbox/${docId}`);
+  const snap = await ref.get();
+  if (snap.exists() && snap.data()?.emailSentAt) return;
+  await ref.set(
     {
       emailDeliveryError: String(errorMessage || "Email send failed"),
     },
@@ -132,7 +137,7 @@ async function processMailDoc(docSnap) {
       },
       { merge: true },
     );
-    await markInboxEmailFailed(data.deleteRequestId, errorMessage);
+    await markInboxEmailFailed(data.deleteRequestId, errorMessage, data.inboxEntryId);
     return;
   }
 
@@ -190,7 +195,7 @@ async function processMailDoc(docSnap) {
       },
       { merge: true },
     );
-    await markInboxEmailSent(data.deleteRequestId, sentAt);
+    await markInboxEmailSent(data.deleteRequestId, sentAt, data.inboxEntryId);
     log(`Sent mail ${docId} to ${to}`);
   } catch (err) {
     log(`Failed to send mail ${docId}`, err.message);
@@ -206,7 +211,7 @@ async function processMailDoc(docSnap) {
       },
       { merge: true },
     );
-    await markInboxEmailFailed(data.deleteRequestId, err.message);
+    await markInboxEmailFailed(data.deleteRequestId, err.message, data.inboxEntryId);
   } finally {
     processing.delete(docId);
   }
@@ -249,6 +254,7 @@ async function sendAccountEmail(payload) {
   const text = String(payload?.text || "").trim();
   const html = String(payload?.html || "").trim();
   const deleteRequestId = String(payload?.deleteRequestId || "").trim();
+  const inboxEntryId = String(payload?.inboxEntryId || "").trim();
 
   if (!to || !subject || (!text && !html)) {
     throw new Error("Missing to, subject, or body");
@@ -284,8 +290,8 @@ async function sendAccountEmail(payload) {
     });
   }
 
-  if (deleteRequestId && firestore) {
-    await markInboxEmailSent(deleteRequestId, sentAt);
+  if ((deleteRequestId || inboxEntryId) && firestore) {
+    await markInboxEmailSent(deleteRequestId, sentAt, inboxEntryId);
   }
 
   log(`Sent mail directly to ${to}`);

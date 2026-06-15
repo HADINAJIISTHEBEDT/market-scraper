@@ -13,8 +13,8 @@
       flex-wrap: wrap;
     }
     .nav-bar a { color: #2563eb; text-decoration: none; font-weight: 600; }
-    .lang-select {
-      padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff;
+    .lang-select, .chat-input {
+      padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; font: inherit;
     }
     .order-card {
       border: 1px solid #e5e7eb; border-radius: 12px;
@@ -32,7 +32,14 @@
     .status-on-the-way { background: #fce7f3; color: #9d174d; }
     .status-delivered { background: #dcfce7; color: #166534; }
     .order-items { margin-top: 10px; }
-    .order-item-row { display: flex; justify-content: space-between; font-size: 14px; padding: 3px 0; border-bottom: 1px solid #f1f5f9; }
+    .order-item-row {
+      display: flex; justify-content: space-between; align-items: center; gap: 8px;
+      font-size: 14px; padding: 6px 0; border-bottom: 1px solid #f1f5f9;
+    }
+    .item-unavailable { opacity: .55; text-decoration: line-through; }
+    .avail-badge { padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+    .avail-yes { background: #dcfce7; color: #166534; }
+    .avail-no { background: #fee2e2; color: #991b1b; }
     .status-track { display: flex; gap: 0; margin-top: 14px; }
     .track-step {
       flex: 1; text-align: center; padding: 6px 4px; font-size: 12px;
@@ -40,6 +47,27 @@
     }
     .track-step.done { background: #16a34a; color: #fff; border-color: #16a34a; }
     .track-step.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+    .driver-box {
+      margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: #f8fafc; font-size: 14px;
+    }
+    .chat-panel {
+      margin-top: 12px; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden;
+    }
+    .chat-messages {
+      max-height: 200px; overflow-y: auto; padding: 10px; background: #f8fafc; display: grid; gap: 8px;
+    }
+    .chat-msg {
+      max-width: 85%; padding: 8px 10px; border-radius: 10px; font-size: 13px; line-height: 1.4;
+    }
+    .chat-msg.market { background: #dbeafe; color: #1e3a8a; justify-self: start; }
+    .chat-msg.customer { background: #fff; border: 1px solid #e2e8f0; justify-self: end; }
+    .chat-msg-meta { font-size: 11px; color: #64748b; margin-bottom: 2px; }
+    .chat-compose { display: flex; gap: 8px; padding: 10px; border-top: 1px solid #e5e7eb; }
+    .chat-input { flex: 1; }
+    .btn-send {
+      padding: 8px 14px; border: none; border-radius: 8px; background: #2563eb; color: #fff;
+      font: inherit; font-weight: 700; cursor: pointer;
+    }
     .empty-msg { text-align: center; color: #64748b; margin-top: 60px; font-size: 18px; }
   </style>
 </head>
@@ -63,9 +91,10 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import {
-      getFirestore, collection, query, where, orderBy, onSnapshot
+      getFirestore, collection, query, where, orderBy, onSnapshot, addDoc
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
     import firebaseConfig from "./firebase-config.js";
+    import { getMarketLabel } from "./markets-config.js";
 
     await window.AppSettings.ready();
     if (!window.FeatureAccess?.guardPage()) {
@@ -81,7 +110,17 @@
         pending: "Beklemede",
         preparing: "Hazirlaniyor",
         onTheWay: "Yolda",
-        delivered: "Teslim edildi"
+        delivered: "Teslim edildi",
+        available: "Mevcut",
+        unavailable: "Yok",
+        driver: "Surucu",
+        trackDriver: "Surucuyu haritada ac",
+        driverWaiting: "Surucu konumu henuz paylasilmadi",
+        chatTitle: "Market ile sohbet",
+        chatPlaceholder: "Market'e mesaj yazin...",
+        send: "Gonder",
+        market: "Market",
+        unknown: "Bilinmiyor",
       },
       en: {
         pageTitle: "My Orders",
@@ -92,7 +131,17 @@
         pending: "Pending",
         preparing: "Preparing",
         onTheWay: "On the way",
-        delivered: "Delivered"
+        delivered: "Delivered",
+        available: "Available",
+        unavailable: "Unavailable",
+        driver: "Driver",
+        trackDriver: "Open driver on map",
+        driverWaiting: "Driver location not shared yet",
+        chatTitle: "Chat with market",
+        chatPlaceholder: "Message the market...",
+        send: "Send",
+        market: "Market",
+        unknown: "Unknown",
       },
       ar: {
         pageTitle: "طلباتي",
@@ -103,8 +152,18 @@
         pending: "قيد الانتظار",
         preparing: "قيد التحضير",
         onTheWay: "في الطريق",
-        delivered: "تم التسليم"
-      }
+        delivered: "تم التسليم",
+        available: "متوفر",
+        unavailable: "غير متوفر",
+        driver: "السائق",
+        trackDriver: "فتح السائق على الخريطة",
+        driverWaiting: "لم يتم مشاركة موقع السائق بعد",
+        chatTitle: "الدردشة مع السوق",
+        chatPlaceholder: "اكتب رسالة للسوق...",
+        send: "إرسال",
+        market: "السوق",
+        unknown: "غير معروف",
+      },
     };
 
     const app = initializeApp(firebaseConfig);
@@ -113,6 +172,7 @@
     const userUid = localStorage.getItem("user_uid");
     let currentLang = localStorage.getItem("app_lang") || "tr";
     let currentOrders = [];
+    const chatUnsubscribers = new Map();
 
     if (!userUid) {
       window.location.href = "login.html";
@@ -124,11 +184,7 @@
 
     function escapeHtml(text) {
       return String(text).replace(/[&<>"']/g, (char) => ({
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#039;"
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
       }[char]));
     }
 
@@ -177,35 +233,124 @@
         `</div>`;
     }
 
+    function driverHtml(order) {
+      const driver = order.driver || {};
+      const loc = order.driverLocation;
+      let track = `<div>${escapeHtml(t("driverWaiting"))}</div>`;
+      if (loc && loc.lat != null && loc.lng != null) {
+        const url = `https://www.google.com/maps?q=${encodeURIComponent(loc.lat)},${encodeURIComponent(loc.lng)}`;
+        track = `<a href="${url}" target="_blank" rel="noopener">${escapeHtml(t("trackDriver"))}</a>`;
+      }
+      return `
+        <div class="driver-box">
+          <strong>${escapeHtml(t("driver"))}</strong>
+          ${driver.name ? `${escapeHtml(driver.name)}<br>` : ""}
+          ${track}
+        </div>
+      `;
+    }
+
+    function renderChatMessages(orderId, messages) {
+      const root = document.getElementById(`chat-messages-${orderId}`);
+      if (!root) return;
+      root.innerHTML = messages.map((msg) => {
+        const role = msg.senderRole === "market" ? "market" : "customer";
+        return `
+          <div class="chat-msg ${role}">
+            <div class="chat-msg-meta">${escapeHtml(msg.senderName || t("unknown"))} · ${escapeHtml(formatDate(msg.createdAt))}</div>
+            <div>${escapeHtml(msg.text || "")}</div>
+          </div>
+        `;
+      }).join("");
+      root.scrollTop = root.scrollHeight;
+    }
+
+    function bindChatListener(orderId) {
+      if (chatUnsubscribers.has(orderId)) return;
+      const q = query(
+        collection(db, "orderChats", orderId, "messages"),
+        orderBy("createdAt", "asc")
+      );
+      const unsub = onSnapshot(q, (snapshot) => {
+        const messages = snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() }));
+        renderChatMessages(orderId, messages);
+      });
+      chatUnsubscribers.set(orderId, unsub);
+    }
+
+    function clearChatListeners(activeOrderIds) {
+      for (const [orderId, unsub] of chatUnsubscribers.entries()) {
+        if (!activeOrderIds.has(orderId)) {
+          unsub();
+          chatUnsubscribers.delete(orderId);
+        }
+      }
+    }
+
+    async function sendChatMessage(orderId) {
+      const input = document.getElementById(`chat-input-${orderId}`);
+      const text = String(input?.value || "").trim();
+      if (!text) return;
+      await addDoc(collection(db, "orderChats", orderId, "messages"), {
+        senderId: userUid,
+        senderRole: "customer",
+        senderName: userName || t("unknown"),
+        text,
+        createdAt: new Date().toISOString(),
+      });
+      input.value = "";
+    }
+
     function renderOrders(orders) {
       currentOrders = orders;
       const root = document.getElementById("ordersList");
       if (!orders.length) {
         root.innerHTML = `<p class="empty-msg">${escapeHtml(t("noOrders"))}<br><a href="index.html">${escapeHtml(t("startShopping"))}</a></p>`;
+        clearChatListeners(new Set());
         return;
       }
 
+      const activeIds = new Set(orders.map((order) => order.id));
       root.innerHTML = orders.map(order => {
         const items = Array.isArray(order.items) ? order.items : [];
-        const itemsHtml = items.map(item =>
-          `<div class="order-item-row">
+        const itemsHtml = items.map(item => {
+          const available = item.available !== false;
+          return `<div class="order-item-row ${available ? "" : "item-unavailable"}">
             <span>${escapeHtml(item.name)} x ${item.qty || 1}</span>
-            <span>${formatPrice((item.price || 0) * (item.qty || 1))}</span>
-          </div>`
-        ).join("");
+            <span>
+              <span class="avail-badge ${available ? "avail-yes" : "avail-no"}">${escapeHtml(available ? t("available") : t("unavailable"))}</span>
+              ${formatPrice((item.price || 0) * (item.qty || 1))}
+            </span>
+          </div>`;
+        }).join("");
+
+        const showDriver = order.status === "on-the-way" || order.status === "delivered";
 
         return `<div class="order-card">
           <div class="order-header">
             <div>
               <div class="order-date">${escapeHtml(formatDate(order.createdAt))}</div>
+              <div class="order-date">${escapeHtml(t("market"))}: ${escapeHtml(getMarketLabel(order.marketId || order.marketName))}</div>
               <span class="status-badge ${statusClass(order.status)}">${escapeHtml(statusLabel(order.status))}</span>
             </div>
             <div class="order-total">${formatPrice(order.totalPrice)}</div>
           </div>
           <div class="order-items">${itemsHtml}</div>
           ${renderTrack(order.status)}
+          ${showDriver ? driverHtml(order) : ""}
+          <div class="chat-panel">
+            <div class="order-date" style="padding:10px 10px 0;">${escapeHtml(t("chatTitle"))}</div>
+            <div class="chat-messages" id="chat-messages-${escapeHtml(order.id)}"></div>
+            <div class="chat-compose">
+              <input class="chat-input" id="chat-input-${escapeHtml(order.id)}" placeholder="${escapeHtml(t("chatPlaceholder"))}" />
+              <button class="btn-send" type="button" data-order-action="send-chat" data-order-id="${escapeHtml(order.id)}">${escapeHtml(t("send"))}</button>
+            </div>
+          </div>
         </div>`;
       }).join("");
+
+      clearChatListeners(activeIds);
+      orders.forEach((order) => bindChatListener(order.id));
     }
 
     document.getElementById("langSelect").addEventListener("change", (event) => {
@@ -213,6 +358,22 @@
       localStorage.setItem("app_lang", currentLang);
       applyLanguage();
       renderOrders(currentOrders);
+    });
+
+    document.body.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-order-action]");
+      if (!button) return;
+      if (button.dataset.orderAction === "send-chat") {
+        void sendChatMessage(button.dataset.orderId || "");
+      }
+    });
+
+    document.body.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") return;
+      const input = event.target.closest(".chat-input");
+      if (!input || !input.id.startsWith("chat-input-")) return;
+      event.preventDefault();
+      void sendChatMessage(input.id.replace("chat-input-", ""));
     });
 
     applyLanguage();

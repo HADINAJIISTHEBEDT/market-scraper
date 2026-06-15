@@ -40,7 +40,7 @@
   <script src="app-settings.js"></script>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { initializeFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { initializeFirestore, doc, setDoc, addDoc, collection } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
     import firebaseConfig from "./firebase-config.js";
 
     await window.AppSettings.ready();
@@ -143,15 +143,7 @@
         setStatus(t("sending"));
         try {
           const requestedAt = new Date().toISOString();
-          await setDoc(doc(db, "deleteRequests", userUid), {
-            userId: userUid,
-            email: userEmail,
-            name: userName || "",
-            message,
-            status: "pending",
-            requestedAt,
-          });
-          await setDoc(doc(db, "adminInbox", userUid), {
+          const inboxRef = await addDoc(collection(db, "adminInbox"), {
             userId: userUid,
             email: userEmail,
             name: userName || "",
@@ -160,6 +152,15 @@
             requestedAt,
             source: "delete-request",
           });
+          await setDoc(doc(db, "deleteRequests", userUid), {
+            userId: userUid,
+            email: userEmail,
+            name: userName || "",
+            message,
+            status: "pending",
+            requestedAt,
+            inboxEntryId: inboxRef.id,
+          }, { merge: true });
           setStatus(t("sent"));
         } catch (error) {
           setStatus(`${t("failed")}: ${error.message}`, true);

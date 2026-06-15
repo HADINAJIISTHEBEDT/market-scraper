@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Market Panel</title>
+  <link rel="stylesheet" href="css.css" />
+  <style>
+    body { max-width: 1100px; margin: 0 auto; padding: 24px; background: #f8fafc; }
+    #accessDenied { display: none; text-align: center; margin-top: 80px; color: #b91c1c; }
+    .nav-bar {
+      display: flex; justify-content: space-between; align-items: center; gap: 12px;
+      margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid #e5e7eb; flex-wrap: wrap;
+    }
+    .nav-bar a { color: #2563eb; text-decoration: none; font-weight: 600; }
+    .lang-select, .field-input, .status-select, .chat-input {
+      padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font: inherit; background: #fff;
+    }
+    .market-header {
+      display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+      margin-bottom: 18px;
+    }
+    .market-title { font-size: 28px; font-weight: 800; color: #1e293b; }
+    .stats-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+    .stat-box {
+      flex: 1; min-width: 120px; border: 1px solid #e5e7eb; border-radius: 10px;
+      padding: 14px; text-align: center; background: #fff;
+    }
+    .stat-num { font-size: 28px; font-weight: 800; color: #2563eb; }
+    .stat-label { font-size: 12px; color: #64748b; margin-top: 4px; }
+    .card {
+      border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px; margin-bottom: 12px; background: #fff;
+    }
+    .card-header { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: flex-start; }
+    .card-title { font-weight: 800; color: #1e293b; }
+    .card-meta { font-size: 13px; color: #64748b; margin-top: 4px; }
+    .profile-box, .payment-box, .driver-box {
+      margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: #f8fafc; font-size: 14px;
+    }
+    .profile-box strong, .payment-box strong, .driver-box strong { display: block; margin-bottom: 6px; }
+    .order-item-row {
+      display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center;
+      padding: 8px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px;
+    }
+    .item-unavailable { opacity: .55; text-decoration: line-through; }
+    .status-badge {
+      display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 600;
+    }
+    .status-pending { background: #fef9c3; color: #854d0e; }
+    .status-preparing { background: #dbeafe; color: #1e40af; }
+    .status-on-the-way { background: #fce7f3; color: #9d174d; }
+    .status-delivered { background: #dcfce7; color: #166534; }
+    .avail-badge { padding: 3px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .avail-yes { background: #dcfce7; color: #166534; }
+    .avail-no { background: #fee2e2; color: #991b1b; }
+    .btn-primary, .btn-secondary, .btn-danger, .btn-update, .btn-small {
+      padding: 8px 14px; border: none; border-radius: 8px; cursor: pointer; font: inherit; font-weight: 700;
+    }
+    .btn-primary { background: #2563eb; color: #fff; }
+    .btn-secondary { background: #e2e8f0; color: #1e293b; }
+    .btn-danger { background: #fee2e2; color: #b91c1c; }
+    .btn-update { background: #2563eb; color: #fff; }
+    .btn-small { padding: 5px 10px; font-size: 12px; }
+    .actions-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; align-items: center; }
+    .driver-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+    .chat-panel {
+      margin-top: 12px; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; background: #fff;
+    }
+    .chat-messages {
+      max-height: 220px; overflow-y: auto; padding: 10px; background: #f8fafc; display: grid; gap: 8px;
+    }
+    .chat-msg {
+      max-width: 85%; padding: 8px 10px; border-radius: 10px; font-size: 13px; line-height: 1.4;
+    }
+    .chat-msg.market { background: #dbeafe; color: #1e3a8a; justify-self: start; }
+    .chat-msg.customer { background: #fff; border: 1px solid #e2e8f0; justify-self: end; }
+    .chat-msg-meta { font-size: 11px; color: #64748b; margin-bottom: 2px; }
+    .chat-compose { display: flex; gap: 8px; padding: 10px; border-top: 1px solid #e5e7eb; }
+    .chat-input { flex: 1; }
+    .empty-msg { color: #64748b; text-align: center; padding: 24px 0; }
+    .toast {
+      position: fixed; right: 20px; bottom: 20px; background: #166534; color: #fff; padding: 12px 16px;
+      border-radius: 10px; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.2); display: none; z-index: 20;
+    }
+  </style>
+</head>
+<body>
+  <div id="accessDenied">
+    <h2 id="deniedTitle">Access Denied</h2>
+    <p id="deniedMessage">You must be logged in as admin to view this market panel.</p>
+    <a id="deniedBack" href="markets.html">Back to markets</a>
+  </div>
+
+  <div id="marketGuard" style="display:none;">
+    <div class="nav-bar">
+      <a id="marketsLink" href="markets.html">All markets</a>
+      <a id="driverLink" href="driver.html">Driver</a>
+      <select id="marketSelect" class="lang-select"></select>
+      <select id="langSelect" class="lang-select">
+        <option value="tr">Türkçe</option>
+        <option value="en">English</option>
+        <option value="ar">العربية</option>
+      </select>
+    </div>
+
+    <div class="market-header">
+      <div class="market-title" id="marketTitle">Market</div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-box"><div class="stat-num" id="statTotal">0</div><div class="stat-label" id="statTotalLabel">Orders</div></div>
+      <div class="stat-box"><div class="stat-num" id="statPending">0</div><div class="stat-label" id="statPendingLabel">Pending</div></div>
+      <div class="stat-box"><div class="stat-num" id="statActive">0</div><div class="stat-label" id="statActiveLabel">On the way</div></div>
+    </div>
+
+    <div id="ordersList"></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="feature-access.js"></script>
+  <script src="app-settings.js"></script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import {
+      getFirestore, collection, doc, getDoc, updateDoc, onSnapshot, addDoc, query, orderBy
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import firebaseConfig from "./firebase-config.js";
+    import { MARKETS, getMarketByKey, getMarketLabel, orderMatchesMarket } from "./markets-config.js";
+
+    await window.AppSettings.ready();
+
+    const I18N = {
+      tr: {
+        deniedTitle: "Erisim reddedildi",
+        deniedMessage: "Market panelini gormek icin admin olarak giris yapmalisiniz.",
+        deniedBack: "Marketlere don",
+        marketsLink: "Tum marketler",
+        driverLink: "Surucu",
+        orders: "Siparisler",
+        pending: "Beklemede",
+        onTheWay: "Yolda",
+        noOrders: "Bu market icin siparis yok.",
+        customerProfile: "Musteri profili",
+        payment: "Odeme",
+        payCash: "Kapida nakit",
+        payCard: "Kart",
+        cardLast4: "Son 4 hane",
+        cardName: "Kart sahibi",
+        cardExpiry: "Son kullanma",
+        phone: "Telefon",
+        address: "Adres",
+        email: "E-posta",
+        available: "Mevcut",
+        unavailable: "Yok",
+        markAvailable: "Mevcut yap",
+        markUnavailable: "Yok yap",
+        updateStatus: "Durumu guncelle",
+        driver: "Surucu",
+        driverName: "Surucu adi",
+        driverPhone: "Surucu telefonu",
+        assignDriver: "Surucu ata ve yola cikar",
+        trackDriver: "Surucuyu takip et",
+        chatTitle: "Canli sohbet",
+        chatPlaceholder: "Musteriye mesaj yazin...",
+        send: "Gonder",
+        updated: "Guncellendi",
+        unknown: "Bilinmiyor",
+        pendingStatus: "Beklemede",
+        preparing: "Hazirlaniyor",
+        onTheWayStatus: "Yolda",
+        delivered: "Teslim edildi",
+        qty: "adet",
+      },
+      en: {
+        deniedTitle: "Access denied",
+        deniedMessage: "You must be logged in as admin to view this market panel.",
+        deniedBack: "Back to markets",
+        marketsLink: "All markets",
+        driverLink: "Driver",
+        orders: "Orders",
+        pending: "Pending",
+        onTheWay: "On the way",
+        noOrders: "No orders for this market yet.",
+        customerProfile: "Customer profile",
+        payment: "Payment",
+        payCash: "Cash on delivery",
+        payCard: "Card",
+        cardLast4: "Last 4 digits",
+        cardName: "Cardholder",
+        cardExpiry: "Expiry",
+        phone: "Phone",
+        address: "Address",
+        email: "Email",
+        available: "Available",
+        unavailable: "Unavailable",
+        markAvailable: "Mark available",
+        markUnavailable: "Mark unavailable",
+        updateStatus: "Update status",
+        driver: "Driver",
+        driverName: "Driver name",
+        driverPhone: "Driver phone",
+        assignDriver: "Assign driver & send",
+        trackDriver: "Track driver",
+        chatTitle: "Live chat",
+        chatPlaceholder: "Message the customer...",
+        send: "Send",
+        updated: "Updated",
+        unknown: "Unknown",
+        pendingStatus: "Pending",
+        preparing: "Preparing",
+        onTheWayStatus: "On the way",
+        delivered: "Delivered",
+        qty: "each",
+      },
+      ar: {
+        deniedTitle: "تم رفض الوصول",
+        deniedMessage: "يجب تسجيل الدخول كمسؤول لعرض لوحة السوق.",
+        deniedBack: "العودة إلى الأسواق",
+        marketsLink: "كل الأسواق",
+        driverLink: "السائق",
+        orders: "الطلبات",
+        pending: "قيد الانتظار",
+        onTheWay: "في الطريق",
+        noOrders: "لا توجد طلبات لهذا السوق بعد.",
+        customerProfile: "ملف العميل",
+        payment: "الدفع",
+        payCash: "نقداً عند التسليم",
+        payCard: "بطاقة",
+        cardLast4: "آخر 4 أرقام",
+        cardName: "اسم حامل البطاقة",
+        cardExpiry: "تاريخ الانتهاء",
+        phone: "الهاتف",
+        address: "العنوان",
+        email: "البريد الإلكتروني",
+        available: "متوفر",
+        unavailable: "غير متوفر",
+        markAvailable: "تعيين متوفر",
+        markUnavailable: "تعيين غير متوفر",
+        updateStatus: "تحديث الحالة",
+        driver: "السائق",
+        driverName: "اسم السائق",
+        driverPhone: "هاتف السائق",
+        assignDriver: "تعيين السائق وإرساله",
+        trackDriver: "تتبع السائق",
+        chatTitle: "دردشة مباشرة",
+        chatPlaceholder: "اكتب رسالة للعميل...",
+        send: "إرسال",
+        updated: "تم التحديث",
+        unknown: "غير معروف",
+        pendingStatus: "قيد الانتظار",
+        preparing: "قيد التحضير",
+        onTheWayStatus: "في الطريق",
+        delivered: "تم التسليم",
+        qty: "للقطعة",
+      },
+    };
+
+    const STATUSES = ["pending", "preparing", "on-the-way", "delivered"];
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    let currentLang = localStorage.getItem("app_lang") || "tr";
+    let currentMarketId = new URLSearchParams(window.location.search).get("market") || MARKETS[0].key;
+    let currentOrders = [];
+    let userCache = new Map();
+    const chatUnsubscribers = new Map();
+
+    function t(key) {
+      return (I18N[currentLang] && I18N[currentLang][key]) || I18N.tr[key] || key;
+    }
+
+    function escapeHtml(text) {
+      return String(text).replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
+      }[char]));
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById("toast");
+      toast.textContent = message;
+      toast.style.display = "block";
+      setTimeout(() => { toast.style.display = "none"; }, 2200);
+    }
+
+    function formatPrice(price) {
+      return `${Number(price || 0).toFixed(2).replace(".", ",")} TL`;
+    }
+
+    function formatDate(iso) {
+      if (!iso) return "";
+      const d = new Date(iso);
+      return d.toLocaleDateString("tr-TR") + " " + d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+    }
+
+    function statusLabel(status) {
+      return {
+        pending: t("pendingStatus"),
+        preparing: t("preparing"),
+        "on-the-way": t("onTheWayStatus"),
+        delivered: t("delivered"),
+      }[status] || status;
+    }
+
+    function statusClass(status) {
+      return "status-" + String(status || "pending").replace(/\s+/g, "-");
+    }
+
+    function paymentHtml(order) {
+      const summary = order.paymentSummary || {};
+      if (order.paymentMethod === "card" || summary.type === "card") {
+        return `
+          <strong>${escapeHtml(t("payment"))}</strong>
+          ${escapeHtml(t("payCard"))}<br>
+          ${escapeHtml(t("cardName"))}: ${escapeHtml(summary.cardholderName || t("unknown"))}<br>
+          ${escapeHtml(t("cardLast4"))}: ${escapeHtml(summary.last4 || "----")}<br>
+          ${escapeHtml(t("cardExpiry"))}: ${escapeHtml(summary.expiry || "-")}
+        `;
+      }
+      return `<strong>${escapeHtml(t("payment"))}</strong>${escapeHtml(t("payCash"))}`;
+    }
+
+    function driverMapLink(order) {
+      const loc = order.driverLocation || order.driver?.location;
+      if (!loc || loc.lat == null || loc.lng == null) return "";
+      const url = `https://www.google.com/maps?q=${encodeURIComponent(loc.lat)},${encodeURIComponent(loc.lng)}`;
+      return `<a href="${url}" target="_blank" rel="noopener">${escapeHtml(t("trackDriver"))}</a>`;
+    }
+
+    async function getUserProfile(userId, order) {
+      if (userCache.has(userId)) return userCache.get(userId);
+      let profile = {
+        name: order.userName || "",
+        email: order.userEmail || "",
+        phone: order.userPhone || "",
+        address: order.userAddress || "",
+      };
+      try {
+        const snap = await getDoc(doc(db, "users", userId));
+        if (snap.exists()) {
+          const data = snap.data();
+          profile = {
+            name: data.name || profile.name,
+            email: data.email || profile.email,
+            phone: data.phone || profile.phone,
+            address: data.address || profile.address,
+          };
+        }
+      } catch (error) {
+        console.warn("User profile fetch failed", error);
+      }
+      userCache.set(userId, profile);
+      return profile;
+    }
+
+    function renderChatMessages(orderId, messages) {
+      const root = document.getElementById(`chat-messages-${orderId}`);
+      if (!root) return;
+      if (!messages.length) {
+        root.innerHTML = `<div class="card-meta">${escapeHtml(t("chatTitle"))}</div>`;
+        return;
+      }
+      root.innerHTML = messages.map((msg) => {
+        const role = msg.senderRole === "market" ? "market" : "customer";
+        return `
+          <div class="chat-msg ${role}">
+            <div class="chat-msg-meta">${escapeHtml(msg.senderName || t("unknown"))} · ${escapeHtml(formatDate(msg.createdAt))}</div>
+            <div>${escapeHtml(msg.text || "")}</div>
+          </div>
+        `;
+      }).join("");
+      root.scrollTop = root.scrollHeight;
+    }
+
+    function bindChatListener(orderId) {
+      if (chatUnsubscribers.has(orderId)) return;
+      const q = query(
+        collection(db, "orderChats", orderId, "messages"),
+        orderBy("createdAt", "asc")
+      );
+      const unsub = onSnapshot(q, (snapshot) => {
+        const messages = snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() }));
+        renderChatMessages(orderId, messages);
+      });
+      chatUnsubscribers.set(orderId, unsub);
+    }
+
+    function clearChatListeners(activeOrderIds) {
+      for (const [orderId, unsub] of chatUnsubscribers.entries()) {
+        if (!activeOrderIds.has(orderId)) {
+          unsub();
+          chatUnsubscribers.delete(orderId);
+        }
+      }
+    }
+
+    async function renderOrders(orders) {
+      const filtered = orders
+        .filter((order) => orderMatchesMarket(order, currentMarketId))
+        .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+
+      currentOrders = filtered;
+      document.getElementById("statTotal").textContent = String(filtered.length);
+      document.getElementById("statPending").textContent = String(filtered.filter((o) => o.status === "pending").length);
+      document.getElementById("statActive").textContent = String(filtered.filter((o) => o.status === "on-the-way").length);
+
+      const root = document.getElementById("ordersList");
+      if (!filtered.length) {
+        root.innerHTML = `<p class="empty-msg">${escapeHtml(t("noOrders"))}</p>`;
+        clearChatListeners(new Set());
+        return;
+      }
+
+      const profiles = await Promise.all(filtered.map((order) => getUserProfile(order.userId, order)));
+      const activeIds = new Set(filtered.map((order) => order.id));
+
+      root.innerHTML = filtered.map((order, index) => {
+        const profile = profiles[index];
+        const items = Array.isArray(order.items) ? order.items : [];
+        const itemsHtml = items.map((item, itemIndex) => {
+          const available = item.available !== false;
+          return `
+            <div class="order-item-row ${available ? "" : "item-unavailable"}">
+              <div>
+                <div>${escapeHtml(item.name)} x ${item.qty || 1}</div>
+                <div class="card-meta">${formatPrice((item.price || 0) * (item.qty || 1))}</div>
+              </div>
+              <span class="avail-badge ${available ? "avail-yes" : "avail-no"}">${escapeHtml(available ? t("available") : t("unavailable"))}</span>
+              <button class="btn-small btn-secondary" type="button"
+                data-market-action="toggle-item" data-order-id="${escapeHtml(order.id)}" data-item-index="${itemIndex}" data-available="${available ? "0" : "1"}">
+                ${escapeHtml(available ? t("markUnavailable") : t("markAvailable"))}
+              </button>
+            </div>
+          `;
+        }).join("");
+
+        const statusOptions = STATUSES.map((status) =>
+          `<option value="${status}" ${order.status === status ? "selected" : ""}>${escapeHtml(statusLabel(status))}</option>`
+        ).join("");
+
+        const driver = order.driver || {};
+        const driverTrack = driverMapLink(order);
+
+        return `
+          <div class="card" id="order-${escapeHtml(order.id)}">
+            <div class="card-header">
+              <div>
+                <div class="card-title">${escapeHtml(profile.name || order.userName || t("unknown"))}</div>
+                <div class="card-meta">${escapeHtml(formatDate(order.createdAt))}</div>
+                <span class="status-badge ${statusClass(order.status)}">${escapeHtml(statusLabel(order.status))}</span>
+              </div>
+              <div class="card-title">${formatPrice(order.totalPrice)}</div>
+            </div>
+
+            <div class="profile-box">
+              <strong>${escapeHtml(t("customerProfile"))}</strong>
+              ${escapeHtml(t("email"))}: ${escapeHtml(profile.email || t("unknown"))}<br>
+              ${escapeHtml(t("phone"))}: ${escapeHtml(profile.phone || t("unknown"))}<br>
+              ${escapeHtml(t("address"))}: ${escapeHtml(profile.address || t("unknown"))}
+            </div>
+
+            <div class="payment-box">${paymentHtml(order)}</div>
+
+            <div>${itemsHtml}</div>
+
+            <div class="actions-row">
+              <select class="status-select" id="status-${escapeHtml(order.id)}">${statusOptions}</select>
+              <button class="btn-update" type="button" data-market-action="update-status" data-order-id="${escapeHtml(order.id)}">${escapeHtml(t("updateStatus"))}</button>
+            </div>
+
+            <div class="driver-box">
+              <strong>${escapeHtml(t("driver"))}</strong>
+              <div class="driver-fields">
+                <input class="field-input" id="driver-name-${escapeHtml(order.id)}" placeholder="${escapeHtml(t("driverName"))}" value="${escapeHtml(driver.name || "")}" />
+                <input class="field-input" id="driver-phone-${escapeHtml(order.id)}" placeholder="${escapeHtml(t("driverPhone"))}" value="${escapeHtml(driver.phone || "")}" />
+              </div>
+              <div class="actions-row">
+                <button class="btn-primary" type="button" data-market-action="assign-driver" data-order-id="${escapeHtml(order.id)}">${escapeHtml(t("assignDriver"))}</button>
+                ${driverTrack}
+              </div>
+            </div>
+
+            <div class="chat-panel">
+              <div class="card-meta" style="padding:10px 10px 0;">${escapeHtml(t("chatTitle"))}</div>
+              <div class="chat-messages" id="chat-messages-${escapeHtml(order.id)}"></div>
+              <div class="chat-compose">
+                <input class="chat-input" id="chat-input-${escapeHtml(order.id)}" placeholder="${escapeHtml(t("chatPlaceholder"))}" />
+                <button class="btn-primary" type="button" data-market-action="send-chat" data-order-id="${escapeHtml(order.id)}">${escapeHtml(t("send"))}</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      clearChatListeners(activeIds);
+      filtered.forEach((order) => bindChatListener(order.id));
+    }
+
+    async function toggleItemAvailability(orderId, itemIndex, makeAvailable) {
+      const order = currentOrders.find((entry) => entry.id === orderId);
+      if (!order) return;
+      const items = Array.isArray(order.items) ? order.items.map((item) => ({ ...item })) : [];
+      if (!items[itemIndex]) return;
+      items[itemIndex].available = makeAvailable;
+      await updateDoc(doc(db, "orders", orderId), {
+        items,
+        updatedAt: new Date().toISOString(),
+      });
+      showToast(t("updated"));
+    }
+
+    async function updateOrderStatus(orderId) {
+      const select = document.getElementById(`status-${orderId}`);
+      if (!select) return;
+      await updateDoc(doc(db, "orders", orderId), {
+        status: select.value,
+        updatedAt: new Date().toISOString(),
+      });
+      showToast(t("updated"));
+    }
+
+    async function assignDriver(orderId) {
+      const name = document.getElementById(`driver-name-${orderId}`)?.value.trim() || "";
+      const phone = document.getElementById(`driver-phone-${orderId}`)?.value.trim() || "";
+      await updateDoc(doc(db, "orders", orderId), {
+        status: "on-the-way",
+        driver: { name, phone },
+        driverAssignedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      showToast(t("updated"));
+    }
+
+    async function sendChatMessage(orderId) {
+      const input = document.getElementById(`chat-input-${orderId}`);
+      const text = String(input?.value || "").trim();
+      if (!text) return;
+      const senderName = localStorage.getItem("user_name") || "Market";
+      const senderId = localStorage.getItem("user_uid") || "market";
+      await addDoc(collection(db, "orderChats", orderId, "messages"), {
+        senderId,
+        senderRole: "market",
+        senderName,
+        marketId: currentMarketId,
+        text,
+        createdAt: new Date().toISOString(),
+      });
+      input.value = "";
+    }
+
+    function bindMarketActions() {
+      const root = document.getElementById("marketGuard");
+      if (!root || root.dataset.actionsBound === "1") return;
+      root.dataset.actionsBound = "1";
+      root.addEventListener("click", async (event) => {
+        const button = event.target.closest("[data-market-action]");
+        if (!button || button.disabled) return;
+        const action = button.dataset.marketAction;
+        const orderId = button.dataset.orderId || "";
+        try {
+          if (action === "toggle-item") {
+            await toggleItemAvailability(orderId, Number(button.dataset.itemIndex), button.dataset.available === "1");
+          } else if (action === "update-status") {
+            await updateOrderStatus(orderId);
+          } else if (action === "assign-driver") {
+            await assignDriver(orderId);
+          } else if (action === "send-chat") {
+            await sendChatMessage(orderId);
+          }
+        } catch (error) {
+          console.error("Market action failed", action, error);
+          showToast(`${t("unknown")}: ${error.message}`);
+        }
+      });
+      root.addEventListener("keydown", async (event) => {
+        if (event.key !== "Enter") return;
+        const input = event.target.closest(".chat-input");
+        if (!input || !input.id.startsWith("chat-input-")) return;
+        event.preventDefault();
+        const orderId = input.id.replace("chat-input-", "");
+        await sendChatMessage(orderId);
+      });
+    }
+
+    function applyLanguage() {
+      document.documentElement.lang = currentLang;
+      document.documentElement.dir = currentLang === "ar" ? "rtl" : "ltr";
+      document.getElementById("langSelect").value = currentLang;
+      document.getElementById("marketsLink").textContent = t("marketsLink");
+      document.getElementById("driverLink").textContent = t("driverLink");
+      document.getElementById("statTotalLabel").textContent = t("orders");
+      document.getElementById("statPendingLabel").textContent = t("pending");
+      document.getElementById("statActiveLabel").textContent = t("onTheWay");
+      document.getElementById("deniedTitle").textContent = t("deniedTitle");
+      document.getElementById("deniedMessage").textContent = t("deniedMessage");
+      document.getElementById("deniedBack").textContent = t("deniedBack");
+      document.title = `${getMarketLabel(currentMarketId)} - Market`;
+      document.getElementById("marketTitle").textContent = getMarketLabel(currentMarketId);
+    }
+
+    function renderMarketSelect() {
+      const select = document.getElementById("marketSelect");
+      select.innerHTML = MARKETS.map((market) =>
+        `<option value="${escapeHtml(market.key)}" ${market.key === currentMarketId ? "selected" : ""}>${escapeHtml(market.label)}</option>`
+      ).join("");
+    }
+
+    function switchMarket(marketId) {
+      currentMarketId = marketId;
+      const url = new URL(window.location.href);
+      url.searchParams.set("market", marketId);
+      window.history.replaceState({}, "", url);
+      applyLanguage();
+      renderOrders(currentOrders);
+    }
+
+    const userUid = localStorage.getItem("user_uid");
+    if (!userUid) {
+      window.location.href = "login.html";
+    } else if (!window.FeatureAccess?.isAdminUser?.()) {
+      document.getElementById("accessDenied").style.display = "block";
+    } else {
+      document.getElementById("marketGuard").style.display = "block";
+      bindMarketActions();
+      renderMarketSelect();
+      applyLanguage();
+
+      document.getElementById("langSelect").addEventListener("change", (event) => {
+        currentLang = String(event.target.value || "tr");
+        localStorage.setItem("app_lang", currentLang);
+        applyLanguage();
+        renderOrders(currentOrders);
+      });
+
+      document.getElementById("marketSelect").addEventListener("change", (event) => {
+        switchMarket(String(event.target.value || MARKETS[0].key));
+      });
+
+      onSnapshot(collection(db, "orders"), (snapshot) => {
+        const orders = snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() }));
+        renderOrders(orders);
+      });
+    }
+  </script>
+</body>
+</html>
