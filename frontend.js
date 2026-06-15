@@ -26,8 +26,8 @@ const PRODUCT_TRANSLATIONS = {
   "apple": "elma",
   "orange": "portakal",
   "banana": "muz",
-  "strawberry": "ciliek",
-  "watermelon": "karpu",
+  "strawberry": "cilek",
+  "watermelon": "karpuz",
   "grape": "uzum",
   "lemon": "limon",
   "mango": "mango",
@@ -48,10 +48,10 @@ const PRODUCT_TRANSLATIONS = {
   
   // Meat & Fish
   "chicken": "tavuk",
-  "beef": "sigi eti",
+  "beef": "sigir eti",
   "fish": "balik",
   "shrimp": "karides",
-  "lamb": "kuzueti",
+  "lamb": "kuzu eti",
   "turkey": "hindi",
   
   // Grains & Bread
@@ -85,8 +85,8 @@ const PRODUCT_TRANSLATIONS = {
   // Snacks
   "chocolate": "cokolata",
   "candy": "seker",
-  "biscuit": "bisküvi",
-  "chips": "cipis",
+  "biscuit": "biskuvi",
+  "chips": "cips",
   "nuts": "kuruyemis",
   "popcorn": "patlamis misir",
   
@@ -118,8 +118,8 @@ const PRODUCT_TRANSLATIONS = {
   "toothpaste": "dis macunu",
   "toilet paper": "tuvalet kagidi",
   "detergent": "deterjan",
-  "dish soap": "bulaşık deterjanı",
-  "hand sanitizer": "el dezenfektanı"
+  "dish soap": "bulasik deterjani",
+  "hand sanitizer": "el dezenfektani"
 };
 
 const I18N = {
@@ -170,15 +170,16 @@ const I18N = {
     addedToCart: "Eklendi!",
     backToSearch: "Aramaya don",
     featuredFreshVegetables: "Taze sebzeler",
-    featuredBreadAndBakery: "Ekmek ve fırın ürünleri",
-    featuredDailyGroceries: "Günlük temel gıdalar",
+    featuredBreadAndBakery: "Ekmek ve firin urunleri",
+    featuredDailyGroceries: "Gunluk temel gida",
     featuredFruit: "Meyve",
-    featuredRiceAndGrains: "Pirinç ve tahıllar",
-    featuredDesserts: "Tatlılar",
+    featuredRiceAndGrains: "Pirinc ve tahillar",
+    featuredDesserts: "Tatlilar",
     featuredPotatoes: "Patates",
-    featuredDairy: "Süt ürünleri",
+    featuredDairy: "Sut urunleri",
     featuredVegetables: "Sebzeler",
     featuredBananas: "Muz",
+    statusLoadingItems: "Urunler yukleniyor...",
   },
   en: {
     title: "Pazar Fiyatı",
@@ -236,6 +237,7 @@ const I18N = {
     featuredDairy: "Dairy",
     featuredVegetables: "Vegetables",
     featuredBananas: "Bananas",
+    statusLoadingItems: "Loading items...",
   },
   ar: {
     title: "Pazar Fiyatı",
@@ -293,6 +295,7 @@ const I18N = {
     featuredDairy: "\u0645\u0646\u062a\u062c\u0627\u062a \u0627\u0644\u0623\u0644\u0628\u0627\u0646",
     featuredVegetables: "\u0627\u0644\u062e\u0636\u0631\u0648\u0627\u062a",
     featuredBananas: "\u0627\u0644\u0645\u0648\u0632",
+    statusLoadingItems: "\u062c\u0627\u0631\u064a \u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a...",
   },
 };
 
@@ -824,7 +827,11 @@ async function runSearch() {
 }
 
 const CATEGORY_ITEMS = {
-  vegetables: ["domates", "lahana", "havuç", "soğan", "mantar", "biber", "patlıcan", "sarımsak", "mısır", "salatalık", "ıspanak", "brokoli", "kereviz", "pazı", "yeşil soğan", "karalahana", "kabak", "enginar", "kabak", "pırasa", "maydanoz", "nane", "marul", "roka", "tere", "semizotu", "kırmızı lahana", " Brüksel lahanası"],
+  vegetables: ["domates", "lahana", "havuc", "sogan", "mantar", "biber", "patlican", "sarimsak", "misir", "salatalik", "ispanak", "brokoli", "kereviz", "pazi", "yesil sogan", "karalahana", "kabak", "enginar", "pirasa", "maydanoz", "nane", "marul", "roka", "tere", "semizotu", "kirmizi lahana", "bruksel lahanasi"],
+};
+
+const CATEGORY_LABEL_KEYS = {
+  vegetables: "featuredFreshVegetables",
 };
 
 let categoryData = {};
@@ -859,7 +866,7 @@ async function loadCategories() {
   const resultsContainer = document.getElementById("results");
   if (!resultsContainer) return;
   
-  resultsContainer.innerHTML = '<p id="status">Loading items...</p>';
+  resultsContainer.innerHTML = '<p id="status">' + escapeHtml(t("statusLoadingItems")) + '</p>';
   
   let html = "";
   
@@ -881,7 +888,7 @@ async function loadCategories() {
     categoryData[category] = allItems;
     
     if (allItems.length > 0) {
-      html += `<section class="panel"><h3>${escapeHtml("Fresh vegetables")}</h3>`;
+      html += `<section class="panel"><h3>${escapeHtml(t(CATEGORY_LABEL_KEYS[category] || "featuredFreshVegetables"))}</h3>`;
       html += `<div class="result-grid">${allItems.map(renderItemCard).join("")}</div></section>`;
     }
   }
@@ -918,7 +925,7 @@ async function refreshPrices() {
   let html = "";
   for (const [category, items] of Object.entries(categoryData)) {
     if (items && items.length > 0) {
-      html += `<section class="panel"><h3>${escapeHtml("Fresh vegetables")}</h3>`;
+      html += `<section class="panel"><h3>${escapeHtml(t(CATEGORY_LABEL_KEYS[category] || "featuredFreshVegetables"))}</h3>`;
       html += `<div class="result-grid">${items.map(renderItemCard).join("")}</div></section>`;
     }
   }

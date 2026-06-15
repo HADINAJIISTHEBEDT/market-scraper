@@ -1,16 +1,6 @@
 (function () {
   "use strict";
 
-  if (!window.FIREBASE_CONFIG) {
-    showBootError("Config missing. Keep firebase-config.global.js in the same folder.");
-    return;
-  }
-
-  if (typeof firebase === "undefined") {
-    showBootError("Firebase failed to load. Check your internet connection.");
-    return;
-  }
-
   const OL = window.OrderLifecycle || {};
   const ORDER_STATUSES = OL.ORDER_STATUSES || ["waiting", "on-the-way", "arrived"];
   const normalizeOrderStatus = OL.normalizeOrderStatus || function (s) { return s || "waiting"; };
@@ -88,6 +78,9 @@
       voiceCall: "Musteriyi ara",
       videoCall: "Goruntulu ara",
       chatDisabled: "Siparis kapandi",
+      bootErrorConfig: "Yapilandirma eksik. firebase-config.global.js dosyasini ayni klasorde tutun.",
+      bootErrorFirebase: "Firebase yuklenemedi. Internet baglantinizi kontrol edin.",
+      bootErrorOrders: "Siparisler yuklenemedi.",
     },
     en: {
       pageTitle: "Driver tracking",
@@ -138,6 +131,9 @@
       voiceCall: "Call customer",
       videoCall: "Video call",
       chatDisabled: "Order closed",
+      bootErrorConfig: "Config missing. Keep firebase-config.global.js in the same folder.",
+      bootErrorFirebase: "Firebase failed to load. Check your internet connection.",
+      bootErrorOrders: "Could not load orders.",
     },
     ar: {
       pageTitle: "تتبع السائق",
@@ -188,22 +184,13 @@
       voiceCall: "اتصل بالعميل",
       videoCall: "مكالمة فيديو",
       chatDisabled: "تم إغلاق الطلب",
+      bootErrorConfig: "الإعدادات ناقصة. احتفظ بملف firebase-config.global.js في نفس المجلد.",
+      bootErrorFirebase: "تعذر تحميل Firebase. تحقق من اتصال الإنترنت.",
+      bootErrorOrders: "تعذر تحميل الطلبات.",
     },
   };
 
-  if (!firebase.apps.length) {
-    firebase.initializeApp(window.FIREBASE_CONFIG);
-  }
-  const db = firebase.firestore();
-  try { db.settings({ experimentalForceLongPolling: true, merge: true }); } catch (e) {}
-
   let currentLang = localStorage.getItem("app_lang") || "tr";
-  let currentOrders = [];
-  let allMarketOrders = [];
-  let activeOrderId = "";
-  let geoWatchId = null;
-  let chatUnsub = null;
-  let driverDisplayName = "";
 
   function showBootError(message) {
     const help = document.getElementById("pageHelp");
@@ -213,6 +200,29 @@
   function t(key) {
     return (I18N[currentLang] && I18N[currentLang][key]) || I18N.tr[key] || key;
   }
+
+  if (!window.FIREBASE_CONFIG) {
+    showBootError(t("bootErrorConfig"));
+    return;
+  }
+
+  if (typeof firebase === "undefined") {
+    showBootError(t("bootErrorFirebase"));
+    return;
+  }
+
+  if (!firebase.apps.length) {
+    firebase.initializeApp(window.FIREBASE_CONFIG);
+  }
+  const db = firebase.firestore();
+  try { db.settings({ experimentalForceLongPolling: true, merge: true }); } catch (e) {}
+
+  let currentOrders = [];
+  let allMarketOrders = [];
+  let activeOrderId = "";
+  let geoWatchId = null;
+  let chatUnsub = null;
+  let driverDisplayName = "";
 
   function escapeHtml(text) {
     return String(text).replace(/[&<>"']/g, function (char) {
@@ -708,7 +718,7 @@
       if (activeOrderId) renderActiveOrderDetails();
     }, function (error) {
       console.error("Orders listener failed", error);
-      showBootError(error.message || "Could not load orders.");
+      showBootError(error.message || t("bootErrorOrders"));
     });
   }
 })();

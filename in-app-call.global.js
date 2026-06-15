@@ -3,6 +3,17 @@
 
   var activeFrame = null;
 
+  var CALL_I18N = {
+    tr: { voice: "Sesli arama", video: "Goruntulu arama", close: "Kapat", frameTitle: "Uygulama ici arama" },
+    en: { voice: "Voice call", video: "Video call", close: "Close", frameTitle: "In-app call" },
+    ar: { voice: "مكالمة صوتية", video: "مكالمة فيديو", close: "إغلاق", frameTitle: "مكالمة داخل التطبيق" },
+  };
+
+  function callT(key) {
+    var lang = localStorage.getItem("app_lang") || "tr";
+    return (CALL_I18N[lang] && CALL_I18N[lang][key]) || CALL_I18N.tr[key] || key;
+  }
+
   function getRoom(orderId) {
     if (window.OrderLifecycle && window.OrderLifecycle.getVideoCallRoom) {
       return window.OrderLifecycle.getVideoCallRoom(orderId);
@@ -39,7 +50,7 @@
       '<span id="inAppCallTitle">Call</span>' +
       '<button type="button" class="in-app-call-close" data-in-app-call-close aria-label="Close">&times;</button>' +
       "</div>" +
-      '<iframe id="inAppCallFrame" allow="camera; microphone; fullscreen; display-capture" title="In-app call"></iframe>' +
+      '<iframe id="inAppCallFrame" allow="camera; microphone; fullscreen; display-capture"></iframe>' +
       "</div>";
 
     var style = document.createElement("style");
@@ -78,9 +89,10 @@
       var title = document.getElementById("inAppCallTitle");
       callMode = callMode === "voice" ? "voice" : "video";
       if (title) {
-        title.textContent = callMode === "voice" ? "Voice call" : "Video call";
+        title.textContent = callMode === "voice" ? callT("voice") : callT("video");
       }
       if (frame) {
+        frame.title = callT("frameTitle");
         frame.src = buildEmbedUrl(orderId, name, callMode);
         activeFrame = frame;
       }

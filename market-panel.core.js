@@ -1,16 +1,6 @@
 (function () {
   "use strict";
 
-  if (!window.FIREBASE_CONFIG || !window.MARKET_ID) {
-    showBootError("Config missing. Keep firebase-config.global.js in the same folder and open this market page directly (bim.html, sok.html, etc.).");
-    return;
-  }
-
-  if (typeof firebase === "undefined") {
-    showBootError("Firebase failed to load. Check your internet connection.");
-    return;
-  }
-
   const MARKET_ID = String(window.MARKET_ID || "").trim();
   const MARKET_LABEL = String(window.MARKET_LABEL || MARKET_ID || "Market");
   const MARKET_COLOR = String(window.MARKET_COLOR || "#2563eb");
@@ -61,7 +51,6 @@
       inboxEmpty: "Yeni bildirim yok.",
       inboxFeedback: "Musteri geri bildirimi",
       inboxClosed: "Siparis kapatildi",
-      pending: "Beklemede",
       panelLoading: "{market} paneli yukleniyor...",
       deniedTitle: "Panel yuklenemedi",
       deniedMessageDefault: "Tum dosyalarin ayni klasorde oldugundan emin olun.",
@@ -115,7 +104,6 @@
       inboxEmpty: "No new notifications.",
       inboxFeedback: "Customer feedback",
       inboxClosed: "Order closed",
-      pending: "Pending",
       panelLoading: "Loading {market} panel...",
       deniedTitle: "Panel could not load",
       deniedMessageDefault: "Check that all files are in the same folder.",
@@ -169,7 +157,6 @@
       inboxEmpty: "لا توجد إشعارات جديدة.",
       inboxFeedback: "ملاحظات العميل",
       inboxClosed: "تم إغلاق الطلب",
-      pending: "قيد الانتظار",
       panelLoading: "جاري تحميل لوحة {market}...",
       deniedTitle: "تعذر تحميل اللوحة",
       deniedMessageDefault: "تأكد من أن جميع الملفات في نفس المجلد.",
@@ -206,6 +193,20 @@
   const userCache = new Map();
   const chatUnsubscribers = new Map();
 
+  function t(key) {
+    return (I18N[currentLang] && I18N[currentLang][key]) || I18N.tr[key] || key;
+  }
+
+  if (!window.FIREBASE_CONFIG || !MARKET_ID) {
+    showBootError(t("bootErrorConfig"));
+    return;
+  }
+
+  if (typeof firebase === "undefined") {
+    showBootError(t("bootErrorFirebase"));
+    return;
+  }
+
   if (!firebase.apps.length) {
     firebase.initializeApp(window.FIREBASE_CONFIG);
   }
@@ -218,9 +219,15 @@
     if (loading) loading.style.display = "none";
     if (denied) {
       denied.style.display = "block";
+      const title = document.getElementById("deniedTitle");
       const msg = document.getElementById("deniedMessage");
-      if (msg) msg.textContent = message;
+      if (title) title.textContent = t("deniedTitle");
+      if (msg) msg.textContent = message || t("deniedMessageDefault");
     }
+  }
+
+  function categoryLabel(name) {
+    return name === "General" ? t("categoryGeneral") : name;
   }
 
   function deliveryPageHref() {
@@ -236,10 +243,6 @@
     if (!target) return false;
     if (normalizeMarketKey(order.marketId || order.marketName) === target) return true;
     return (Array.isArray(order.items) ? order.items : []).some((item) => normalizeMarketKey(item.market) === target);
-  }
-
-  function t(key) {
-    return (I18N[currentLang] && I18N[currentLang][key]) || I18N.tr[key] || key;
   }
 
   function escapeHtml(text) {
@@ -317,7 +320,7 @@
       }).join("");
       return `
         <div class="item-category-block">
-          <div class="item-category-title">${escapeHtml(group.category)}</div>
+          <div class="item-category-title">${escapeHtml(categoryLabel(group.category))}</div>
           ${rows}
         </div>
       `;
@@ -525,7 +528,7 @@
       console.error("Orders listener failed", error);
       db.collection("orders").onSnapshot(renderSnapshot, (fallbackError) => {
         console.error("Orders fallback listener failed", fallbackError);
-        showBootError(fallbackError.message || "Could not load orders.");
+        showBootError(fallbackError.message || t("bootErrorOrders"));
       });
     });
   }
@@ -773,10 +776,12 @@
       driverLink.href = deliveryPageHref();
     }
     document.getElementById("statTotalLabel").textContent = t("orders");
-    document.getElementById("statPendingLabel").textContent = t("waitingStatus");
+    document.getElementById("statPendingLabel").textContent = t("pending");
     document.getElementById("statActiveLabel").textContent = t("onTheWay");
     const inboxTitle = document.getElementById("marketInboxTitle");
     if (inboxTitle) inboxTitle.textContent = t("inboxTitle");
+    const loading = document.getElementById("marketLoading");
+    if (loading) loading.textContent = t("panelLoading").replace("{market}", MARKET_LABEL);
     document.title = `${MARKET_LABEL} Panel`;
     document.getElementById("marketTitle").textContent = MARKET_LABEL;
     const badge = document.getElementById("marketBadge");
