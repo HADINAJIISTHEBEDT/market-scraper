@@ -49,14 +49,23 @@ function readServiceAccountFromEnv() {
 }
 
 function isMailConfigured() {
+  return Boolean(transporter);
+}
+
+function isMailQueueConfigured() {
   return Boolean(transporter && firestore);
 }
 
 function getMailStatus() {
   return {
     supported: isMailConfigured(),
+    queueSupported: isMailQueueConfigured(),
     from: envString("MAIL_FROM") || envString("SMTP_USER") || null,
-    reason: initError ? initError.message : null,
+    reason: initError
+      ? initError.message
+      : !transporter
+        ? "Set SMTP_USER and SMTP_PASS on Render"
+        : null,
   };
 }
 
@@ -78,8 +87,29 @@ function buildTransporter() {
 async function markInboxEmailSent(deleteRequestId, sentAt) {
   if (!firestore || !deleteRequestId) return;
   await firestore.doc(`adminInbox/${deleteRequestId}`).set(
-    { emailSentAt: sentAt },
+    {
+      emailSentAt: sentAt,
+      emailDeliveryError: "",
+    },
     { merge: true },
+  );
+}
+
+async function markInboxEmailFailed(deleteRequestId, errorMessage) {
+  if (!firestore || !deleteRequestId) return;
+  await firestore.doc(`adminInbox/${deleteRequestId}`).set(
+    {
+      emailDeliveryError: String(errorMessage || "Email send failed"),
+    },
+    { merge: true },
+  );
+}
+
+function getFromAddress() {
+  return (
+    envString("MAIL_FROM") ||
+    envString("SMTP_USER") ||
+    envString("GMAIL_USER")
   );
 }
 
@@ -90,7 +120,21 @@ async function processMailDoc(docSnap) {
   const data = docSnap.data() || {};
   const deliveryState = data.delivery?.state;
   if (deliveryState === "SUCCESS" || deliveryState === "PROCESSING") return;
-  if (!transporter) return;
+  if (!transporter) {
+    const errorMessage = initError?.message || "SMTP not configured on server";
+    await docSnap.ref.set(
+      {
+        delivery: {
+          state: "ERROR",
+          error: errorMessage,
+          endTime: new Date().toISOString(),
+        },
+      },
+      { merge: true },
+    );
+    await markInboxEmailFailed(data.deleteRequestId, errorMessage);
+    return;
+  }
 
   const to = Array.isArray(data.to) ? data.to[0] : data.to;
   const subject = String(data.message?.subject || "").trim();
@@ -124,10 +168,7 @@ async function processMailDoc(docSnap) {
   );
 
   try {
-    const from =
-      envString("MAIL_FROM") ||
-      envString("SMTP_USER") ||
-      envString("GMAIL_USER");
+    const from = getFromAddress();
     const info = await transporter.sendMail({
       from,
       to,
@@ -165,6 +206,7 @@ async function processMailDoc(docSnap) {
       },
       { merge: true },
     );
+    await markInboxEmailFailed(data.deleteRequestId, err.message);
   } finally {
     processing.delete(docId);
   }
@@ -201,6 +243,55 @@ function startMailListener() {
   );
 }
 
+async function sendAccountEmail(payload) {
+  const to = String(payload?.to || "").trim();
+  const subject = String(payload?.subject || "").trim();
+  const text = String(payload?.text || "").trim();
+  const html = String(payload?.html || "").trim();
+  const deleteRequestId = String(payload?.deleteRequestId || "").trim();
+
+  if (!to || !subject || (!text && !html)) {
+    throw new Error("Missing to, subject, or body");
+  }
+  if (!transporter) {
+    throw new Error(initError?.message || "SMTP not configured. Set SMTP_USER and SMTP_PASS on Render.");
+  }
+
+  const startedAt = new Date().toISOString();
+  const info = await transporter.sendMail({
+    from: getFromAddress(),
+    to,
+    subject,
+    text: text || undefined,
+    html: html || undefined,
+  });
+  const sentAt = new Date().toISOString();
+
+  if (firestore) {
+    await firestore.collection(MAIL_COLLECTION).doc(`sent-${deleteRequestId || "manual"}-${Date.now()}`).set({
+      to,
+      message: { subject, text, html },
+      deleteRequestId: deleteRequestId || null,
+      delivery: {
+        state: "SUCCESS",
+        startTime: startedAt,
+        endTime: sentAt,
+        messageId: info.messageId || null,
+        attempts: 1,
+      },
+      emailSentAt: sentAt,
+      sentAt,
+    });
+  }
+
+  if (deleteRequestId && firestore) {
+    await markInboxEmailSent(deleteRequestId, sentAt);
+  }
+
+  log(`Sent mail directly to ${to}`);
+  return { ok: true, sentAt, messageId: info.messageId || null };
+}
+
 async function initializeMailService() {
   if (initialized) return;
   initialized = true;
@@ -225,13 +316,16 @@ async function initializeMailService() {
     }
 
     firestore = admin.firestore();
-    await transporter.verify();
+    try {
+      await transporter.verify();
+    } catch (verifyError) {
+      log("SMTP verify warning (will still try to send)", verifyError.message);
+    }
     startMailListener();
     await processPendingMail();
     log("Mail service initialized");
   } catch (err) {
     initError = err;
-    transporter = null;
     log("Failed to initialize mail service", err.message);
   }
 }
@@ -241,4 +335,5 @@ module.exports = {
   getMailStatus,
   isMailConfigured,
   processPendingMail,
+  sendAccountEmail,
 };

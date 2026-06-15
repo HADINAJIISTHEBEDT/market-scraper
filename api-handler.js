@@ -18,6 +18,7 @@ const {
   initializeMailService,
   getMailStatus,
   processPendingMail,
+  sendAccountEmail,
 } = require("./mail-service");
 
 const MIME = {
@@ -96,10 +97,13 @@ async function routeApiRequest(method, urlPath, body) {
   }
 
   if (method === "GET" && urlPath === "/health") {
+    const mail = getMailStatus();
     return jsonResponse(200, {
       status: "ok",
       push: getPushStatus().supported,
-      mail: getMailStatus().supported,
+      mail: mail.supported,
+      mailFrom: mail.from,
+      mailError: mail.reason,
       timestamp: Date.now(),
     });
   }
@@ -173,6 +177,19 @@ async function routeApiRequest(method, urlPath, body) {
   if (urlPath === "/mail-process") {
     await processPendingMail();
     return jsonResponse(200, { ok: true, mail: getMailStatus() });
+  }
+
+  if (urlPath === "/send-account-email") {
+    try {
+      const result = await sendAccountEmail(body);
+      return jsonResponse(200, result);
+    } catch (err) {
+      return jsonResponse(503, {
+        ok: false,
+        error: err.message || "Email send failed",
+        mail: getMailStatus(),
+      });
+    }
   }
 
   throw new HttpError(404, "not found", notFoundPayload(urlPath));

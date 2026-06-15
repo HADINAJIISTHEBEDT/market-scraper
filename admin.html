@@ -261,8 +261,8 @@
         saved: "Kaydedildi", removed: "Silindi", id: "ID", role: "Rol", name: "Ad", phone: "Telefon", address: "Adres", email: "E-posta",
         deleteRequestsTitle: "Hesap silme istekleri", noDeleteRequests: "Henuz silme istegi yok.", requestedAt: "Istek tarihi", markRequestDone: "Tamamlandi olarak isaretle",
         inboxTitle: "Gelen kutusu", inboxHelp: "Hesap silme isteklerinden gelen mesajlar burada kalici olarak saklanir ve hicbir zaman silinmez.", noInboxMessages: "Henuz mesaj yok.", message: "Mesaj",
-        inboxDone: "Tamamlandi", inboxCompleted: "Hesap silindi", inboxEmailQueued: "E-posta siraya alindi", inboxEmailSent: "E-posta gonderildi",
-        emailQueued: "E-posta gonderim siraya alindi", emailQueueFailed: "E-posta siraya alinamadi",
+        inboxDone: "Tamamlandi", inboxCompleted: "Hesap silindi", inboxEmailQueued: "E-posta siraya alindi", inboxEmailSent: "E-posta gonderildi", inboxEmailFailed: "E-posta gonderilemedi",
+        emailQueued: "E-posta gonderim siraya alindi", emailQueueFailed: "E-posta siraya alinamadi", emailServerNotConfigured: "Render SMTP ayarlari eksik",
         block: "Engelle", unblock: "Engeli kaldir", blocked: "Engellendi"
       },
       en: {
@@ -282,8 +282,8 @@
         saved: "Saved", removed: "Removed", id: "ID", role: "Role", name: "Name", phone: "Phone", address: "Address", email: "Email",
         deleteRequestsTitle: "Account delete requests", noDeleteRequests: "No delete requests yet.", requestedAt: "Requested at", markRequestDone: "Mark request done",
         inboxTitle: "Inbox", inboxHelp: "Messages from account deletion requests are saved here permanently and are never deleted.", noInboxMessages: "No messages yet.", message: "Message",
-        inboxDone: "Done", inboxCompleted: "Account deleted", inboxEmailQueued: "Email queued", inboxEmailSent: "Email sent",
-        emailQueued: "Email send queued", emailQueueFailed: "Could not queue email",
+        inboxDone: "Done", inboxCompleted: "Account deleted", inboxEmailQueued: "Email queued", inboxEmailSent: "Email sent", inboxEmailFailed: "Email failed",
+        emailQueued: "Email send queued", emailQueueFailed: "Could not queue email", emailServerNotConfigured: "Render SMTP settings are missing",
         block: "Block", unblock: "Unblock", blocked: "Blocked"
       },
       ar: {
@@ -303,8 +303,8 @@
         saved: "تم الحفظ", removed: "تم الحذف", id: "المعرف", role: "الدور", name: "الاسم", phone: "الهاتف", address: "العنوان", email: "البريد الإلكتروني",
         deleteRequestsTitle: "طلبات حذف الحساب", noDeleteRequests: "لا توجد طلبات حذف بعد.", requestedAt: "تاريخ الطلب", markRequestDone: "وضع علامة مكتمل",
         inboxTitle: "صندوق الوارد", inboxHelp: "يتم حفظ رسائل طلبات حذف الحساب هنا بشكل دائم ولا يتم حذفها أبداً.", noInboxMessages: "لا توجد رسائل بعد.", message: "الرسالة",
-        inboxDone: "مكتمل", inboxCompleted: "تم حذف الحساب", inboxEmailQueued: "تمت جدولة البريد", inboxEmailSent: "تم إرسال البريد",
-        emailQueued: "تمت إضافة البريد الإلكتروني إلى قائمة الإرسال", emailQueueFailed: "تعذر إضافة البريد الإلكتروني إلى قائمة الإرسال",
+        inboxDone: "مكتمل", inboxCompleted: "تم حذف الحساب", inboxEmailQueued: "تمت جدولة البريد", inboxEmailSent: "تم إرسال البريد", inboxEmailFailed: "فشل إرسال البريد",
+        emailQueued: "تمت إضافة البريد الإلكتروني إلى قائمة الإرسال", emailQueueFailed: "تعذر إضافة البريد الإلكتروني إلى قائمة الإرسال", emailServerNotConfigured: "إعدادات SMTP على Render غير مكتملة",
         block: "حظر", unblock: "إلغاء الحظر", blocked: "محظور"
       }
     };
@@ -688,8 +688,9 @@
       }
       root.innerHTML = entries.map((entry) => {
         const status = getInboxStatus(entry);
-        const emailQueued = Boolean(entry.doneEmailQueuedAt || entry.accountDeletedEmailQueuedAt);
+        const emailQueued = Boolean(entry.doneEmailQueuedAt || entry.accountDeletedEmailQueuedAt) && !entry.emailSentAt && !entry.emailDeliveryError;
         const emailSent = Boolean(entry.emailSentAt);
+        const emailFailed = Boolean(String(entry.emailDeliveryError || "").trim());
         const userId = entry.userId || entry.id;
         const actionsHtml = status === "pending" ? `
           <div class="actions-row">
@@ -706,7 +707,7 @@
               <div class="card-meta">${escapeHtml(t("requestedAt"))}: ${escapeHtml(formatDate(entry.requestedAt))}</div>
               <div class="card-meta">
                 <span class="status-badge ${inboxStatusClass(status)}">${escapeHtml(inboxStatusLabel(status))}</span>
-                ${emailSent ? `<span class="status-badge status-done">${escapeHtml(t("inboxEmailSent"))}</span>` : emailQueued ? `<span class="status-badge status-preparing">${escapeHtml(t("inboxEmailQueued"))}</span>` : ""}
+                ${emailSent ? `<span class="status-badge status-done">${escapeHtml(t("inboxEmailSent"))}</span>` : emailFailed ? `<span class="status-badge status-blocked" title="${escapeHtml(entry.emailDeliveryError)}">${escapeHtml(t("inboxEmailFailed"))}</span>` : emailQueued ? `<span class="status-badge status-preparing">${escapeHtml(t("inboxEmailQueued"))}</span>` : ""}
               </div>
             </div>
           </div>
@@ -868,6 +869,33 @@
       return requestSnap.exists() ? { id: requestSnap.id, ...requestSnap.data() } : null;
     }
 
+    async function deliverEmailViaServer(userId, emailPayload) {
+      const response = await fetch(`${MAIL_API_BASE}/send-account-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...emailPayload,
+          deleteRequestId: userId,
+        }),
+      });
+      let data = {};
+      try {
+        data = await response.json();
+      } catch (error) {
+        data = { ok: false, error: "Invalid server response" };
+      }
+      if (!response.ok || !data.ok) {
+        const errorMessage = data.error || data.mail?.reason || t("emailServerNotConfigured");
+        await updateAdminInboxForUser(userId, { emailDeliveryError: errorMessage });
+        throw new Error(errorMessage);
+      }
+      await updateAdminInboxForUser(userId, {
+        emailSentAt: data.sentAt || new Date().toISOString(),
+        emailDeliveryError: "",
+      });
+      return true;
+    }
+
     async function wakeMailService() {
       try {
         await fetch(`${MAIL_API_BASE}/health`);
@@ -906,7 +934,7 @@ Pazar Fiyatı Admin`;
         queuedAt: new Date().toISOString(),
         queuedBy: localStorage.getItem("user_email") || OWNER_EMAIL,
       });
-      void wakeMailService();
+      await deliverEmailViaServer(userId, { to: email, subject, text, html });
       return true;
     }
 
@@ -940,7 +968,7 @@ Pazar Fiyatı Admin`;
         queuedAt: new Date().toISOString(),
         queuedBy: localStorage.getItem("user_email") || OWNER_EMAIL,
       });
-      void wakeMailService();
+      await deliverEmailViaServer(userId, { to: email, subject, text, html });
       return true;
     }
 
@@ -969,7 +997,6 @@ Pazar Fiyatı Admin`;
         await updateAdminInboxForUser(userId, {
           status: "completed",
           completedAt: now,
-          accountDeletedEmailQueuedAt: emailQueued ? now : null,
         });
         await setDoc(doc(db, "deleteRequests", userId), {
           status: "completed",
@@ -983,7 +1010,9 @@ Pazar Fiyatı Admin`;
       currentUsers = currentUsers.filter((entry) => entry.id !== userId);
       renderUsers(currentUsers);
       if (emailQueued) {
-        showToast(`${t("removed")} - ${t("emailQueued")}`);
+        showToast(`${t("removed")} - ${t("inboxEmailSent")}`);
+      } else if (hasDeleteRequest) {
+        showToast(`${t("removed")} - ${t("inboxEmailFailed")}`);
       } else {
         showToast(t("removed"));
       }
@@ -1009,7 +1038,7 @@ Pazar Fiyatı Admin`;
         doneMarkedBy: localStorage.getItem("user_email") || OWNER_EMAIL,
         doneEmailQueuedAt: now,
       }, { merge: true });
-      showToast(`${t("updated")} - ${t("emailQueued")}`);
+      showToast(`${t("updated")} - ${t("inboxEmailSent")}`);
     };
 
     document.querySelectorAll(".tab-btn").forEach((button) => {
