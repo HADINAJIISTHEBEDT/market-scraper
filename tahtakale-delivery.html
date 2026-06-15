@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="tr">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Driver</title>
+  <title>tahtakale Delivery</title>
   <link rel="stylesheet" href="css.css" />
   <link rel="stylesheet" href="market-panel.css" />
   <style>
@@ -12,7 +12,7 @@
       display: flex; justify-content: space-between; align-items: center; gap: 12px;
       margin-bottom: 24px; padding-bottom: 14px; border-bottom: 1px solid #e5e7eb; flex-wrap: wrap;
     }
-    .market-label { font-weight: 800; color: #1e293b; }
+    .market-label { font-weight: 800; color: #2d6a4f; }
     .lang-select, .field-input, .status-select {
       padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font: inherit; background: #fff;
     }
@@ -24,7 +24,7 @@
     .btn-primary, .btn-secondary, .btn-danger {
       padding: 10px 16px; border: none; border-radius: 8px; cursor: pointer; font: inherit; font-weight: 700;
     }
-    .btn-primary { background: #2563eb; color: #fff; }
+    .btn-primary { background: #2d6a4f; color: #fff; }
     .btn-secondary { background: #e2e8f0; color: #1e293b; }
     .btn-danger { background: #fee2e2; color: #b91c1c; }
     .actions-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; align-items: center; }
@@ -47,7 +47,7 @@
     .chat-compose { display: flex; gap: 8px; padding: 10px; border-top: 1px solid #e5e7eb; }
     .chat-input { flex: 1; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font: inherit; }
     .call-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
-    .btn-call, .btn-video { padding: 8px 14px; border: none; border-radius: 8px; font: inherit; font-weight: 700; cursor: pointer; text-decoration: none; display: inline-block; }
+    .btn-call, .btn-video { padding: 8px 14px; border: none; border-radius: 8px; font: inherit; font-weight: 700; cursor: pointer; }
     .btn-call { background: #16a34a; color: #fff; }
     .btn-video { background: #7c3aed; color: #fff; }
     .chat-disabled { opacity: .65; }
@@ -55,27 +55,34 @@
   </style>
 </head>
 <body>
+  <script>
+    window.MARKET_ID = "tahtakale";
+    window.DELIVERY_MARKET_ID = "tahtakale";
+    window.MARKET_LABEL = "Tahtakale";
+  </script>
+
   <div class="nav-bar">
-    <span class="market-label" id="marketLabel">Driver</span>
+    <span class="market-label" id="marketLabel">tahtakale Delivery</span>
+    <a href="tahtakale.html" style="color:#2d6a4f;font-weight:600;text-decoration:none;">Market panel</a>
     <select id="langSelect" class="lang-select">
-      <option value="tr">Türkçe</option>
+      <option value="tr">TÃ¼rkÃ§e</option>
       <option value="en">English</option>
-      <option value="ar">العربية</option>
+      <option value="ar">Ø§Ù„Ø¹Ø±Ø¨ÙŠØ©</option>
     </select>
   </div>
 
   <div id="driverGate" class="card">
     <div class="card-title" id="driverGateTitle">Driver phone</div>
-    <p class="card-meta" id="driverGateHelp">Enter your phone number to see orders assigned to you.</p>
+    <p class="card-meta" id="driverGateHelp">Enter the phone number the market assigned to you.</p>
     <div class="driver-gate-row">
-      <input class="field-input" id="driverPhoneInput" type="tel" autocomplete="tel" />
+      <input class="field-input" id="driverPhoneInput" type="tel" autocomplete="tel" placeholder="05XXXXXXXXX" />
       <button class="btn-primary" type="button" id="driverPhoneSave">Continue</button>
     </div>
   </div>
 
   <div id="driverApp" hidden>
-    <h1 id="pageTitle">Driver tracking</h1>
-    <p id="pageHelp" class="card-meta">Share live GPS for active deliveries and update order status.</p>
+    <h1 id="pageTitle">tahtakale delivery</h1>
+    <p id="pageHelp" class="card-meta">Chat and call the customer in-app. Set arrived, then close the order.</p>
 
     <div id="activeOrderCard" class="card" hidden>
       <div class="card-title" id="activeOrderTitle">Active order</div>
@@ -85,7 +92,7 @@
       <div class="actions-row">
         <select class="status-select" id="driverStatusSelect"></select>
         <button class="btn-primary" type="button" id="updateStatusBtn">Update status</button>
-        <button class="btn-secondary" type="button" id="closeOrderBtn" hidden>Close order</button>
+        <button class="btn-danger" type="button" id="closeOrderBtn" hidden>Close order</button>
       </div>
       <div class="location-box" id="locationBox"></div>
       <div class="actions-row">
@@ -103,7 +110,7 @@
       </div>
     </div>
 
-    <h2 id="ordersTitle" style="font-size:20px;margin:24px 0 12px;">Active deliveries</h2>
+    <h2 id="ordersTitle" style="font-size:20px;margin:24px 0 12px;">Your deliveries</h2>
     <div id="ordersList"></div>
   </div>
 
@@ -113,6 +120,7 @@
   <script src="markets-config.global.js"></script>
   <script src="order-lifecycle.global.js"></script>
   <script src="in-app-call.js"></script>
-  <script src="driver.core.js"></script>
+  <script src="delivery.core.js"></script>
 </body>
 </html>
+

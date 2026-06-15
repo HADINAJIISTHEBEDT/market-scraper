@@ -621,6 +621,7 @@
       await db.collection("orders").doc(orderId).update({
         status,
         updatedAt: new Date().toISOString(),
+        ...(status === "arrived" ? { arrivedAt: new Date().toISOString() } : {}),
       });
       showToast(t("updated"));
     } catch (error) {

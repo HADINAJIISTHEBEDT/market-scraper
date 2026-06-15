@@ -21,8 +21,6 @@
   const isOrderClosed = OL.isOrderClosed;
   const isOrderCommunicationActive = OL.isOrderCommunicationActive;
   const hasAssignedDriver = OL.hasAssignedDriver;
-  const formatTelHref = OL.formatTelHref;
-  const getVideoCallUrl = OL.getVideoCallUrl;
   const orderChatCollection = OL.orderChatCollection;
   const writeOrderInboxNotifications = OL.writeOrderInboxNotifications;
 
