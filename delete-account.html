@@ -59,7 +59,8 @@
           missingLogin: "Silme istegi gondermek icin once giris yapmalisin.",
           sending: "Istek gonderiliyor...",
           sent: "Istek admine gonderildi. Verilerin en fazla 7 gun icinde silinecek ve en kisa surede sana e-posta gonderecegiz.",
-          failed: "Istek gonderilemedi"
+          failed: "Istek gonderilemedi",
+          messageRequired: "Lutfen admine bir mesaj yazin."
         },
         en: {
           title: "Delete your account",
@@ -73,7 +74,8 @@
           missingLogin: "Please sign in before sending a deletion request.",
           sending: "Sending request...",
           sent: "Your request was sent to the admin. Your data will be deleted within a maximum of 7 days, and we will send you an email as soon as possible.",
-          failed: "Could not send request"
+          failed: "Could not send request",
+          messageRequired: "Please write a message to the admin."
         },
         ar: {
           title: "حذف حسابك",
@@ -87,7 +89,8 @@
           missingLogin: "يرجى تسجيل الدخول قبل إرسال طلب الحذف.",
           sending: "جار إرسال الطلب...",
           sent: "تم إرسال طلبك إلى المسؤول. سيتم حذف بياناتك خلال مدة أقصاها 7 أيام، وسنرسل لك بريداً إلكترونياً في أقرب وقت ممكن.",
-          failed: "تعذر إرسال الطلب"
+          failed: "تعذر إرسال الطلب",
+          messageRequired: "يرجى كتابة رسالة إلى المسؤول."
         }
       };
 
@@ -132,9 +135,13 @@
           setTimeout(() => { window.location.href = "login.html"; }, 900);
           return;
         }
+        const message = document.getElementById("requestMessage").value.trim();
+        if (!message) {
+          setStatus(t("messageRequired"), true);
+          return;
+        }
         setStatus(t("sending"));
         try {
-          const message = document.getElementById("requestMessage").value.trim();
           const requestedAt = new Date().toISOString();
           await setDoc(doc(db, "deleteRequests", userUid), {
             userId: userUid,
@@ -143,18 +150,16 @@
             message,
             status: "pending",
             requestedAt,
-          }, { merge: true });
-          if (message) {
-            await setDoc(doc(db, "adminInbox", userUid), {
-              userId: userUid,
-              email: userEmail,
-              name: userName || "",
-              message,
-              status: "pending",
-              requestedAt,
-              source: "delete-request",
-            }, { merge: true });
-          }
+          });
+          await setDoc(doc(db, "adminInbox", userUid), {
+            userId: userUid,
+            email: userEmail,
+            name: userName || "",
+            message,
+            status: "pending",
+            requestedAt,
+            source: "delete-request",
+          });
           setStatus(t("sent"));
         } catch (error) {
           setStatus(`${t("failed")}: ${error.message}`, true);
