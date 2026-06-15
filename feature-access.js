@@ -108,7 +108,10 @@
   }
 
   function canUseFeatures() {
-    return isAdminUser() || areFeaturesUnlockedForAll();
+    if (isAdminUser()) return true;
+    if (areFeaturesUnlockedForAll()) return true;
+    if (localStorage.getItem("user_uid") && localStorage.getItem("user_email")) return true;
+    return false;
   }
 
   function ensureModal() {
@@ -239,6 +242,14 @@
       const badge = card.querySelector("[data-feature-badge]");
       if (label && key) label.textContent = t(key);
       if (badge) badge.textContent = t("lockedBadge");
+      if (card.dataset.feature === "login") {
+        if (card.dataset.loginBound === "true") return;
+        card.dataset.loginBound = "true";
+        card.addEventListener("click", () => {
+          window.location.href = "login.html";
+        });
+        return;
+      }
       bindLockedTrigger(card);
     });
   }
@@ -249,6 +260,7 @@
   }
 
   function initLoginNotice() {
+    if (location.pathname.endsWith("login.html")) return;
     if (canUseFeatures()) return;
     const status = document.getElementById("authStatus");
     if (status && !status.textContent.trim()) {
@@ -336,7 +348,8 @@
 
   function startDeletedAccountWatcher() {
     const uid = localStorage.getItem("user_uid");
-    if (!uid || window.__deletedAccountWatcherStarted) return;
+    if (!uid) return;
+    if (window.__deletedAccountWatcherStarted) return;
     window.__deletedAccountWatcherStarted = true;
 
     import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js")
@@ -365,10 +378,6 @@
           const data = snapshot.exists() ? snapshot.data() : null;
           if (data?.blocked) {
             handleBlockedAccess();
-            return;
-          }
-          if (!snapshot.exists()) {
-            handleAdminDeletedLogout();
           }
         });
         firestore.onSnapshot(firestore.doc(db, "deletedAccounts", uid), (snapshot) => {

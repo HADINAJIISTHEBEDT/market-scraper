@@ -415,6 +415,7 @@
 
   <script src="feature-access.js"></script>
   <script src="app-settings.js"></script>
+  <script src="firebase-config.global.js"></script>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import {
@@ -436,7 +437,16 @@
       initializeFirestore,
       setDoc
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-    import firebaseConfig from "./firebase-config.js";
+    if (!window.FIREBASE_CONFIG) {
+      throw new Error("firebase-config.global.js is missing from this folder.");
+    }
+    const firebaseConfig = window.FIREBASE_CONFIG;
+    const AUTH_BRIDGE_CANDIDATES = [
+      "https://st-business-86a9b.web.app/auth-bridge.html",
+      "https://st-business-86a9b.firebaseapp.com/auth-bridge.html",
+      "https://market-scraper-0k36.onrender.com/auth-bridge.html",
+    ];
+    const isFilePage = location.protocol === "file:";
 
     const I18N = {
       tr: {
@@ -561,6 +571,81 @@
       return normalizeGmail(email) === normalizeGmail(OWNER_EMAIL);
     }
 
+    function isGmailAddress(email) {
+      return /@(gmail|googlemail)\.com$/i.test(String(email || ""));
+    }
+
+    async function safeSignOut() {
+      if (isFilePage) return;
+      try {
+        await signOut(auth);
+      } catch (error) {
+        console.warn("Sign out skipped", error);
+      }
+    }
+
+    function getAuthBridgeTarget() {
+      const url = AUTH_BRIDGE_CANDIDATES[0];
+      return { url, origin: new URL(url).origin };
+    }
+
+    async function resolveAuthBridgeUrl() {
+      // file:// cannot fetch https (browser blocks it), but popup sign-in still works
+      if (isFilePage) {
+        return getAuthBridgeTarget();
+      }
+      for (const url of AUTH_BRIDGE_CANDIDATES) {
+        try {
+          const response = await fetch(url, { method: "GET", cache: "no-store" });
+          if (response.ok) {
+            return { url, origin: new URL(url).origin };
+          }
+        } catch (error) {
+          console.warn("Auth bridge unavailable:", url, error);
+        }
+      }
+      return getAuthBridgeTarget();
+    }
+
+    function signInViaHostedBridge(bridgeUrl, bridgeOrigin) {
+      return new Promise((resolve, reject) => {
+        const popup = window.open(bridgeUrl, "pazarquery-auth", "width=520,height=680");
+        if (!popup) {
+          reject(Object.assign(new Error("popup blocked"), { code: "auth/popup-blocked" }));
+          return;
+        }
+
+        let settled = false;
+        const timeout = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          window.removeEventListener("message", onMessage);
+          reject(new Error("Sign-in timed out. Close the popup and try again."));
+        }, 120000);
+
+        function onMessage(event) {
+          if (event.origin !== bridgeOrigin) return;
+          if (!event.data || event.data.type !== "pazarquery-auth") return;
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeout);
+          window.removeEventListener("message", onMessage);
+          if (event.data.error) {
+            reject(new Error(event.data.error));
+            return;
+          }
+          resolve({
+            uid: event.data.uid,
+            email: event.data.email,
+            displayName: event.data.displayName || "",
+            photoURL: event.data.photoURL || "",
+          });
+        }
+
+        window.addEventListener("message", onMessage);
+      });
+    }
+
     function setStatus(messageKey, isError = false) {
       const box = document.getElementById("authStatus");
       box.textContent = t(messageKey);
@@ -674,8 +759,8 @@
     async function routeSignedInUser(user) {
       setStatus("statusChecking");
       try {
-        if (!user.email || !/@gmail\.com$/i.test(user.email)) {
-          await signOut(auth);
+        if (!user.email || !isGmailAddress(user.email)) {
+          await safeSignOut();
           setRawStatus(t("errorGoogleOnly"), true);
           return;
         }
@@ -690,7 +775,7 @@
         try {
           const profile = await syncUserRecord(user);
           if (profile.blocked) {
-            await signOut(auth);
+            await safeSignOut();
             window.FeatureAccess?.clearLocalUser?.();
             setRawStatus(window.FeatureAccess?.t?.("blockedAccountBody") || t("blockedAccount"), true);
             return;
@@ -754,6 +839,18 @@
 
     async function continueWithGoogle() {
       setStatus("statusStarting");
+      if (isFilePage) {
+        try {
+          const bridge = await resolveAuthBridgeUrl();
+          const user = await signInViaHostedBridge(bridge.url, bridge.origin);
+          await routeSignedInUser(user);
+        } catch (error) {
+          console.error("Google sign-in failed", error);
+          setRawStatus(error.message || getFriendlyError(error), true);
+        }
+        return;
+      }
+
       try {
         await setPersistence(auth, browserLocalPersistence);
         try {
@@ -776,6 +873,7 @@
     }
 
     async function handleExistingSession() {
+      if (isFilePage) return;
       await setPersistence(auth, browserLocalPersistence);
       try {
         const result = await getRedirectResult(auth);

@@ -8,4 +8,8 @@ const firebaseConfig = {
   appId: "1:472603409840:web:30127c81e74c3b3c4e2a75"
 };
 
+if (typeof window !== "undefined") {
+  window.FIREBASE_CONFIG = firebaseConfig;
+}
+
 export default firebaseConfig;

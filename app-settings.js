@@ -114,15 +114,20 @@
 
   async function subscribeToSettings() {
     try {
-      const [{ initializeApp }, { doc, initializeFirestore, onSnapshot }] = await Promise.all([
+      const [{ initializeApp, getApp, getApps }, { doc, initializeFirestore, getFirestore, onSnapshot }] = await Promise.all([
         import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"),
         import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js"),
       ]);
-      const app = initializeApp(firebaseConfig);
-      const db = initializeFirestore(app, {
-        experimentalForceLongPolling: true,
-        useFetchStreams: false,
-      });
+      const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+      let db;
+      try {
+        db = initializeFirestore(app, {
+          experimentalForceLongPolling: true,
+          useFetchStreams: false,
+        });
+      } catch {
+        db = getFirestore(app);
+      }
 
       onSnapshot(
         doc(db, "appSettings", "global"),

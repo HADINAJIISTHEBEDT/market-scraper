@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Google Sign In</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #edf2fb;
+      color: #202124;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      padding: 24px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <p id="status">Opening Google sign-in...</p>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getAuth, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import firebaseConfig from "./firebase-config.js";
+
+    const AUTH_MESSAGE = "pazarquery-auth";
+    const statusEl = document.getElementById("status");
+
+    function notify(payload) {
+      if (window.opener && !window.opener.closed) {
+        window.opener.postMessage({ type: AUTH_MESSAGE, ...payload }, "*");
+      }
+    }
+
+    function finish(message, isError) {
+      statusEl.textContent = message;
+      if (isError) {
+        notify({ error: message });
+        setTimeout(() => window.close(), 2500);
+        return;
+      }
+      window.close();
+    }
+
+    if (!window.opener) {
+      finish("Open login from the app folder, then try again.", true);
+    } else {
+      const app = initializeApp(firebaseConfig);
+      const auth = getAuth(app);
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: "select_account" });
+
+      signInWithPopup(auth, provider)
+        .then((result) => {
+          const user = result.user;
+          if (!user?.email) {
+            finish("No email returned from Google.", true);
+            return;
+          }
+          notify({
+            uid: user.uid,
+            email: user.email,
+            displayName: user.displayName || "",
+            photoURL: user.photoURL || "",
+          });
+          finish("Signed in. You can close this window.", false);
+        })
+        .catch((error) => {
+          console.error("Auth bridge failed", error);
+          finish(error.message || "Google sign-in failed.", true);
+        });
+    }
+  </script>
+</body>
+</html>

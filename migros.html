@@ -1,0 +1,50 @@
+﻿<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Migros Panel</title>
+  <link rel="stylesheet" href="css.css" />
+  <link rel="stylesheet" href="market-panel.css" />
+</head>
+<body>
+  <script>
+    window.MARKET_ID = "migros";
+    window.MARKET_LABEL = "Migros";
+    window.MARKET_COLOR = "#f58220";
+  </script>
+  <div id="marketLoading">Loading Migros panel...</div>
+  <div id="accessDenied">
+    <h2>Panel could not load</h2>
+    <p id="deniedMessage">Check that all files are in the same folder.</p>
+  </div>
+  <div id="marketGuard" style="display:none;">
+    <div class="nav-bar">
+      <a id="driverLink" href="driver.html?market=migros">Driver</a>
+      <select id="langSelect" class="lang-select">
+        <option value="tr">Turkce</option>
+        <option value="en">English</option>
+        <option value="ar">Arabic</option>
+      </select>
+    </div>
+    <div class="market-header" id="marketHeader">
+      <div class="market-badge" id="marketBadge">MIG</div>
+      <div class="market-title" id="marketTitle">Migros</div>
+    </div>
+    <div class="stats-row">
+      <div class="stat-box"><div class="stat-num" id="statTotal">0</div><div class="stat-label" id="statTotalLabel">Orders</div></div>
+      <div class="stat-box"><div class="stat-num" id="statPending">0</div><div class="stat-label" id="statPendingLabel">Pending</div></div>
+      <div class="stat-box"><div class="stat-num" id="statActive">0</div><div class="stat-label" id="statActiveLabel">On the way</div></div>
+    </div>
+    <h2 id="marketInboxTitle" class="section-title" style="font-size:20px;margin:24px 0 12px;">Inbox</h2>
+    <div id="marketInboxList"></div>
+    <div id="ordersList"></div>
+  </div>
+  <div class="toast" id="toast"></div>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.global.js"></script>
+  <script src="order-lifecycle.global.js"></script>
+  <script src="market-panel.core.js"></script>
+</body>
+</html>

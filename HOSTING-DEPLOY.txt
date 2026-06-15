@@ -1,0 +1,34 @@
+FIREBASE HOSTING DEPLOY (official method)
+======================================
+
+Your project is already set up:
+  firebase.json  - hosting config
+  .firebaserc     - project st-business-86a9b
+
+You only need to login once, then deploy.
+
+OPTION A - double-click
+-----------------------
+1. Double-click deploy-hosting.bat
+2. Step 1: browser opens -> sign in with Firebase Google account
+3. Step 2: wait for "Deploy complete"
+4. Open https://st-business-86a9b.web.app/auth-bridge.html
+
+OPTION B - manual (same as Firebase docs)
+-----------------------------------------
+Open Command Prompt in this folder, then:
+
+  set PATH=C:\Program Files\nodejs;%PATH%
+  node_modules\.bin\firebase login
+  node_modules\.bin\firebase deploy --only hosting --project st-business-86a9b
+
+If browser login fails:
+
+  node_modules\.bin\firebase login --no-localhost
+
+After deploy
+------------
+Firebase Console -> Hosting should show a release (not "Get started").
+Your site URLs:
+  https://st-business-86a9b.web.app
+  https://st-business-86a9b.firebaseapp.com

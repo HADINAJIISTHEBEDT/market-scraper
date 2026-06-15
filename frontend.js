@@ -574,6 +574,7 @@ function renderItemCard(item) {
     price: Number(item.price || 0),
     image: item.image || "",
     unitPrice: item.unitPrice || "",
+    category: item.category || item._searchTerm || String(document.getElementById("searchInput")?.value || "").trim() || "General",
   }));
   return `<article class="item-card">
     ${imageHtml}
@@ -695,6 +696,7 @@ function updateNavbar() {
   if (!canUse) {
     window.FeatureAccess?.initComingSoonPanel?.();
     window.FeatureAccess?.initLockedFooterLinks?.();
+    if (navLoginBtn) navLoginBtn.hidden = false;
     return;
   }
 
@@ -869,7 +871,7 @@ async function loadCategories() {
       for (const item of items) {
         const existing = allItems.find(i => i.name === item.name && i.market === item.market);
         if (!existing) {
-          allItems.push({...item, _searchTerm: product});
+          allItems.push({...item, _searchTerm: product, category: product});
         }
       }
       if (allItems.length >= 30) break;
@@ -900,7 +902,7 @@ async function refreshPrices() {
       for (const item of items) {
         const existing = allItems.find(i => i.name === item.name && i.market === item.market);
         if (!existing) {
-          allItems.push({...item, _searchTerm: product});
+          allItems.push({...item, _searchTerm: product, category: product});
         }
       }
       if (allItems.length >= 30) break;

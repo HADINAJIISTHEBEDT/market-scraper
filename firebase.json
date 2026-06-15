@@ -5,6 +5,13 @@
       "firebase.json",
       "**/.*",
       "**/node_modules/**",
+      "**/.cache/**",
+      "market scraper/**",
+      "android-app/**",
+      "daemon/**",
+      "netlify/**",
+      "tools/**",
+      "dist/**",
       "server.js",
       "server-simple.js",
       "api-handler.js",
@@ -18,21 +25,24 @@
       "uninstall*.js",
       "service.js",
       "main.js",
-      "daemon/**",
-      "netlify/**",
-      "android-app/**",
       "serviceAccountKey.json",
-      "*.bat",
-      "*.ps1",
-      "*.exe",
-      "*.key",
-      "*.crt",
-      "*.cer",
-      "*.log",
+      "**/*.exe",
+      "**/*.dll",
+      "**/*.msi",
+      "**/*.bat",
+      "**/*.ps1",
+      "**/*.cmd",
+      "**/*.key",
+      "**/*.crt",
+      "**/*.cer",
+      "**/*.log",
+      "package.json",
       "package-lock.json",
       "render.yaml",
       "netlify.toml",
       "deploy-cloud.txt",
+      "HOSTING-DEPLOY.txt",
+      "deploy-log.txt",
       "TODO.md",
       "README.md"
     ],
@@ -62,16 +72,32 @@
         "destination": "/delete-account.html"
       },
       {
-        "source": "/markets",
-        "destination": "/markets.html"
-      },
-      {
-        "source": "/market",
-        "destination": "/market.html"
-      },
-      {
         "source": "/driver",
         "destination": "/driver.html"
+      },
+      {
+        "source": "/bim",
+        "destination": "/bim.html"
+      },
+      {
+        "source": "/a101",
+        "destination": "/a101.html"
+      },
+      {
+        "source": "/sok",
+        "destination": "/sok.html"
+      },
+      {
+        "source": "/migros",
+        "destination": "/migros.html"
+      },
+      {
+        "source": "/tahtakale",
+        "destination": "/tahtakale.html"
+      },
+      {
+        "source": "/carrefour",
+        "destination": "/carrefour.html"
       }
     ],
     "headers": [
