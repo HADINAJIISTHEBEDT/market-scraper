@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   "use strict";
 
   if (!window.FIREBASE_CONFIG) {
@@ -137,54 +137,54 @@
       chatDisabled: "Order closed",
     },
     ar: {
-      pageTitle: "تتبع السائق",
-      pageHelp: "شارك GPS المباشر للتسليمات النشطة وحدّث حالة الطلب.",
-      driverPhoneTitle: "هاتف السائق",
-      driverPhoneHelp: "أدخل رقم هاتفك لرؤية الطلبات المعينة لك.",
-      driverPhonePlaceholder: "رقم هاتفك",
-      driverPhoneSave: "متابعة",
-      marketOnly: "صفحة السائق هذه مخصصة لسوقك فقط.",
-      wrongMarket: "سوق غير صالح. افتح صفحة السائق من لوحة السوق.",
-      ordersTitle: "التسليمات النشطة",
-      noOrders: "لا توجد طلبات نشطة.",
-      selectOrder: "اختر للتتبع",
-      activeOrder: "الطلب النشط",
-      orderNumber: "رقم الطلب",
-      customer: "العميل",
-      market: "السوق",
-      phone: "الهاتف",
-      address: "العنوان",
-      payment: "الدفع",
-      payCash: "نقداً عند التسليم",
-      payCard: "بطاقة",
-      cardLast4: "آخر 4 أرقام",
-      cardName: "اسم حامل البطاقة",
-      cardExpiry: "تاريخ الانتهاء",
-      available: "متوفر",
-      unavailable: "غير متوفر",
-      waiting: "قيد التحضير",
-      onTheWay: "في الطريق",
-      arrived: "تم التسليم",
-      driver: "السائق",
-      updateStatus: "تحديث الحالة",
-      startTracking: "بدء التتبع المباشر",
-      stopTracking: "إيقاف التتبع",
-      trackingLive: "يتم مشاركة الموقع المباشر",
-      trackingStopped: "تم إيقاف التتبع",
-      lastUpdate: "آخر تحديث",
-      openMap: "فتح الخريطة",
-      locationUnavailable: "الموقع غير متاح",
-      updated: "تم التحديث",
-      unknown: "غير معروف",
-      closeOrder: "إغلاق الطلب",
-      closed: "تم إغلاق الطلب",
-      orderClosed: "اكتمل الطلب وأُغلق",
-      chatTitle: "الدردشة مع العميل",
-      chatPlaceholder: "اكتب رسالة للعميل...",
-      send: "إرسال",
-      voiceCall: "اتصل بالعميل",
-      videoCall: "مكالمة فيديو",
-      chatDisabled: "تم إغلاق الطلب",
+      pageTitle: "ØªØªØ¨Ø¹ Ø§Ù„Ø³Ø§Ø¦Ù‚",
+      pageHelp: "Ø´Ø§Ø±Ùƒ GPS Ø§Ù„Ù…Ø¨Ø§Ø´Ø± Ù„Ù„ØªØ³Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ù†Ø´Ø·Ø© ÙˆØ­Ø¯Ù‘Ø« Ø­Ø§Ù„Ø© Ø§Ù„Ø·Ù„Ø¨.",
+      driverPhoneTitle: "Ù‡Ø§ØªÙ Ø§Ù„Ø³Ø§Ø¦Ù‚",
+      driverPhoneHelp: "Ø£Ø¯Ø®Ù„ Ø±Ù‚Ù… Ù‡Ø§ØªÙÙƒ Ù„Ø±Ø¤ÙŠØ© Ø§Ù„Ø·Ù„Ø¨Ø§Øª Ø§Ù„Ù…Ø¹ÙŠÙ†Ø© Ù„Ùƒ.",
+      driverPhonePlaceholder: "Ø±Ù‚Ù… Ù‡Ø§ØªÙÙƒ",
+      driverPhoneSave: "Ù…ØªØ§Ø¨Ø¹Ø©",
+      marketOnly: "ØµÙØ­Ø© Ø§Ù„Ø³Ø§Ø¦Ù‚ Ù‡Ø°Ù‡ Ù…Ø®ØµØµØ© Ù„Ø³ÙˆÙ‚Ùƒ ÙÙ‚Ø·.",
+      wrongMarket: "Ø³ÙˆÙ‚ ØºÙŠØ± ØµØ§Ù„Ø­. Ø§ÙØªØ­ ØµÙØ­Ø© Ø§Ù„Ø³Ø§Ø¦Ù‚ Ù…Ù† Ù„ÙˆØ­Ø© Ø§Ù„Ø³ÙˆÙ‚.",
+      ordersTitle: "Ø§Ù„ØªØ³Ù„ÙŠÙ…Ø§Øª Ø§Ù„Ù†Ø´Ø·Ø©",
+      noOrders: "Ù„Ø§ ØªÙˆØ¬Ø¯ Ø·Ù„Ø¨Ø§Øª Ù†Ø´Ø·Ø©.",
+      selectOrder: "Ø§Ø®ØªØ± Ù„Ù„ØªØªØ¨Ø¹",
+      activeOrder: "Ø§Ù„Ø·Ù„Ø¨ Ø§Ù„Ù†Ø´Ø·",
+      orderNumber: "Ø±Ù‚Ù… Ø§Ù„Ø·Ù„Ø¨",
+      customer: "Ø§Ù„Ø¹Ù…ÙŠÙ„",
+      market: "Ø§Ù„Ø³ÙˆÙ‚",
+      phone: "Ø§Ù„Ù‡Ø§ØªÙ",
+      address: "Ø§Ù„Ø¹Ù†ÙˆØ§Ù†",
+      payment: "Ø§Ù„Ø¯ÙØ¹",
+      payCash: "Ù†Ù‚Ø¯Ø§Ù‹ Ø¹Ù†Ø¯ Ø§Ù„ØªØ³Ù„ÙŠÙ…",
+      payCard: "Ø¨Ø·Ø§Ù‚Ø©",
+      cardLast4: "Ø¢Ø®Ø± 4 Ø£Ø±Ù‚Ø§Ù…",
+      cardName: "Ø§Ø³Ù… Ø­Ø§Ù…Ù„ Ø§Ù„Ø¨Ø·Ø§Ù‚Ø©",
+      cardExpiry: "ØªØ§Ø±ÙŠØ® Ø§Ù„Ø§Ù†ØªÙ‡Ø§Ø¡",
+      available: "Ù…ØªÙˆÙØ±",
+      unavailable: "ØºÙŠØ± Ù…ØªÙˆÙØ±",
+      waiting: "Ù‚ÙŠØ¯ Ø§Ù„ØªØ­Ø¶ÙŠØ±",
+      onTheWay: "ÙÙŠ Ø§Ù„Ø·Ø±ÙŠÙ‚",
+      arrived: "ØªÙ… Ø§Ù„ØªØ³Ù„ÙŠÙ…",
+      driver: "Ø§Ù„Ø³Ø§Ø¦Ù‚",
+      updateStatus: "ØªØ­Ø¯ÙŠØ« Ø§Ù„Ø­Ø§Ù„Ø©",
+      startTracking: "Ø¨Ø¯Ø¡ Ø§Ù„ØªØªØ¨Ø¹ Ø§Ù„Ù…Ø¨Ø§Ø´Ø±",
+      stopTracking: "Ø¥ÙŠÙ‚Ø§Ù Ø§Ù„ØªØªØ¨Ø¹",
+      trackingLive: "ÙŠØªÙ… Ù…Ø´Ø§Ø±ÙƒØ© Ø§Ù„Ù…ÙˆÙ‚Ø¹ Ø§Ù„Ù…Ø¨Ø§Ø´Ø±",
+      trackingStopped: "ØªÙ… Ø¥ÙŠÙ‚Ø§Ù Ø§Ù„ØªØªØ¨Ø¹",
+      lastUpdate: "Ø¢Ø®Ø± ØªØ­Ø¯ÙŠØ«",
+      openMap: "ÙØªØ­ Ø§Ù„Ø®Ø±ÙŠØ·Ø©",
+      locationUnavailable: "Ø§Ù„Ù…ÙˆÙ‚Ø¹ ØºÙŠØ± Ù…ØªØ§Ø­",
+      updated: "ØªÙ… Ø§Ù„ØªØ­Ø¯ÙŠØ«",
+      unknown: "ØºÙŠØ± Ù…Ø¹Ø±ÙˆÙ",
+      closeOrder: "Ø¥ØºÙ„Ø§Ù‚ Ø§Ù„Ø·Ù„Ø¨",
+      closed: "ØªÙ… Ø¥ØºÙ„Ø§Ù‚ Ø§Ù„Ø·Ù„Ø¨",
+      orderClosed: "Ø§ÙƒØªÙ…Ù„ Ø§Ù„Ø·Ù„Ø¨ ÙˆØ£ÙØºÙ„Ù‚",
+      chatTitle: "Ø§Ù„Ø¯Ø±Ø¯Ø´Ø© Ù…Ø¹ Ø§Ù„Ø¹Ù…ÙŠÙ„",
+      chatPlaceholder: "Ø§ÙƒØªØ¨ Ø±Ø³Ø§Ù„Ø© Ù„Ù„Ø¹Ù…ÙŠÙ„...",
+      send: "Ø¥Ø±Ø³Ø§Ù„",
+      voiceCall: "Ø§ØªØµÙ„ Ø¨Ø§Ù„Ø¹Ù…ÙŠÙ„",
+      videoCall: "Ù…ÙƒØ§Ù„Ù…Ø© ÙÙŠØ¯ÙŠÙˆ",
+      chatDisabled: "ØªÙ… Ø¥ØºÙ„Ø§Ù‚ Ø§Ù„Ø·Ù„Ø¨",
     },
   };
 
@@ -302,7 +302,7 @@
       const role = msg.senderRole === "driver" ? "driver" : "customer";
       return (
         '<div class="chat-msg ' + role + '">' +
-        '<div class="chat-msg-meta">' + escapeHtml(msg.senderName || t("unknown")) + " · " +
+        '<div class="chat-msg-meta">' + escapeHtml(msg.senderName || t("unknown")) + " Â· " +
         escapeHtml(formatDate(msg.createdAt)) + "</div>" +
         "<div>" + escapeHtml(msg.text || "") + "</div></div>"
       );
@@ -524,10 +524,10 @@
       return (
         '<div class="card">' +
         '<div class="card-title">' + escapeHtml(order.userName || t("unknown")) +
-        (orderNo ? " · " + escapeHtml(orderNo) : "") + "</div>" +
+        (orderNo ? " Â· " + escapeHtml(orderNo) : "") + "</div>" +
         '<div class="card-meta">' + escapeHtml(getMarketLabel(order.marketId || order.marketName)) +
-        " · " + escapeHtml(statusLabel(order.status)) +
-        " · " + escapeHtml(formatDate(order.createdAt)) + "</div>" +
+        " Â· " + escapeHtml(statusLabel(order.status)) +
+        " Â· " + escapeHtml(formatDate(order.createdAt)) + "</div>" +
         '<div class="actions-row">' +
         '<button class="btn-primary" type="button" data-driver-action="select-order" data-order-id="' +
         escapeHtml(order.id) + '">' + escapeHtml(t("selectOrder")) + "</button>" +

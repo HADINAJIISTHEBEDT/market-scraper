@@ -43,6 +43,7 @@
       driverName: "Surucu adi",
       driverPhone: "Surucu telefonu",
       assignDriver: "Surucu ata ve yola cikar",
+      deliveryPage: "Surucu sayfasi",
       trackDriver: "Surucuyu takip et",
       savedDrivers: "Kayitli suruculer",
       addDriver: "Surucu ekle",
@@ -88,6 +89,7 @@
       driverName: "Driver name",
       driverPhone: "Driver phone",
       assignDriver: "Assign driver & send",
+      deliveryPage: "Driver delivery page",
       trackDriver: "Track driver",
       savedDrivers: "Saved drivers",
       addDriver: "Add driver",
@@ -133,6 +135,7 @@
       driverName: "اسم السائق",
       driverPhone: "هاتف السائق",
       assignDriver: "تعيين السائق وإرساله",
+      deliveryPage: "صفحة تسليم السائق",
       trackDriver: "تتبع السائق",
       savedDrivers: "السائقون المحفوظون",
       addDriver: "إضافة سائق",
@@ -177,6 +180,7 @@
     firebase.initializeApp(window.FIREBASE_CONFIG);
   }
   const db = firebase.firestore();
+  try { db.settings({ experimentalForceLongPolling: true, merge: true }); } catch (e) {}
 
   function showBootError(message) {
     const loading = document.getElementById("marketLoading");
@@ -187,6 +191,10 @@
       const msg = document.getElementById("deniedMessage");
       if (msg) msg.textContent = message;
     }
+  }
+
+  function deliveryPageHref() {
+    return MARKET_ID + "-delivery.html";
   }
 
   function normalizeMarketKey(value) {
@@ -462,12 +470,33 @@
   function startMarketInboxListener() {
     const root = document.getElementById("marketInboxList");
     if (!root) return;
-    db.collection("marketInbox").where("marketId", "==", MARKET_ID).orderBy("requestedAt", "desc")
-      .onSnapshot((snapshot) => {
-        renderMarketInbox(snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() })));
-      }, (error) => {
+    const renderInboxSnapshot = (snapshot) => {
+      const entries = snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() }))
+        .filter((entry) => !entry.marketId || normalizeMarketKey(entry.marketId) === normalizeMarketKey(MARKET_ID))
+        .sort((a, b) => String(b.requestedAt || b.createdAt || "").localeCompare(String(a.requestedAt || a.createdAt || "")));
+      renderMarketInbox(entries);
+    };
+    db.collection("marketInbox").where("marketId", "==", MARKET_ID)
+      .onSnapshot(renderInboxSnapshot, (error) => {
         console.error("Market inbox listener failed", error);
+        db.collection("marketInbox").onSnapshot(renderInboxSnapshot, (fallbackError) => {
+          console.error("Market inbox fallback failed", fallbackError);
+        });
       });
+  }
+
+  function startOrdersListener() {
+    const renderSnapshot = (snapshot) => {
+      const orders = snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() }));
+      renderOrders(orders.filter((order) => orderMatchesMarket(order, MARKET_ID)));
+    };
+    db.collection("orders").where("marketId", "==", MARKET_ID).onSnapshot(renderSnapshot, (error) => {
+      console.error("Orders listener failed", error);
+      db.collection("orders").onSnapshot(renderSnapshot, (fallbackError) => {
+        console.error("Orders fallback listener failed", fallbackError);
+        showBootError(fallbackError.message || "Could not load orders.");
+      });
+    });
   }
 
   async function renderOrders(orders) {
@@ -497,6 +526,7 @@
 
       const currentStatus = normalizeOrderStatus(order.status);
       const orderNo = orderNumberDisplay(order);
+      const closed = isOrderClosed(order.status);
       const statusOptions = STATUSES.map((status) =>
         `<option value="${status}" ${currentStatus === status ? "selected" : ""}>${escapeHtml(statusLabel(status))}</option>`
       ).join("");
@@ -525,8 +555,8 @@
             ${itemsHtml}
           </div>
           <div class="actions-row">
-            <select class="status-select" id="status-${escapeHtml(order.id)}">${statusOptions}</select>
-            <button class="btn-update" type="button" data-market-action="update-status" data-order-id="${escapeHtml(order.id)}">${escapeHtml(t("updateStatus"))}</button>
+            <select class="status-select" id="status-${escapeHtml(order.id)}" ${closed ? "disabled" : ""}>${statusOptions}</select>
+            <button class="btn-update" type="button" data-market-action="update-status" data-order-id="${escapeHtml(order.id)}" ${closed ? "disabled" : ""}>${escapeHtml(t("updateStatus"))}</button>
           </div>
           <div class="driver-box">
             <strong>${escapeHtml(t("driver"))}</strong>
@@ -572,10 +602,33 @@
   }
 
   async function updateOrderStatus(orderId) {
+    const order = currentOrders.find((entry) => entry.id === orderId);
+    if (!order) {
+      showToast(t("unknown"));
+      return;
+    }
+    if (isOrderClosed(order.status)) {
+      showToast(t("inboxClosed"));
+      return;
+    }
     const select = document.getElementById(`status-${orderId}`);
-    if (!select) return;
-    await db.collection("orders").doc(orderId).update({ status: select.value, updatedAt: new Date().toISOString() });
-    showToast(t("updated"));
+    if (!select || select.disabled) return;
+    const status = normalizeOrderStatus(select.value);
+    if (!STATUSES.includes(status)) return;
+    const button = document.querySelector(`[data-market-action="update-status"][data-order-id="${orderId}"]`);
+    try {
+      if (button) button.disabled = true;
+      await db.collection("orders").doc(orderId).update({
+        status,
+        updatedAt: new Date().toISOString(),
+      });
+      showToast(t("updated"));
+    } catch (error) {
+      console.error("Market status update failed", error);
+      showToast(String(error.message || t("unknown")));
+    } finally {
+      if (button && !isOrderClosed(order.status)) button.disabled = false;
+    }
   }
 
   async function assignDriver(orderId) {
@@ -676,7 +729,10 @@
     document.documentElement.dir = currentLang === "ar" ? "rtl" : "ltr";
     document.getElementById("langSelect").value = currentLang;
     const driverLink = document.getElementById("driverLink");
-    if (driverLink) driverLink.textContent = t("driverLink");
+    if (driverLink) {
+      driverLink.textContent = t("driverLink");
+      driverLink.href = deliveryPageHref();
+    }
     document.getElementById("statTotalLabel").textContent = t("orders");
     document.getElementById("statPendingLabel").textContent = t("waitingStatus");
     document.getElementById("statActiveLabel").textContent = t("onTheWay");
@@ -707,13 +763,7 @@
     });
     startMarketInboxListener();
     loadMarketDrivers();
-    db.collection("orders").where("marketId", "==", MARKET_ID).onSnapshot((snapshot) => {
-      const orders = snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() }));
-      renderOrders(orders.filter((order) => orderMatchesMarket(order, MARKET_ID)));
-    }, (error) => {
-      console.error("Orders listener failed", error);
-      showBootError(error.message || "Could not load orders.");
-    });
+    startOrdersListener();
   }
 
   startPanel();

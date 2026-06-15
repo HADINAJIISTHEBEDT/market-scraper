@@ -62,6 +62,7 @@
       feedbackPlaceholder: "Teslimat deneyiminizi paylasin...",
       feedbackSend: "Gonder",
       feedbackThanks: "Geri bildiriminiz icin tesekkurler!",
+      feedbackPrompt: "Teslimat tamamlandi. Lutfen geri bildiriminizi gonderin.",
       orderClosed: "Siparis kapatildi",
     },
     en: {
@@ -95,6 +96,7 @@
       feedbackPlaceholder: "Share your delivery experience...",
       feedbackSend: "Send",
       feedbackThanks: "Thank you for your feedback!",
+      feedbackPrompt: "Delivery complete. Please send your feedback.",
       orderClosed: "Order closed",
     },
     ar: {
@@ -128,6 +130,7 @@
       feedbackPlaceholder: "شارك تجربة التسليم...",
       feedbackSend: "إرسال",
       feedbackThanks: "شكراً على ملاحظاتك!",
+      feedbackPrompt: "اكتمل التسليم. يرجى إرسال ملاحظاتك.",
       orderClosed: "تم إغلاق الطلب",
     },
   };
@@ -216,12 +219,12 @@
       track = '<a href="' + url + '" target="_blank" rel="noopener">' + escapeHtml(t("trackDriver")) + "</a>";
     }
     const phoneDisplay = driver.phone ? escapeHtml(driver.phone) : escapeHtml(t("unknown"));
-    const telHref = formatTelHref(driver.phone);
     let callRow = "";
-    if (commActive && telHref) {
+    if (commActive) {
       callRow =
         '<div class="call-row">' +
-        '<a class="btn-call" href="' + escapeHtml(telHref) + '">' + escapeHtml(t("voiceCall")) + "</a>" +
+        '<button class="btn-call" type="button" data-order-action="voice-call" data-order-id="' +
+        escapeHtml(order.id) + '">' + escapeHtml(t("voiceCall")) + "</button>" +
         '<button class="btn-video" type="button" data-order-action="video-call" data-order-id="' +
         escapeHtml(order.id) + '">' + escapeHtml(t("videoCall")) + "</button></div>";
     }
@@ -242,7 +245,11 @@
     if (order.feedbackSubmitted) {
       return '<div class="feedback-box feedback-thanks">' + escapeHtml(t("feedbackThanks")) + "</div>";
     }
+    var prompt = order.feedbackRequested
+      ? '<div class="feedback-title" style="color:#166534;">' + escapeHtml(t("feedbackPrompt")) + "</div>"
+      : "";
     return (
+      prompt +
       '<div class="feedback-box">' +
       '<div class="feedback-title">' + escapeHtml(t("feedbackTitle")) + "</div>" +
       '<textarea class="feedback-input" id="feedback-input-' + escapeHtml(order.id) + '" placeholder="' +
@@ -346,11 +353,18 @@
     });
   }
 
-  function startVideoCall(orderId) {
+  function startInAppCall(orderId, mode) {
     const order = currentOrders.find(function (entry) { return entry.id === orderId; });
     if (!order || !isOrderCommunicationActive(order)) return;
-    const url = getVideoCallUrl(orderId, userName || "Customer");
-    window.open(url, "marketfiyati-video-" + orderId, "noopener,noreferrer,width=960,height=640");
+    if (!window.InAppCall) return;
+    window.InAppCall.open({
+      orderId: orderId,
+      displayName: userName || t("unknown"),
+      mode: mode === "voice" ? "voice" : "video",
+      title: mode === "voice" ? t("voiceCall") : t("videoCall"),
+    }).catch(function (error) {
+      console.error("In-app call failed", error);
+    });
   }
 
   function submitFeedback(orderId) {
@@ -555,7 +569,9 @@
       } else if (button.dataset.orderAction === "submit-feedback") {
         submitFeedback(button.dataset.orderId || "");
       } else if (button.dataset.orderAction === "video-call") {
-        startVideoCall(button.dataset.orderId || "");
+        startInAppCall(button.dataset.orderId || "", "video");
+      } else if (button.dataset.orderAction === "voice-call") {
+        startInAppCall(button.dataset.orderId || "", "voice");
       }
     });
 
