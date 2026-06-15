@@ -36,6 +36,8 @@
       searchLink: "Arama",
       cartLink: "Sepet",
       noOrders: "Henuz siparis yok.",
+      loadingOrders: "Siparisler yukleniyor...",
+      loadError: "Siparisler yuklenemedi. Sayfayi yenileyin veya tekrar giris yapin.",
       startShopping: "Alisverise basla",
       orderNumber: "Siparis no",
       waiting: "Siparis hazirlaniyor",
@@ -67,6 +69,8 @@
       searchLink: "Search",
       cartLink: "Cart",
       noOrders: "No orders yet.",
+      loadingOrders: "Loading orders...",
+      loadError: "Could not load orders. Refresh the page or sign in again.",
       startShopping: "Start shopping",
       orderNumber: "Order no",
       waiting: "Waiting / preparing",
@@ -98,6 +102,8 @@
       searchLink: "البحث",
       cartLink: "السلة",
       noOrders: "لا توجد طلبات بعد.",
+      loadingOrders: "جاري تحميل الطلبات...",
+      loadError: "تعذر تحميل الطلبات. حدّث الصفحة أو سجّل الدخول مرة أخرى.",
       startShopping: "ابدأ التسوق",
       orderNumber: "رقم الطلب",
       waiting: "قيد التحضير",
@@ -128,7 +134,10 @@
 
   const userName = localStorage.getItem("user_name");
   const userUid = localStorage.getItem("user_uid");
+  const userEmail = String(localStorage.getItem("user_email") || "").trim().toLowerCase();
   let currentLang = localStorage.getItem("app_lang") || "tr";
+  let ordersUnsubscribe = null;
+  let triedEmailFallback = false;
   let currentOrders = [];
   const chatUnsubscribers = new Map();
 
@@ -376,18 +385,50 @@
     });
   }
 
-  function renderOrders(orders) {
-    currentOrders = orders;
+  function sortOrdersDesc(orders) {
+    return orders.slice().sort(function (a, b) {
+      return String(b.createdAt || "").localeCompare(String(a.createdAt || ""));
+    });
+  }
+
+  function showOrdersStatus(html) {
     const root = document.getElementById("ordersList");
-    if (!orders.length) {
+    if (root) root.innerHTML = html;
+  }
+
+  function showLoadingOrders() {
+    showOrdersStatus('<p class="empty-msg">' + escapeHtml(t("loadingOrders")) + "</p>");
+  }
+
+  function showOrdersLoadError(error) {
+    console.error("Orders listener failed", error);
+    const detail = error && error.message ? ": " + error.message : "";
+    showOrdersStatus(
+      '<p class="empty-msg" style="color:#b91c1c">' + escapeHtml(t("loadError")) +
+      escapeHtml(detail) + '<br><a href="login.html">' + escapeHtml(t("startShopping")) + "</a></p>"
+    );
+  }
+
+  function mapOrderDocs(docs) {
+    return docs.map(function (doc) {
+      return Object.assign({ id: doc.id }, doc.data());
+    });
+  }
+
+  function renderOrders(orders) {
+    try {
+    currentOrders = sortOrdersDesc(orders);
+    const root = document.getElementById("ordersList");
+    if (!root) return;
+    if (!currentOrders.length) {
       root.innerHTML = '<p class="empty-msg">' + escapeHtml(t("noOrders")) + '<br><a href="index.html">' +
         escapeHtml(t("startShopping")) + "</a></p>";
       clearChatListeners(new Set());
       return;
     }
 
-    const activeIds = new Set(orders.map(function (order) { return order.id; }));
-    root.innerHTML = orders.map(function (order) {
+    const activeIds = new Set(currentOrders.map(function (order) { return order.id; }));
+    root.innerHTML = currentOrders.map(function (order) {
       const items = Array.isArray(order.items) ? order.items : [];
       const itemsHtml = groupItemsByCategory(items).map(function (group) {
         const rows = group.entries.map(function (entry) {
@@ -433,11 +474,69 @@
     }).join("");
 
     clearChatListeners(activeIds);
-    orders.forEach(function (order) {
+    currentOrders.forEach(function (order) {
       if (isOrderCommunicationActive(order) || isOrderClosed(order.status)) {
         bindChatListener(order);
       }
     });
+    } catch (error) {
+      showOrdersLoadError(error);
+    }
+  }
+
+  function attachOrdersListener(field, value, onEmpty) {
+    if (ordersUnsubscribe) {
+      ordersUnsubscribe();
+      ordersUnsubscribe = null;
+    }
+    if (!value) {
+      renderOrders([]);
+      return;
+    }
+    ordersUnsubscribe = db.collection("orders").where(field, "==", value).onSnapshot(
+      function (snapshot) {
+        const orders = mapOrderDocs(snapshot.docs);
+        if (!orders.length && typeof onEmpty === "function") {
+          onEmpty();
+          return;
+        }
+        renderOrders(orders);
+      },
+      function (error) {
+        db.collection("orders").where(field, "==", value).get()
+          .then(function (snapshot) {
+            const orders = mapOrderDocs(snapshot.docs);
+            if (!orders.length && typeof onEmpty === "function") {
+              onEmpty();
+              return;
+            }
+            renderOrders(orders);
+          })
+          .catch(function (fallbackError) {
+            showOrdersLoadError(fallbackError || error);
+          });
+      }
+    );
+  }
+
+  function startOrdersListener() {
+    showLoadingOrders();
+    if (!userUid && !userEmail) {
+      window.location.href = "login.html";
+      return;
+    }
+    if (userUid) {
+      attachOrdersListener("userId", userUid, function () {
+        if (triedEmailFallback || !userEmail) {
+          renderOrders([]);
+          return;
+        }
+        triedEmailFallback = true;
+        attachOrdersListener("userEmail", userEmail);
+      });
+      return;
+    }
+    attachOrdersListener("userEmail", userEmail);
   }
 
   function bindEvents() {
@@ -470,26 +569,21 @@
   }
 
   function boot() {
-    if (!userUid) {
+    if (!userUid && !userEmail) {
       window.location.href = "login.html";
       return;
     }
     if (window.FeatureAccess && !window.FeatureAccess.guardPage()) return;
     applyLanguage();
     bindEvents();
-    db.collection("orders").where("userId", "==", userUid).orderBy("createdAt", "desc")
-      .onSnapshot(function (snapshot) {
-        renderOrders(snapshot.docs.map(function (doc) {
-          return Object.assign({ id: doc.id }, doc.data());
-        }));
-      }, function (error) {
-        console.error("Orders listener failed", error);
-      });
+    startOrdersListener();
   }
 
-  if (window.AppSettings && window.AppSettings.ready) {
-    window.AppSettings.ready().finally(boot);
-  } else {
-    boot();
-  }
+  var settingsReady = window.AppSettings && window.AppSettings.ready
+    ? window.AppSettings.ready()
+    : Promise.resolve();
+  Promise.race([
+    settingsReady,
+    new Promise(function (resolve) { setTimeout(resolve, 2500); }),
+  ]).finally(boot);
 })();
