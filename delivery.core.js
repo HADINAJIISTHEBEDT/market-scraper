@@ -15,6 +15,7 @@
   const isDeliveryChatActive = OL.isDeliveryChatActive || function () { return false; };
   const archiveOrderConversation = OL.archiveOrderConversation || function () { return Promise.resolve(); };
   const getOrderCustomerLocation = OL.getOrderCustomerLocation || function () { return null; };
+  const buildDualLocationMapHtml = OL.buildDualLocationMapHtml || function () { return { html: "", openUrl: "" }; };
   const orderChatCollection = OL.orderChatCollection || function (db, id) {
     return db.collection("orderChats").doc(id).collection("messages");
   };
@@ -104,6 +105,10 @@
       historyTitle: "Gecmis siparisler",
       callHistoryTitle: "Arama gecmisi",
       noHistory: "Gecmis kayit yok.",
+      callWith: "Konusan",
+      callCompleted: "Tamamlandi",
+      callDeclined: "Reddedildi",
+      callRemoteEnded: "Karsi taraf kapatti",
       portalDenied: "Surucu paneli market panelinden acilamaz. Once cikis yapin.",
       bootErrorConfig: "Yapilandirma eksik. firebase-config.global.js dosyasini ayni klasorde tutun.",
       bootErrorFirebase: "Firebase yuklenemedi. Internet baglantinizi kontrol edin.",
@@ -174,6 +179,10 @@
       historyTitle: "Order history",
       callHistoryTitle: "Call history",
       noHistory: "No history yet.",
+      callWith: "With",
+      callCompleted: "Completed",
+      callDeclined: "Declined",
+      callRemoteEnded: "Remote ended",
       portalDenied: "The driver portal cannot be opened from the market panel. Log out first.",
       bootErrorConfig: "Config missing. Keep firebase-config.global.js in the same folder.",
       bootErrorFirebase: "Firebase failed to load. Check your internet connection.",
@@ -244,6 +253,10 @@
       historyTitle: "سجل الطلبات",
       callHistoryTitle: "سجل المكالمات",
       noHistory: "لا يوجد سجل بعد.",
+      callWith: "مع",
+      callCompleted: "مكتملة",
+      callDeclined: "مرفوضة",
+      callRemoteEnded: "أنهى الطرف الآخر",
       portalDenied: "لا يمكن فتح بوابة السائق من لوحة السوق. سجّل الخروج أولاً.",
       bootErrorConfig: "الإعدادات ناقصة. احتفظ بملف firebase-config.global.js في نفس المجلد.",
       bootErrorFirebase: "تعذر تحميل Firebase. تحقق من اتصال الإنترنت.",
@@ -519,27 +532,33 @@
       box.textContent = t("locationUnavailable");
       return;
     }
-    let mapUrl = "https://www.google.com/maps";
-    if (customer && driver && driver.lat != null) {
-      mapUrl = "https://www.google.com/maps/dir/?api=1&origin=" +
-        encodeURIComponent(driver.lat + "," + driver.lng) +
-        "&destination=" + encodeURIComponent(customer.lat + "," + customer.lng);
-    } else if (customer) {
-      mapUrl = "https://www.google.com/maps/search/?api=1&query=" +
-        encodeURIComponent(customer.lat + "," + customer.lng);
-    } else if (driver) {
-      mapUrl = "https://www.google.com/maps/search/?api=1&query=" +
-        encodeURIComponent(driver.lat + "," + driver.lng);
-    }
+    const map = buildDualLocationMapHtml(customer, driver, {
+      liveBadge: driver && driver.lat != null && geoWatchId != null ? t("trackingLive") : "",
+    });
     box.innerHTML =
+      map.html +
       (driver && driver.lat != null
-        ? '<span class="live-badge">' + escapeHtml(t("trackingLive")) + "</span><br>" +
-          escapeHtml(t("lastUpdate")) + ": " + escapeHtml(formatDate(driver.updatedAt)) + "<br>"
+        ? '<div class="card-meta">' + escapeHtml(t("lastUpdate")) + ": " + escapeHtml(formatDate(driver.updatedAt)) + "</div>"
         : "") +
       (customer
-        ? escapeHtml(t("customerLocation")) + ": " + escapeHtml(String(customer.lat)) + ", " + escapeHtml(String(customer.lng)) + "<br>"
+        ? '<div class="card-meta">' + escapeHtml(t("customerLocation")) + ": " +
+          escapeHtml(String(customer.lat)) + ", " + escapeHtml(String(customer.lng)) + "</div>"
         : "") +
-      '<a href="' + mapUrl + '" target="_blank" rel="noopener">' + escapeHtml(t("openMap")) + "</a>";
+      (map.openUrl
+        ? '<a href="' + escapeHtml(map.openUrl) + '" target="_blank" rel="noopener">' + escapeHtml(t("openMap")) + "</a>"
+        : "");
+  }
+
+  function maybeAutoStartTracking(order) {
+    if (!order || order.id !== activeOrderId) return;
+    if (isOrderClosed(order.status)) {
+      stopTracking();
+      return;
+    }
+    const status = normalizeOrderStatus(order.status);
+    if ((status === "on-the-way" || status === "arrived") && geoWatchId == null && navigator.geolocation) {
+      startTracking();
+    }
   }
 
   function renderItemsHtml(items) {
@@ -628,12 +647,18 @@
       callsRoot.innerHTML = '<p class="empty-msg">' + escapeHtml(t("noHistory")) + "</p>";
     } else {
       callsRoot.innerHTML = calls.map(function (entry) {
+        var outcome = entry.outcome === "declined" ? t("callDeclined")
+          : entry.outcome === "remote-ended" ? t("callRemoteEnded") : t("callCompleted");
         return (
           '<div class="card">' +
           '<div class="card-title">' + escapeHtml(getMarketLabel(entry.marketId || entry.marketName)) +
-          " · " + escapeHtml(entry.driverName || t("unknown")) + "</div>" +
+          (entry.orderNumber ? " · #" + escapeHtml(String(entry.orderNumber)) : "") + "</div>" +
+          '<div class="card-meta">' + escapeHtml(t("callWith")) + ": " +
+          escapeHtml(entry.callerName || t("unknown")) + " · " +
+          escapeHtml(entry.customerName || t("unknown")) + "</div>" +
           '<div class="card-meta">' + escapeHtml(formatDate(entry.startedAt || entry.createdAt)) +
-          " · " + escapeHtml(entry.mode === "video" ? callTMode("video") : callTMode("voice")) + "</div>" +
+          " · " + escapeHtml(entry.mode === "video" ? callTMode("video") : callTMode("voice")) +
+          " · " + escapeHtml(outcome) + "</div>" +
           "</div>"
         );
       }).join("");
@@ -733,6 +758,7 @@
     document.getElementById("driverStatusSelect").innerHTML = statusOptions;
     renderLocationBox(order);
     driverDisplayName = (order.driver && order.driver.name) || t("driver");
+    maybeAutoStartTracking(order);
     const closeBtn = document.getElementById("closeOrderBtn");
     if (closeBtn) {
       const arrived = normalizeOrderStatus(order.status) === "arrived";
@@ -764,6 +790,7 @@
       root.innerHTML = '<p class="empty-msg">' + escapeHtml(emptyMsg) + "</p>";
       document.getElementById("activeOrderCard").hidden = true;
       activeOrderId = "";
+      stopTracking(true);
       clearDriverChatListener();
       syncDriverCallWatch();
       return;
@@ -813,6 +840,7 @@
         accuracy: position.coords.accuracy,
         updatedAt: now,
       },
+      trackingActive: true,
       updatedAt: now,
     }).then(function () {
       const order = currentOrders.find(function (entry) { return entry.id === activeOrderId; });
@@ -833,26 +861,45 @@
   function startTracking() {
     if (!activeOrderId || !navigator.geolocation) return;
     if (geoWatchId != null) navigator.geolocation.clearWatch(geoWatchId);
+    navigator.geolocation.getCurrentPosition(pushDriverLocation, function () {}, {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 15000,
+    });
     geoWatchId = navigator.geolocation.watchPosition(
       pushDriverLocation,
       function (error) {
         console.error("Geolocation failed", error);
         document.getElementById("locationBox").textContent = t("locationUnavailable");
       },
-      { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+      { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 }
     );
     document.getElementById("startTrackingBtn").hidden = true;
     document.getElementById("stopTrackingBtn").hidden = false;
+    const order = currentOrders.find(function (entry) { return entry.id === activeOrderId; });
+    if (order) renderLocationBox(order);
   }
 
-  function stopTracking() {
+  function stopTracking(clearRemote) {
     if (geoWatchId != null) {
       navigator.geolocation.clearWatch(geoWatchId);
       geoWatchId = null;
     }
-    document.getElementById("startTrackingBtn").hidden = false;
-    document.getElementById("stopTrackingBtn").hidden = true;
-    document.getElementById("locationBox").textContent = t("trackingStopped");
+    const startBtn = document.getElementById("startTrackingBtn");
+    const stopBtn = document.getElementById("stopTrackingBtn");
+    const box = document.getElementById("locationBox");
+    if (startBtn) startBtn.hidden = false;
+    if (stopBtn) stopBtn.hidden = true;
+    if (box) box.textContent = t("trackingStopped");
+    if (clearRemote && activeOrderId) {
+      db.collection("orders").doc(activeOrderId).update({
+        driverLocation: firebase.firestore.FieldValue.delete(),
+        trackingActive: false,
+        updatedAt: new Date().toISOString(),
+      }).catch(function (error) {
+        console.error("Clear driver location failed", error);
+      });
+    }
   }
 
   function updateDriverStatus() {
@@ -891,6 +938,8 @@
       feedbackRequested: true,
       closedAt: now,
       updatedAt: now,
+      trackingActive: false,
+      driverLocation: firebase.firestore.FieldValue.delete(),
     }).then(function () {
       return archiveOrderConversation(db, orderId, order, "order_closed");
     }).then(function () {
@@ -906,8 +955,8 @@
       });
     }).then(function () {
       if (window.InAppCall) window.InAppCall.close();
+      stopTracking(false);
       activeOrderId = "";
-      stopTracking();
       clearDriverChatListener();
       alert(t("closed"));
       renderOrders(allMarketOrders);

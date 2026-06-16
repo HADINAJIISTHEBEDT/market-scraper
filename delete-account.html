@@ -143,6 +143,7 @@
         setStatus(t("sending"));
         try {
           const requestedAt = new Date().toISOString();
+          const userLang = localStorage.getItem("app_lang") || "tr";
           const inboxRef = await addDoc(collection(db, "adminInbox"), {
             userId: userUid,
             email: userEmail,
@@ -150,6 +151,7 @@
             message,
             status: "pending",
             requestedAt,
+            lang: userLang,
             source: "delete-request",
           });
           await setDoc(doc(db, "deleteRequests", userUid), {
@@ -159,6 +161,7 @@
             message,
             status: "pending",
             requestedAt,
+            lang: userLang,
             inboxEntryId: inboxRef.id,
           }, { merge: true });
           setStatus(t("sent"));

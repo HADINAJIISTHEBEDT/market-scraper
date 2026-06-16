@@ -1,16 +1,16 @@
 {
-  "name": "PazarQuery",
-  "short_name": "PazarQuery",
-  "description": "Find everyday items and build your basket faster",
+  "name": "Pazar Fiyatı",
+  "short_name": "Pazar Fiyatı",
+  "description": "Market fiyatlarini karsilastirin ve sepetinizi hizla olusturun",
   "start_url": "/index.html",
   "display": "standalone",
-  "background_color": "#f7f8f4",
-  "theme_color": "#1f7a5c",
+  "background_color": "#ffffff",
+  "theme_color": "#1F3FA0",
   "icons": [
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍰</text></svg>",
-      "sizes": "any",
-      "type": "image/svg+xml"
+      "src": "logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
     }
   ],
   "permissions": ["notifications"]

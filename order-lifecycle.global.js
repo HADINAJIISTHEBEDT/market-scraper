@@ -226,6 +226,35 @@
     });
   }
 
+  function buildDualLocationMapHtml(customer, driver, options) {
+    options = options || {};
+    customer = customer || null;
+    driver = driver && driver.lat != null && driver.lng != null ? driver : null;
+    if (!customer && !driver) return { html: "", openUrl: "" };
+
+    var openUrl = "https://www.google.com/maps";
+    var embedSrc = "";
+    if (customer && driver) {
+      openUrl = "https://www.google.com/maps/dir/?api=1&origin=" + driver.lat + "," + driver.lng +
+        "&destination=" + customer.lat + "," + customer.lng;
+      embedSrc = "https://www.google.com/maps?output=embed&saddr=" + driver.lat + "," + driver.lng +
+        "&daddr=" + customer.lat + "," + customer.lng;
+    } else if (customer) {
+      openUrl = "https://www.google.com/maps/search/?api=1&query=" + customer.lat + "," + customer.lng;
+      embedSrc = "https://maps.google.com/maps?q=" + customer.lat + "," + customer.lng + "&output=embed";
+    } else if (driver) {
+      openUrl = "https://www.google.com/maps/search/?api=1&query=" + driver.lat + "," + driver.lng;
+      embedSrc = "https://maps.google.com/maps?q=" + driver.lat + "," + driver.lng + "&output=embed";
+    }
+
+    var html =
+      '<div class="live-map-panel">' +
+      (options.liveBadge ? '<span class="live-badge">' + String(options.liveBadge) + "</span>" : "") +
+      '<iframe class="live-map-frame" title="Map" loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="' + embedSrc + '"></iframe>' +
+      "</div>";
+    return { html: html, openUrl: openUrl };
+  }
+
   function formatTelHref(phone) {
     var digits = normalizePhone(phone);
     if (!digits) return "";
@@ -265,6 +294,7 @@
       callerName: String(entry.callerName || ""),
       callerRole: String(entry.callerRole || ""),
       mode: String(entry.mode || "voice"),
+      outcome: String(entry.outcome || "completed"),
       startedAt: String(entry.startedAt || now),
       endedAt: String(entry.endedAt || now),
       createdAt: now,
@@ -339,6 +369,7 @@
     isCustomerChatActive: isCustomerChatActive,
     isDeliveryChatActive: isDeliveryChatActive,
     archiveOrderConversation: archiveOrderConversation,
+    buildDualLocationMapHtml: buildDualLocationMapHtml,
     normalizeOrderStatus: normalizeOrderStatus,
     formatOrderNumber: formatOrderNumber,
     orderNumberDisplay: orderNumberDisplay,

@@ -42,6 +42,7 @@
   const isOrderPaid = OL.isOrderPaid || function () { return false; };
   const paymentDeadlinePassed = OL.paymentDeadlinePassed || function () { return false; };
   const PAYMENT_TIMEOUT_MS = OL.PAYMENT_TIMEOUT_MS || 20 * 60 * 1000;
+  const buildDualLocationMapHtml = OL.buildDualLocationMapHtml || function () { return { html: "", openUrl: "" }; };
   const getOrderCustomerLocation = OL.getOrderCustomerLocation || function () { return null; };
   const isDeliveryChatActive = OL.isDeliveryChatActive || function () { return false; };
   const archiveOrderConversation = OL.archiveOrderConversation || function () { return Promise.resolve(); };
@@ -278,17 +279,26 @@
     const normalized = normalizeOrderStatus(order.status);
     const closed = isOrderClosed(order.status);
     const commActive = isOrderCommunicationActive(order);
-    let track = "<div>" + escapeHtml(t("driverWaiting")) + "</div>";
     const customerLoc = getOrderCustomerLocation(order);
-    if (loc && loc.lat != null && loc.lng != null) {
-      const url = "https://www.google.com/maps/dir/?api=1&origin=" +
-        encodeURIComponent(loc.lat + "," + loc.lng) +
-        (customerLoc ? "&destination=" + encodeURIComponent(customerLoc.lat + "," + customerLoc.lng) : "");
-      track = '<a href="' + url + '" target="_blank" rel="noopener">' + escapeHtml(t("trackDriver")) + "</a>";
+    const map = buildDualLocationMapHtml(customerLoc, loc, {
+      liveBadge: loc && loc.lat != null && order.trackingActive ? t("trackDriver") : "",
+    });
+    let track = "";
+    if (map.html) {
+      track =
+        map.html +
+        (loc && loc.updatedAt
+          ? '<div class="order-date">' + escapeHtml(formatDate(loc.updatedAt)) + "</div>"
+          : "") +
+        (map.openUrl
+          ? '<a href="' + escapeHtml(map.openUrl) + '" target="_blank" rel="noopener">' + escapeHtml(t("trackDriver")) + "</a>"
+          : "");
     } else if (customerLoc) {
       const url = "https://www.google.com/maps/search/?api=1&query=" +
         encodeURIComponent(customerLoc.lat + "," + customerLoc.lng);
       track = '<a href="' + url + '" target="_blank" rel="noopener">' + escapeHtml(t("trackDriver")) + "</a>";
+    } else {
+      track = "<div>" + escapeHtml(t("driverWaiting")) + "</div>";
     }
     const phoneDisplay = driver.phone ? escapeHtml(driver.phone) : escapeHtml(t("unknown"));
     let callRow = "";

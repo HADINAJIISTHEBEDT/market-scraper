@@ -16,7 +16,7 @@ messaging.onBackgroundMessage((payload) => {
   const notification = payload.notification || {};
   const data = payload.data || {};
 
-  self.registration.showNotification(notification.title || "Dessert Cafe Manager", {
+  self.registration.showNotification(notification.title || "Pazar Fiyatı", {
     body: notification.body || "Timer finished!",
     tag: data.tag || "dessert-timer",
     vibrate: [200, 100, 200],

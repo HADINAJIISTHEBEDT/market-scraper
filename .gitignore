@@ -12,6 +12,10 @@ serviceAccountKey.json
 *.crt*
 *.key*
 *.png
+!logo.png
+!play-store-icon.png
+!android-app/play-store-icon.png
+!android-app/app/src/main/res/drawable-nodpi/ic_launcher_logo.png
 migros-local.env.bat
 nul
 android-app/.gradle/

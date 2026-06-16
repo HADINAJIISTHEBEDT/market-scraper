@@ -30,7 +30,7 @@
       voice: "مكالمة صوتية", video: "مكالمة فيديو", close: "إغلاق",
       incoming: "مكالمة واردة", from: "من", accept: "قبول", decline: "رفض",
       calling: "جاري الاتصال...", connected: "متصل", ended: "انتهت المكالمة",
-      flipCamera: "قلب الكamera", speakerOn: "مكبر الصوت", speakerOff: "كتم مكبر الصوت",
+      flipCamera: "قلب الكاميرا", speakerOn: "مكبر الصوت", speakerOff: "كتم مكبر الصوت",
     },
   };
 
@@ -266,20 +266,29 @@
 
   async function flipCamera() {
     if (!activeCall || activeCall.mode !== "video" || !activeCall.pc) return;
-    useFrontCamera = !useFrontCamera;
+    var nextFront = !useFrontCamera;
     try {
-      var stream = await startLocalMedia("video", useFrontCamera ? "user" : "environment");
+      var stream = await startLocalMedia("video", nextFront ? "user" : "environment", true);
       var newVideoTrack = stream.getVideoTracks()[0];
-      if (!newVideoTrack) return;
+      if (!newVideoTrack) {
+        stream.getTracks().forEach(function (track) { track.stop(); });
+        return;
+      }
       var sender = activeCall.pc.getSenders().find(function (entry) {
         return entry.track && entry.track.kind === "video";
       });
       if (sender) await sender.replaceTrack(newVideoTrack);
       if (activeCall.localStream) {
         activeCall.localStream.getVideoTracks().forEach(function (track) { track.stop(); });
+        activeCall.localStream.addTrack(newVideoTrack);
+      } else {
+        activeCall.localStream = stream;
       }
-      activeCall.localStream = stream;
-      bindLocalPreview(stream);
+      stream.getTracks().forEach(function (track) {
+        if (track !== newVideoTrack) track.stop();
+      });
+      useFrontCamera = nextFront;
+      bindLocalPreview(activeCall.localStream);
     } catch (error) {
       console.error("Camera flip failed", error);
     }
@@ -416,11 +425,11 @@
     candidateUnsubs.delete(orderId);
   }
 
-  async function startLocalMedia(mode, facingMode) {
+  async function startLocalMedia(mode, facingMode, videoOnly) {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       throw new Error("Microphone not available in this browser");
     }
-    var constraints = { audio: true };
+    var constraints = videoOnly ? {} : { audio: true };
     if (mode === "video") {
       constraints.video = facingMode ? { facingMode: facingMode } : true;
     }
@@ -437,6 +446,30 @@
     }, meta || {}));
   }
 
+  async function persistCallHistoryIfNeeded(outcome) {
+    if (!activeCall || activeCall.historySaved) return;
+    activeCall.historySaved = true;
+    var call = activeCall;
+    var meta = call.meta || {};
+    try {
+      await saveCallHistory(call.orderId, {
+        orderNumber: meta.orderNumber || "",
+        marketId: meta.marketId || "",
+        marketName: meta.marketName || "",
+        driverName: meta.driverName || "",
+        customerName: meta.customerName || "",
+        callerName: meta.callerName || watchState.displayName || "",
+        callerRole: meta.callerRole || watchState.localRole || "",
+        mode: call.mode || "voice",
+        startedAt: call.startedAt || new Date().toISOString(),
+        outcome: outcome || "completed",
+      });
+    } catch (error) {
+      console.error("Call history save failed", error);
+      activeCall.historySaved = false;
+    }
+  }
+
   async function beginCall(orderId, mode, isCaller, remoteMeta) {
     cleanupPeer();
     useFrontCamera = true;
@@ -446,13 +479,25 @@
     stream.getTracks().forEach(function (track) {
       pc.addTrack(track, stream);
     });
+    var meta = Object.assign({}, remoteMeta || {});
+    if (!meta.callerName) {
+      meta.callerName = isCaller
+        ? (watchState.displayName || meta.customerName || "Guest")
+        : (meta.callerName || "Guest");
+    }
+    if (!meta.callerRole) {
+      meta.callerRole = isCaller
+        ? (watchState.localRole || "customer")
+        : (meta.callerRole || "customer");
+    }
     activeCall = {
       orderId: orderId,
       mode: mode,
       pc: pc,
       localStream: stream,
       startedAt: new Date().toISOString(),
-      meta: remoteMeta || {},
+      meta: meta,
+      historySaved: false,
     };
     watchCandidates(orderId, pc);
     showCallModal(mode === "video" ? callT("video") : callT("voice"));
@@ -542,6 +587,14 @@
       if (outgoingOrderId === orderId) outgoingOrderId = "";
       hideIncoming();
       stopRing();
+      pendingIncoming = null;
+      if (activeCall && activeCall.orderId === orderId) {
+        await persistCallHistoryIfNeeded(status === "declined" ? "declined" : "remote-ended");
+        close(true);
+      } else {
+        var modal = document.getElementById("inAppCallModal");
+        if (modal && !modal.hidden) close(true);
+      }
     }
   }
 
@@ -633,7 +686,7 @@
     return Promise.resolve();
   }
 
-  function close() {
+  function close(fromRemote) {
     var endedOrderId = activeCall && activeCall.orderId;
     var endedMeta = activeCall && activeCall.meta;
     var startedAt = activeCall && activeCall.startedAt;
@@ -642,20 +695,18 @@
     outgoingOrderId = "";
     hideIncoming();
     pendingIncoming = null;
-    if (endedOrderId) {
+    if (activeCall) {
+      persistCallHistoryIfNeeded(fromRemote ? "remote-ended" : "ended");
+    }
+    if (endedOrderId && !fromRemote) {
       unwatchCandidates(endedOrderId);
       var ref = callRef(endedOrderId);
       if (ref) {
         ref.set({ status: "ended", updatedAt: new Date().toISOString() }, { merge: true }).catch(function () {});
-        if (startedAt && window.OrderLifecycle && window.OrderLifecycle.writeCallHistory) {
-          saveCallHistory(endedOrderId, Object.assign({}, endedMeta || {}, {
-            startedAt: startedAt,
-            callerName: watchState.displayName || "",
-            callerRole: watchState.localRole || "",
-            mode: endedMode || "voice",
-          }));
-        }
       }
+    } else if (endedOrderId && fromRemote) {
+      unwatchCandidates(endedOrderId);
+      setCallStatus(callT("ended"));
     }
     cleanupPeer();
     var modal = document.getElementById("inAppCallModal");

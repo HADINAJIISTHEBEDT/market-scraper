@@ -50,6 +50,7 @@ class MainActivity : AppCompatActivity() {
     }
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (!::binding.isInitialized) return@registerForActivityResult
             binding.webView.post {
                 binding.webView.evaluateJavascript(
                     "window.dispatchEvent(new CustomEvent('android-notification-permission', { detail: { granted: ${if (granted) "true" else "false"} } }));",
@@ -59,6 +60,7 @@ class MainActivity : AppCompatActivity() {
         }
     private val storagePermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (!::binding.isInitialized) return@registerForActivityResult
             binding.webView.post {
                 binding.webView.evaluateJavascript(
                     "window.dispatchEvent(new CustomEvent('android-storage-permission', { detail: { granted: ${if (granted) "true" else "false"} } }));",
@@ -68,6 +70,7 @@ class MainActivity : AppCompatActivity() {
         }
     private val multiPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+            if (!::binding.isInitialized) return@registerForActivityResult
             val allGranted = permissions.values.all { it }
             binding.webView.post {
                 binding.webView.evaluateJavascript(
@@ -329,6 +332,7 @@ class MainActivity : AppCompatActivity() {
 
         @JavascriptInterface
         fun showUpdateNotification(title: String?, body: String?) {
+            if (!hasNotificationPermission()) return
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(PLAY_STORE_URL)).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
             }
@@ -349,7 +353,11 @@ class MainActivity : AppCompatActivity() {
                 .setContentIntent(pendingIntent)
                 .build()
 
-            NotificationManagerCompat.from(this@MainActivity).notify(99999, notification)
+            try {
+                NotificationManagerCompat.from(this@MainActivity).notify(99999, notification)
+            } catch (_: SecurityException) {
+                // Notification permission not granted on Android 13+
+            }
         }
 
         @JavascriptInterface

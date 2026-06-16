@@ -307,7 +307,10 @@
         inboxUserDeleted: "Kullanici silindi",
         sendingEmail: "Gmail gonderiliyor...",
         block: "Engelle", unblock: "Engeli kaldir", blocked: "Engellendi",
-        historyTitle: "Siparis gecmisi", callHistoryTitle: "Arama gecmisi", noHistory: "Henuz gecmis yok."
+        historyTitle: "Siparis gecmisi", callHistoryTitle: "Arama gecmisi", noHistory: "Henuz gecmis yok.",
+        callWith: "Konusan", callMode: "Tur", callOutcome: "Sonuc", callCompleted: "Tamamlandi",
+        callDeclined: "Reddedildi", callRemoteEnded: "Karsi taraf kapatti",
+        voiceCall: "Sesli arama", videoCall: "Goruntulu arama"
       },
       en: {
         adminTitle: "Admin Panel", backLink: "Back to App", deniedTitle: "Access Denied",
@@ -334,7 +337,10 @@
         inboxUserDeleted: "User deleted",
         sendingEmail: "Sending Gmail...",
         block: "Block", unblock: "Unblock", blocked: "Blocked",
-        historyTitle: "Order history", callHistoryTitle: "Call history", noHistory: "No history yet."
+        historyTitle: "Order history", callHistoryTitle: "Call history", noHistory: "No history yet.",
+        callWith: "With", callMode: "Type", callOutcome: "Outcome", callCompleted: "Completed",
+        callDeclined: "Declined", callRemoteEnded: "Remote ended",
+        voiceCall: "Voice call", videoCall: "Video call"
       },
       ar: {
         adminTitle: "لوحة الإدارة", backLink: "العودة إلى التطبيق", deniedTitle: "تم رفض الوصول",
@@ -361,7 +367,10 @@
         inboxUserDeleted: "تم حذف المستخدم",
         sendingEmail: "جار إرسال Gmail...",
         block: "حظر", unblock: "إلغاء الحظر", blocked: "محظور",
-        historyTitle: "سجل الطلبات", callHistoryTitle: "سجل المكالمات", noHistory: "لا يوجد سجل بعد."
+        historyTitle: "سجل الطلبات", callHistoryTitle: "سجل المكالمات", noHistory: "لا يوجد سجل بعد.",
+        callWith: "مع", callMode: "النوع", callOutcome: "النتيجة", callCompleted: "مكتملة",
+        callDeclined: "مرفوضة", callRemoteEnded: "أنهى الطرف الآخر",
+        voiceCall: "مكالمة صوتية", videoCall: "مكالمة فيديو"
       }
     };
 
@@ -1202,12 +1211,20 @@
         root.innerHTML = `<p class="empty-msg">${escapeHtml(t("noHistory"))}</p>`;
         return;
       }
-      root.innerHTML = rows.map((entry) => `
+      root.innerHTML = rows.map((entry) => {
+        const modeLabel = entry.mode === "video" ? t("videoCall") : t("voiceCall");
+        const outcomeKey = entry.outcome === "declined" ? "callDeclined"
+          : entry.outcome === "remote-ended" ? "callRemoteEnded" : "callCompleted";
+        return `
         <div class="card">
-          <div class="card-title">${escapeHtml(getMarketLabel(entry.marketId || entry.marketName))} · ${escapeHtml(entry.driverName || t("unknown"))}</div>
-          <div class="card-meta">${escapeHtml(formatDate(entry.startedAt || entry.createdAt))}</div>
+          <div class="card-title">${escapeHtml(getMarketLabel(entry.marketId || entry.marketName))} · #${escapeHtml(String(entry.orderNumber || entry.orderId || ""))}</div>
+          <div class="card-meta">${escapeHtml(t("driver"))}: ${escapeHtml(entry.driverName || t("unknown"))}</div>
+          <div class="card-meta">${escapeHtml(t("callWith"))}: ${escapeHtml(entry.callerName || t("unknown"))} (${escapeHtml(entry.callerRole || "")})</div>
+          <div class="card-meta">${escapeHtml(t("callMode"))}: ${escapeHtml(modeLabel)} · ${escapeHtml(t("callOutcome"))}: ${escapeHtml(t(outcomeKey))}</div>
+          <div class="card-meta">${escapeHtml(formatDate(entry.startedAt || entry.createdAt))}${entry.endedAt ? " → " + escapeHtml(formatDate(entry.endedAt)) : ""}</div>
         </div>
-      `).join("");
+      `;
+      }).join("");
     }
 
     function renderOrders(orders) {
@@ -1518,6 +1535,28 @@ Pazar Fiyatı Admin`;
       return true;
     }
 
+    function accountDeletedEmailContent(name, lang) {
+      lang = lang || "tr";
+      const templates = {
+        tr: {
+          subject: "Pazar Fiyati hesabiniz silindi",
+          text: `Merhaba ${name},\n\nHesap silme talebiniz uzerine Pazar Fiyati hesabiniz ve kisisel verileriniz silindi.\n\nBunu siz talep etmediyseniz ${OWNER_EMAIL} adresine yazin.\n\nPazar Fiyati Admin`,
+          html: `<p>Merhaba ${escapeHtml(name)},</p><p>Hesap silme talebiniz uzerine Pazar Fiyati hesabiniz ve kisisel verileriniz silindi.</p><p>Bunu siz talep etmediyseniz <a href="mailto:${OWNER_EMAIL}">${OWNER_EMAIL}</a> adresine yazin.</p><p>Pazar Fiyati Admin</p>`,
+        },
+        en: {
+          subject: "Your Pazar Fiyati account was deleted",
+          text: `Hello ${name},\n\nYour Pazar Fiyati account and personal data have been deleted after your account deletion request.\n\nIf you did not request this, please contact ${OWNER_EMAIL}.\n\nPazar Fiyati Admin`,
+          html: `<p>Hello ${escapeHtml(name)},</p><p>Your Pazar Fiyati account and personal data have been deleted after your account deletion request.</p><p>If you did not request this, please contact <a href="mailto:${OWNER_EMAIL}">${OWNER_EMAIL}</a>.</p><p>Pazar Fiyati Admin</p>`,
+        },
+        ar: {
+          subject: "تم حذف حسابك في Pazar Fiyati",
+          text: `مرحباً ${name},\n\nتم حذف حسابك وبياناتك الشخصية في Pazar Fiyati بناءً على طلب حذف الحساب.\n\nإذا لم تطلب ذلك، يرجى التواصل مع ${OWNER_EMAIL}.\n\nإدارة Pazar Fiyati`,
+          html: `<p>مرحباً ${escapeHtml(name)},</p><p>تم حذف حسابك وبياناتك الشخصية في Pazar Fiyati بناءً على طلب حذف الحساب.</p><p>إذا لم تطلب ذلك، يرجى التواصل مع <a href="mailto:${OWNER_EMAIL}">${OWNER_EMAIL}</a>.</p><p>إدارة Pazar Fiyati</p>`,
+        },
+      };
+      return templates[lang] || templates.tr;
+    }
+
     async function queueAccountDeletedEmail(userId, requestOverride) {
       const request = requestOverride || await getDeleteRequestForUser(userId);
       if (!request) return false;
@@ -1526,20 +1565,11 @@ Pazar Fiyatı Admin`;
       if (!email) throw new Error("No Gmail found for this delete request.");
 
       const name = request.name || user.name || email;
-      const subject = "Your Pazar Fiyatı account was deleted";
-      const text = `Hello ${name},
-
-Your Pazar Fiyatı account and personal data have been deleted after your account deletion request.
-
-If you did not request this, please contact ${OWNER_EMAIL}.
-
-Pazar Fiyatı Admin`;
-      const html = `
-        <p>Hello ${escapeHtml(name)},</p>
-        <p>Your Pazar Fiyatı account and personal data have been deleted after your account deletion request.</p>
-        <p>If you did not request this, please contact <a href="mailto:${OWNER_EMAIL}">${OWNER_EMAIL}</a>.</p>
-        <p>Pazar Fiyatı Admin</p>
-      `;
+      const lang = request.lang || user.lang || "tr";
+      const content = accountDeletedEmailContent(name, lang);
+      const subject = content.subject;
+      const text = content.text;
+      const html = content.html;
 
       const payload = { to: email, subject, text, html };
       const inboxEntryId = getInboxEntryIdForRequest(request);
@@ -1590,6 +1620,10 @@ Pazar Fiyatı Admin`;
       try {
         const user = await getUserForAdmin(userId);
         const request = await getDeleteRequestForUser(userId);
+        if (request && String(request.message || "").trim()) {
+          await wakeMailService();
+          await queueAccountDeletedEmail(userId, request);
+        }
         await removeUserAccount(userId, user, request);
         showToast(t("removed"));
       } catch (error) {
@@ -1619,13 +1653,12 @@ Pazar Fiyatı Admin`;
       }
 
       try {
-        const mailWake = wakeMailService();
+        await wakeMailService();
+        const sentAt = await queueAccountDeletedEmail(userId, request);
         if (isUserRegistered(userId)) {
           const user = await getUserForAdmin(userId);
           await removeUserAccount(userId, user, request);
         }
-        await mailWake;
-        const sentAt = await queueAccountDeletedEmail(userId, request);
 
         const now = new Date().toISOString();
         const doneUpdate = {
@@ -1645,11 +1678,6 @@ Pazar Fiyatı Admin`;
         showToast(`${t("updated")} - ${t("inboxEmailSent")}`);
       } catch (error) {
         console.error("Mark delete request done failed", error);
-        const entry = currentInboxMessages.find((item) => item.id === entryId);
-        if (entry?.emailSentAt) {
-          showToast(`${t("updated")} - ${t("inboxEmailSent")}`);
-          return;
-        }
         await updateAdminInboxForUser(userId, { emailDeliveryError: error.message }, entryId);
         showToast(`${t("emailQueueFailed")}: ${error.message}`, true);
         if (button) {
