@@ -268,7 +268,7 @@
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
     import {
       initializeFirestore, collection, query, orderBy, onSnapshot,
-      doc, updateDoc, getDoc, setDoc, deleteDoc, addDoc
+      doc, updateDoc, getDoc, setDoc, deleteDoc, addDoc, getDocs
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
     if (!window.FIREBASE_CONFIG || !window.MarketsConfig || !window.OrderLifecycle) {
@@ -1281,10 +1281,38 @@
       showToast(t("updated"));
     };
 
+    async function archiveOrderForAdmin(orderId, order, reason) {
+      const messagesSnap = await getDocs(
+        query(collection(db, "orderChats", orderId, "messages"), orderBy("createdAt", "asc"))
+      );
+      const messages = messagesSnap.docs.map((entry) => ({ id: entry.id, ...entry.data() }));
+      if (!messages.length) return;
+      const now = new Date().toISOString();
+      await setDoc(doc(db, "orderConversations", orderId), {
+        orderId: String(orderId || ""),
+        orderNumber: order.orderNumber != null ? order.orderNumber : "",
+        userId: String(order.userId || ""),
+        userName: String(order.userName || ""),
+        userEmail: String(order.userEmail || ""),
+        marketId: String(order.marketId || ""),
+        marketName: String(order.marketName || ""),
+        driverName: String(order.driver?.name || ""),
+        messages,
+        messageCount: messages.length,
+        archivedAt: now,
+        archiveReason: String(reason || "archived"),
+        updatedAt: now,
+      }, { merge: true });
+    }
+
     window.deleteOrder = async function(orderId) {
       const order = currentOrders.find((entry) => entry.id === orderId);
-      if (order && window.OrderLifecycle?.archiveOrderConversation) {
-        await window.OrderLifecycle.archiveOrderConversation(db, orderId, order, "admin_deleted");
+      if (order) {
+        try {
+          await archiveOrderForAdmin(orderId, order, "admin_deleted");
+        } catch (error) {
+          console.warn("Conversation archive failed before delete", error);
+        }
       }
       await deleteDoc(doc(db, "orders", orderId));
       showToast(t("removed"));
