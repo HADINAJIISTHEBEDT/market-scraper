@@ -1,12 +1,14 @@
 (function () {
   "use strict";
 
-  const ORDER_STATUSES = ["waiting", "on-the-way", "arrived"];
+  const ORDER_STATUSES = ["waiting", "awaiting-payment", "preparing", "on-the-way", "arrived"];
+  const PAYMENT_TIMEOUT_MS = 20 * 60 * 1000;
 
   const LEGACY_STATUS_MAP = {
     pending: "waiting",
-    preparing: "waiting",
+    preparing: "preparing",
     waiting: "waiting",
+    "awaiting-payment": "awaiting-payment",
     "on-the-way": "on-the-way",
     delivered: "arrived",
     arrived: "arrived",
@@ -137,11 +139,57 @@
     return !!(driver && (driver.name || driver.phone || driver.driverId));
   }
 
+  function allItemsAvailable(order) {
+    var items = Array.isArray(order && order.items) ? order.items : [];
+    if (!items.length) return false;
+    return items.every(function (item) {
+      return item && item.available !== false;
+    });
+  }
+
+  function isAwaitingPayment(order) {
+    return normalizeOrderStatus(order && order.status) === "awaiting-payment";
+  }
+
+  function isOrderPaid(order) {
+    return !!(order && (order.paidAt || order.paymentMethod));
+  }
+
+  function paymentDeadlinePassed(order) {
+    if (!order || !order.paymentDeadline) return false;
+    return Date.now() > new Date(order.paymentDeadline).getTime();
+  }
+
+  function parseMapCoordinates(mapLink) {
+    var raw = String(mapLink || "").trim();
+    if (!raw) return null;
+    var atMatch = raw.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+    if (atMatch) return { lat: parseFloat(atMatch[1]), lng: parseFloat(atMatch[2]) };
+    var qMatch = raw.match(/[?&]q=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+    if (qMatch) return { lat: parseFloat(qMatch[1]), lng: parseFloat(qMatch[2]) };
+    var pathMatch = raw.match(/\/(-?\d+\.?\d*),(-?\d+\.?\d*)(?:\/?|$|\?)/);
+    if (pathMatch) return { lat: parseFloat(pathMatch[1]), lng: parseFloat(pathMatch[2]) };
+    return null;
+  }
+
+  function getOrderCustomerLocation(order) {
+    order = order || {};
+    if (order.userLat != null && order.userLng != null) {
+      return { lat: Number(order.userLat), lng: Number(order.userLng) };
+    }
+    return parseMapCoordinates(order.userMapLink || order.mapLink || "");
+  }
+
   function isOrderCommunicationActive(order) {
     if (!order || isOrderClosed(order.status)) return false;
     if (!hasAssignedDriver(order)) return false;
     var status = normalizeOrderStatus(order.status);
     return status === "on-the-way" || status === "arrived";
+  }
+
+  function isCustomerChatActive(order) {
+    if (!order || isOrderClosed(order.status)) return false;
+    return true;
   }
 
   function formatTelHref(phone) {
@@ -247,6 +295,14 @@
 
   window.OrderLifecycle = {
     ORDER_STATUSES: ORDER_STATUSES,
+    PAYMENT_TIMEOUT_MS: PAYMENT_TIMEOUT_MS,
+    allItemsAvailable: allItemsAvailable,
+    isAwaitingPayment: isAwaitingPayment,
+    isOrderPaid: isOrderPaid,
+    paymentDeadlinePassed: paymentDeadlinePassed,
+    parseMapCoordinates: parseMapCoordinates,
+    getOrderCustomerLocation: getOrderCustomerLocation,
+    isCustomerChatActive: isCustomerChatActive,
     normalizeOrderStatus: normalizeOrderStatus,
     formatOrderNumber: formatOrderNumber,
     orderNumberDisplay: orderNumberDisplay,

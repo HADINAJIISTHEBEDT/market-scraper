@@ -40,16 +40,19 @@
       deliveryPage: "Surucu sayfasi",
       trackDriver: "Surucuyu takip et",
       savedDrivers: "Kayitli suruculer",
-      addDriver: "Surucu ekle",
+      assignAfterPayment: "Surucu yalnizca odeme sonrasi atanabilir",
       deleteDriver: "Surucuyu sil",
       selectDriver: "Surucu sec",
       chatTitle: "Canli sohbet",
+      chatAdminOnly: "Musteri mesajlari yalnizca admin panelinde gorunur.",
       chatPlaceholder: "Musteriye mesaj yazin...",
       send: "Gonder",
       updated: "Guncellendi",
       unknown: "Bilinmiyor",
       orderNumber: "Siparis no",
-      waitingStatus: "Siparis hazirlaniyor",
+      waitingStatus: "Siparis inceleniyor",
+      awaitingPaymentStatus: "Odeme bekleniyor",
+      preparingStatus: "Hazirlaniyor",
       onTheWayStatus: "Yolda",
       arrivedStatus: "Teslim edildi",
       inboxTitle: "Gelen kutusu",
@@ -98,16 +101,19 @@
       deliveryPage: "Driver delivery page",
       trackDriver: "Track driver",
       savedDrivers: "Saved drivers",
-      addDriver: "Add driver",
+      assignAfterPayment: "Assign driver only after customer payment",
       deleteDriver: "Delete driver",
       selectDriver: "Select driver",
       chatTitle: "Live chat",
+      chatAdminOnly: "Customer messages are visible only in the admin panel.",
       chatPlaceholder: "Message the customer...",
       send: "Send",
       updated: "Updated",
       unknown: "Unknown",
       orderNumber: "Order no",
-      waitingStatus: "Waiting / preparing",
+      waitingStatus: "Waiting / reviewing",
+      awaitingPaymentStatus: "Awaiting payment",
+      preparingStatus: "Preparing",
       onTheWayStatus: "On the way",
       arrivedStatus: "Arrived",
       inboxTitle: "Inbox",
@@ -160,12 +166,16 @@
       deleteDriver: "حذف السائق",
       selectDriver: "اختر السائق",
       chatTitle: "دردشة مباشرة",
+      chatAdminOnly: "رسائل العملاء تظهر فقط في لوحة الإدارة.",
       chatPlaceholder: "اكتب رسالة للعميل...",
       send: "إرسال",
       updated: "تم التحديث",
       unknown: "غير معروف",
       orderNumber: "رقم الطلب",
-      waitingStatus: "قيد التحضير",
+      waitingStatus: "قيد المراجعة",
+      awaitingPaymentStatus: "في انتظار الدفع",
+      preparingStatus: "قيد التحضير",
+      assignAfterPayment: "Surucu yalnizca odeme sonrasi atanabilir",
       onTheWayStatus: "في الطريق",
       arrivedStatus: "تم التسليم",
       inboxTitle: "صندوق الوارد",
@@ -196,6 +206,9 @@
     }, 0);
   };
   const isOrderClosed = OL.isOrderClosed || function () { return false; };
+  const allItemsAvailable = OL.allItemsAvailable || function () { return false; };
+  const isOrderPaid = OL.isOrderPaid || function () { return false; };
+  const PAYMENT_TIMEOUT_MS = OL.PAYMENT_TIMEOUT_MS || 20 * 60 * 1000;
   const isOrderCommunicationActive = OL.isOrderCommunicationActive || function () { return true; };
   const orderChatCollection = OL.orderChatCollection || function (db, id) {
     return db.collection("orderChats").doc(id).collection("messages");
@@ -304,6 +317,8 @@
     const normalized = normalizeOrderStatus(status);
     return {
       waiting: t("waitingStatus"),
+      "awaiting-payment": t("awaitingPaymentStatus"),
+      preparing: t("preparingStatus"),
       "on-the-way": t("onTheWayStatus"),
       arrived: t("arrivedStatus"),
     }[normalized] || normalized;
@@ -666,7 +681,10 @@
 
     currentOrders = filtered;
     document.getElementById("statTotal").textContent = String(filtered.length);
-    document.getElementById("statPending").textContent = String(filtered.filter((o) => normalizeOrderStatus(o.status) === "waiting").length);
+    document.getElementById("statPending").textContent = String(filtered.filter((o) => {
+      const status = normalizeOrderStatus(o.status);
+      return status === "waiting" || status === "awaiting-payment";
+    }).length);
     document.getElementById("statActive").textContent = String(filtered.filter((o) => normalizeOrderStatus(o.status) === "on-the-way").length);
 
     const root = document.getElementById("ordersList");
@@ -731,24 +749,12 @@
             </div>
           </div>
           ${isOrderClosed(order.status) ? `<div class="card-meta" style="margin-top:10px;">${escapeHtml(t("inboxClosed"))}</div>` : `
-          <div class="chat-panel${isOrderCommunicationActive(order) ? "" : " chat-disabled"}">
-            <div class="card-meta" style="padding:10px 10px 0;">${escapeHtml(t("chatTitle"))}</div>
-            <div class="chat-messages" id="chat-messages-${escapeHtml(order.id)}"></div>
-            <div class="chat-compose" ${isOrderCommunicationActive(order) ? "" : 'style="display:none"'}>
-              <input class="chat-input" id="chat-input-${escapeHtml(order.id)}" placeholder="${escapeHtml(t("chatPlaceholder"))}" />
-              <button class="btn-primary" type="button" data-market-action="send-chat" data-order-id="${escapeHtml(order.id)}">${escapeHtml(t("send"))}</button>
-            </div>
-          </div>`}
+          <div class="card-meta" style="margin-top:10px;padding:10px;background:#f8fafc;border-radius:10px;">${escapeHtml(t("chatAdminOnly"))}</div>`}
         </div>
       `;
     }).join("");
 
-    clearChatListeners(activeIds);
-    filtered.forEach((order) => {
-      if (isOrderCommunicationActive(order) || isOrderClosed(order.status)) {
-        bindChatListener(order);
-      }
-    });
+    clearChatListeners(new Set());
     renderMarketHistory(filtered);
     renderMarketCallHistory();
   }
@@ -760,11 +766,18 @@
     if (!items[itemIndex]) return;
     items[itemIndex].available = makeAvailable;
     const totalPrice = computeOrderTotal(items);
-    await db.collection("orders").doc(orderId).update({
+    const updates = {
       items,
       totalPrice,
       updatedAt: new Date().toISOString(),
-    });
+    };
+    const currentStatus = normalizeOrderStatus(order.status);
+    if (allItemsAvailable({ items }) && currentStatus === "waiting") {
+      updates.status = "awaiting-payment";
+      updates.paymentDeadline = new Date(Date.now() + PAYMENT_TIMEOUT_MS).toISOString();
+      updates.allItemsConfirmedAt = new Date().toISOString();
+    }
+    await db.collection("orders").doc(orderId).update(updates);
     showToast(t("updated"));
   }
 
@@ -782,6 +795,10 @@
     if (!select || select.disabled) return;
     const status = normalizeOrderStatus(select.value);
     if (!STATUSES.includes(status)) return;
+    if (status === "preparing" && !isOrderPaid(order)) {
+      showToast(t("assignAfterPayment"));
+      return;
+    }
     const button = document.querySelector(`[data-market-action="update-status"][data-order-id="${orderId}"]`);
     try {
       if (button) button.disabled = true;
@@ -815,6 +832,12 @@
     }
     phone = normalizePhone(phone) || phone;
     if (!name) return;
+    const order = currentOrders.find((entry) => entry.id === orderId);
+    const orderStatus = normalizeOrderStatus(order && order.status);
+    if (orderStatus !== "preparing" || !isOrderPaid(order)) {
+      showToast(t("assignAfterPayment"));
+      return;
+    }
     if (!driverId && phone && !marketDrivers.some((entry) => normalizePhone(entry.phone) === phone)) {
       driverId = "drv_" + Date.now().toString(36);
       marketDrivers.push({ id: driverId, name, phone });

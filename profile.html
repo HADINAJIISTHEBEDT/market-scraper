@@ -166,7 +166,8 @@
           <input id="mapLinkInput" name="mapLink" type="url" placeholder="https://maps.google.com/..." />
         </label>
         <div class="actions" style="margin-top:-6px;">
-          <button id="openMapsBtn" class="secondary-btn" type="button">Google Maps'te adres bul</button>
+          <button id="openMapsBtn" class="secondary-btn" type="button">Google Maps'te konumumu ekle</button>
+          <button id="useLocationBtn" class="secondary-btn" type="button">Bu konumu kaydet</button>
         </div>
         <div class="actions">
           <button id="saveButton" class="primary-btn" type="submit">Kaydet ve devam et</button>
@@ -204,7 +205,8 @@
         phoneLabel: "Telefon numarasi (istege bagli)",
         addressLabel: "Adres",
         mapLinkLabel: "Google Maps baglantisi (istege bagli)",
-        openMapsBtn: "Google Maps'te adres bul",
+        openMapsBtn: "Google Maps'te konumumu ekle",
+        useLocationBtn: "Bu konumu kaydet",
         saveButton: "Kaydet ve devam et",
         logoutButton: "Cikis yap",
         backLink: "Uygulamaya don",
@@ -226,7 +228,8 @@
         phoneLabel: "Phone number (optional)",
         addressLabel: "Address",
         mapLinkLabel: "Google Maps link (optional)",
-        openMapsBtn: "Find address on Google Maps",
+        openMapsBtn: "Add my location on Google Maps",
+        useLocationBtn: "Save this location",
         saveButton: "Save and continue",
         logoutButton: "Logout",
         backLink: "Back to app",
@@ -292,6 +295,8 @@
       document.getElementById("addressLabel").textContent = t("addressLabel");
       document.getElementById("mapLinkLabel").textContent = t("mapLinkLabel");
       document.getElementById("openMapsBtn").textContent = t("openMapsBtn");
+      const useLocationBtn = document.getElementById("useLocationBtn");
+      if (useLocationBtn) useLocationBtn.textContent = t("useLocationBtn");
       document.getElementById("saveButton").textContent = t("saveButton");
       document.getElementById("logoutButton").textContent = t("logoutButton");
       document.getElementById("backLink").innerHTML = "&larr; " + t("backLink");
@@ -383,9 +388,36 @@
 
     document.getElementById("profileForm").addEventListener("submit", saveProfile);
     document.getElementById("openMapsBtn").addEventListener("click", () => {
+      const setMapFromCoords = (lat, lng) => {
+        const shareUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+        document.getElementById("mapLinkInput").value = shareUrl;
+        window.open(shareUrl, "_blank", "noopener");
+      };
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => setMapFromCoords(pos.coords.latitude, pos.coords.longitude),
+          () => {
+            const query = document.getElementById("addressInput").value.trim() || document.getElementById("nameInput").value.trim();
+            window.open("https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(query || "Turkey"), "_blank", "noopener");
+          },
+          { enableHighAccuracy: true, timeout: 12000 }
+        );
+        return;
+      }
       const query = document.getElementById("addressInput").value.trim() || document.getElementById("nameInput").value.trim();
-      const url = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(query || "Turkey");
-      window.open(url, "_blank", "noopener");
+      window.open("https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(query || "Turkey"), "_blank", "noopener");
+    });
+    document.getElementById("useLocationBtn").addEventListener("click", () => {
+      if (!navigator.geolocation) return;
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          document.getElementById("mapLinkInput").value = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+        },
+        () => {},
+        { enableHighAccuracy: true, timeout: 12000 }
+      );
     });
     document.getElementById("logoutButton").addEventListener("click", logout);
 

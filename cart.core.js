@@ -136,18 +136,27 @@
     });
 
     allocateOrderNumber(db).then(function (orderNumber) {
+      var mapLink = localStorage.getItem("user_map_link") || "";
+      var coords = window.OrderLifecycle.parseMapCoordinates
+        ? window.OrderLifecycle.parseMapCoordinates(mapLink)
+        : null;
       return db.collection("orders").add({
         userId: userUid,
         userName: userName || t("unknown"),
         userEmail: localStorage.getItem("user_email") || "",
         userPhone: localStorage.getItem("user_phone") || "",
         userAddress: localStorage.getItem("user_address") || "",
+        userMapLink: mapLink,
+        userPhoto: localStorage.getItem("user_photo") || "",
+        userLat: coords ? coords.lat : null,
+        userLng: coords ? coords.lng : null,
         marketId: marketId,
         marketName: marketName,
         orderNumber: orderNumber,
         items: orderItems,
         totalPrice: total,
         status: "waiting",
+        paymentStatus: "pending",
         createdAt: new Date().toISOString()
       }).then(function () {
         return orderNumber;

@@ -35,6 +35,14 @@
     if (role === "market") return "market";
     return "customer";
   };
+  const isCustomerChatActive = OL.isCustomerChatActive || function (order) {
+    return !isOrderClosed(order && order.status);
+  };
+  const isAwaitingPayment = OL.isAwaitingPayment || function () { return false; };
+  const isOrderPaid = OL.isOrderPaid || function () { return false; };
+  const paymentDeadlinePassed = OL.paymentDeadlinePassed || function () { return false; };
+  const PAYMENT_TIMEOUT_MS = OL.PAYMENT_TIMEOUT_MS || 20 * 60 * 1000;
+  const getOrderCustomerLocation = OL.getOrderCustomerLocation || function () { return null; };
 
   const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(window.FIREBASE_CONFIG);
   const db = firebase.firestore();
@@ -50,7 +58,9 @@
       loadError: "Siparisler yuklenemedi. Sayfayi yenileyin veya tekrar giris yapin.",
       startShopping: "Alisverise basla",
       orderNumber: "Siparis no",
-      waiting: "Siparis hazirlaniyor",
+      waiting: "Siparis inceleniyor",
+      awaitingPayment: "Odeme bekleniyor",
+      preparing: "Hazirlaniyor",
       onTheWay: "Yolda",
       arrived: "Teslim edildi",
       available: "Mevcut",
@@ -61,13 +71,24 @@
       driverWaiting: "Surucu konumu henuz paylasilmadi",
       voiceCall: "Sesli ara",
       videoCall: "Goruntulu ara",
-      chatTitle: "Surucu ile sohbet",
-      chatPlaceholder: "Surucuye mesaj yazin...",
-      chatDisabled: "Siparis kapandi — sohbet ve aramalar devre disi",
-      chatWaiting: "Surucu atandiginda sohbet acilir",
+      chatTitle: "Admin destegi",
+      chatPlaceholder: "Admin'e mesaj yazin...",
+      chatDisabled: "Siparis kapandi — sohbet devre disi",
+      chatWaiting: "Admin ile siparis hakkinda yazisabilirsiniz",
       send: "Gonder",
       market: "Market",
       unknown: "Bilinmiyor",
+      payNowTitle: "Odeme gerekli",
+      payNowHelp: "Market tum urunleri onayladi. Devam etmek icin 20 dakika icinde odeme yapin.",
+      payTimeLeft: "Kalan sure",
+      payNow: "Ode ve devam et",
+      payCash: "Kapida nakit",
+      payCard: "Kart",
+      cardName: "Kart uzerindeki isim",
+      cardLast4: "Kart son 4 hane",
+      cardExpiry: "Son kullanma",
+      orderDeletedNoPay: "Siparisiniz odeme yapilmadigi icin silindi (20 dakika sure).",
+      historyTitle: "Gecmis siparisler",
       feedbackTitle: "Teslimat geri bildirimi",
       feedbackPlaceholder: "Teslimat deneyiminizi paylasin...",
       feedbackSend: "Gonder",
@@ -84,7 +105,9 @@
       loadError: "Could not load orders. Refresh the page or sign in again.",
       startShopping: "Start shopping",
       orderNumber: "Order no",
-      waiting: "Waiting / preparing",
+      waiting: "Waiting / reviewing",
+      awaitingPayment: "Awaiting payment",
+      preparing: "Preparing",
       onTheWay: "On the way",
       arrived: "Arrived",
       available: "Available",
@@ -95,13 +118,24 @@
       driverWaiting: "Driver location not shared yet",
       voiceCall: "Voice call",
       videoCall: "Video call",
-      chatTitle: "Chat with driver",
-      chatPlaceholder: "Message the driver...",
-      chatDisabled: "Order closed — chat and calls disabled",
-      chatWaiting: "Chat opens when a driver is assigned",
+      chatTitle: "Admin support",
+      chatPlaceholder: "Message admin...",
+      chatDisabled: "Order closed — chat disabled",
+      chatWaiting: "You can message admin about this order",
       send: "Send",
       market: "Market",
       unknown: "Unknown",
+      payNowTitle: "Payment required",
+      payNowHelp: "The market confirmed all items. Pay within 20 minutes to continue.",
+      payTimeLeft: "Time left",
+      payNow: "Pay and continue",
+      payCash: "Cash on delivery",
+      payCard: "Card",
+      cardName: "Name on card",
+      cardLast4: "Last 4 digits",
+      cardExpiry: "Expiry",
+      orderDeletedNoPay: "Your order was deleted because you did not pay within 20 minutes.",
+      historyTitle: "Order history",
       feedbackTitle: "Delivery feedback",
       feedbackPlaceholder: "Share your delivery experience...",
       feedbackSend: "Send",
@@ -118,7 +152,9 @@
       loadError: "تعذر تحميل الطلبات. حدّث الصفحة أو سجّل الدخول مرة أخرى.",
       startShopping: "ابدأ التسوق",
       orderNumber: "رقم الطلب",
-      waiting: "قيد التحضير",
+      waiting: "قيد المراجعة",
+      awaitingPayment: "في انتظار الدفع",
+      preparing: "قيد التحضير",
       onTheWay: "في الطريق",
       arrived: "تم التسليم",
       available: "متوفر",
@@ -129,13 +165,24 @@
       driverWaiting: "لم يتم مشاركة موقع السائق بعد",
       voiceCall: "مكالمة صوتية",
       videoCall: "مكالمة فيديو",
-      chatTitle: "الدردشة مع السائق",
-      chatPlaceholder: "اكتب رسالة للسائق...",
-      chatDisabled: "تم إغلاق الطلب — الدردشة والمكالمات معطلة",
-      chatWaiting: "تفتح الدردشة عند تعيين سائق",
+      chatTitle: "دعم الإدارة",
+      chatPlaceholder: "اكتب رسالة للإدارة...",
+      chatDisabled: "تم إغلاق الطلب — الدردشة معطلة",
+      chatWaiting: "يمكنك مراسلة الإدارة حول هذا الطلب",
       send: "إرسال",
       market: "السوق",
       unknown: "غير معروف",
+      payNowTitle: "الدفع مطلوب",
+      payNowHelp: "أكد السوق جميع المنتجات. ادفع خلال 20 دقيقة للمتابعة.",
+      payTimeLeft: "الوقت المتبقي",
+      payNow: "ادفع وتابع",
+      payCash: "نقداً عند التسليم",
+      payCard: "بطاقة",
+      cardName: "الاسم على البطاقة",
+      cardLast4: "آخر 4 أرقام",
+      cardExpiry: "تاريخ الانتهاء",
+      orderDeletedNoPay: "تم حذف طلبك لأنك لم تدفع خلال 20 دقيقة.",
+      historyTitle: "سجل الطلبات",
       feedbackTitle: "ملاحظات التسليم",
       feedbackPlaceholder: "شارك تجربة التسليم...",
       feedbackSend: "إرسال",
@@ -180,6 +227,8 @@
     const normalized = normalizeOrderStatus(status);
     return {
       waiting: t("waiting"),
+      "awaiting-payment": t("awaitingPayment"),
+      preparing: t("preparing"),
       "on-the-way": t("onTheWay"),
       arrived: t("arrived"),
     }[normalized] || normalized;
@@ -224,8 +273,15 @@
     const closed = isOrderClosed(order.status);
     const commActive = isOrderCommunicationActive(order);
     let track = "<div>" + escapeHtml(t("driverWaiting")) + "</div>";
+    const customerLoc = getOrderCustomerLocation(order);
     if (loc && loc.lat != null && loc.lng != null) {
-      const url = "https://www.google.com/maps?q=" + encodeURIComponent(loc.lat) + "," + encodeURIComponent(loc.lng);
+      const url = "https://www.google.com/maps/dir/?api=1&origin=" +
+        encodeURIComponent(loc.lat + "," + loc.lng) +
+        (customerLoc ? "&destination=" + encodeURIComponent(customerLoc.lat + "," + customerLoc.lng) : "");
+      track = '<a href="' + url + '" target="_blank" rel="noopener">' + escapeHtml(t("trackDriver")) + "</a>";
+    } else if (customerLoc) {
+      const url = "https://www.google.com/maps/search/?api=1&query=" +
+        encodeURIComponent(customerLoc.lat + "," + customerLoc.lng);
       track = '<a href="' + url + '" target="_blank" rel="noopener">' + escapeHtml(t("trackDriver")) + "</a>";
     }
     const phoneDisplay = driver.phone ? escapeHtml(driver.phone) : escapeHtml(t("unknown"));
@@ -280,7 +336,7 @@
 
   function chatPanelHtml(order) {
     const closed = isOrderClosed(order.status);
-    const commActive = isOrderCommunicationActive(order);
+    const chatActive = isCustomerChatActive(order);
     if (closed) {
       return (
         '<div class="chat-panel chat-disabled">' +
@@ -288,7 +344,7 @@
         '<div class="chat-messages" id="chat-messages-' + escapeHtml(order.id) + '"></div></div>'
       );
     }
-    if (!commActive) {
+    if (!chatActive) {
       return (
         '<div class="chat-panel chat-disabled">' +
         '<div class="order-date" style="padding:10px;">' + escapeHtml(t("chatWaiting")) + "</div></div>"
@@ -307,11 +363,37 @@
     );
   }
 
+  function paymentPanelHtml(order) {
+    if (!isAwaitingPayment(order) || isOrderPaid(order)) return "";
+    const deadline = order.paymentDeadline ? new Date(order.paymentDeadline).getTime() : Date.now() + PAYMENT_TIMEOUT_MS;
+    const mins = Math.max(0, Math.ceil((deadline - Date.now()) / 60000));
+    return (
+      '<div class="payment-box" style="margin-top:12px;padding:12px;border:1px solid #fcd34d;border-radius:12px;background:#fffbeb;">' +
+      "<strong>" + escapeHtml(t("payNowTitle")) + "</strong><br>" +
+      escapeHtml(t("payNowHelp")) + "<br>" +
+      escapeHtml(t("payTimeLeft")) + ": " + mins + " min<br>" +
+      '<label><input type="radio" name="pay-' + escapeHtml(order.id) + '" value="cash" checked> ' +
+      escapeHtml(t("payCash")) + "</label><br>" +
+      '<label><input type="radio" name="pay-' + escapeHtml(order.id) + '" value="card"> ' +
+      escapeHtml(t("payCard")) + "</label>" +
+      '<div id="card-fields-' + escapeHtml(order.id) + '" style="display:none;margin-top:8px;">' +
+      '<input class="chat-input" id="pay-name-' + escapeHtml(order.id) + '" placeholder="' + escapeHtml(t("cardName")) + '" style="width:100%;margin-bottom:6px;" />' +
+      '<input class="chat-input" id="pay-last4-' + escapeHtml(order.id) + '" placeholder="' + escapeHtml(t("cardLast4")) + '" maxlength="4" style="width:100%;margin-bottom:6px;" />' +
+      '<input class="chat-input" id="pay-expiry-' + escapeHtml(order.id) + '" placeholder="' + escapeHtml(t("cardExpiry")) + '" style="width:100%;" />' +
+      "</div>" +
+      '<button class="btn-send" type="button" data-order-action="pay-order" data-order-id="' +
+      escapeHtml(order.id) + '" style="margin-top:10px;">' + escapeHtml(t("payNow")) + "</button>" +
+      "</div>"
+    );
+  }
+
   function renderChatMessages(orderId, messages) {
     const root = document.getElementById("chat-messages-" + orderId);
     if (!root) return;
     const order = currentOrders.find(function (entry) { return entry.id === orderId; });
-    root.innerHTML = messages.map(function (msg) {
+    root.innerHTML = messages.filter(function (msg) {
+      return String(msg.senderRole || "").toLowerCase() !== "market";
+    }).map(function (msg) {
       const role = chatRoleClassLocal(msg.senderRole);
       const senderLabel = resolveChatSenderDisplayName
         ? resolveChatSenderDisplayName(msg, order, {
@@ -334,7 +416,7 @@
   function bindChatListener(order) {
     const orderId = order.id;
     if (chatUnsubscribers.has(orderId)) return;
-    if (!isOrderCommunicationActive(order) && !isOrderClosed(order.status)) return;
+    if (!isCustomerChatActive(order) && !isOrderClosed(order.status)) return;
     const unsub = orderChatCollection(db, orderId)
       .orderBy("createdAt", "asc")
       .onSnapshot(function (snapshot) {
@@ -357,7 +439,7 @@
 
   function sendChatMessage(orderId) {
     const order = currentOrders.find(function (entry) { return entry.id === orderId; });
-    if (!order || !isOrderCommunicationActive(order)) return;
+    if (!order || !isCustomerChatActive(order)) return;
     const input = document.getElementById("chat-input-" + orderId);
     const text = String(input && input.value || "").trim();
     if (!text) return;
@@ -391,6 +473,8 @@
         marketName: getMarketLabel(order.marketId || order.marketName),
         driverName: order.driver && order.driver.name ? order.driver.name : "",
         customerName: userName || t("unknown"),
+        customerPhoto: order.userPhoto || localStorage.getItem("user_photo") || "",
+        driverPhoto: "",
       },
     }).catch(function (error) {
       console.error("In-app call failed", error);
@@ -472,9 +556,99 @@
     });
   }
 
+  function payOrder(orderId) {
+    const order = currentOrders.find(function (entry) { return entry.id === orderId; });
+    if (!order || !isAwaitingPayment(order) || isOrderPaid(order)) return;
+    const methodInput = document.querySelector('input[name="pay-' + orderId + '"]:checked');
+    const method = methodInput ? methodInput.value : "cash";
+    const now = new Date().toISOString();
+    const payload = {
+      paymentMethod: method,
+      paidAt: now,
+      status: "preparing",
+      updatedAt: now,
+    };
+    if (method === "card") {
+      payload.paymentSummary = {
+        type: "card",
+        cardholderName: document.getElementById("pay-name-" + orderId)?.value.trim() || "",
+        last4: document.getElementById("pay-last4-" + orderId)?.value.trim() || "",
+        expiry: document.getElementById("pay-expiry-" + orderId)?.value.trim() || "",
+      };
+    }
+    const button = document.querySelector('[data-order-action="pay-order"][data-order-id="' + orderId + '"]');
+    if (button) button.disabled = true;
+    db.collection("orders").doc(orderId).update(payload).catch(function (error) {
+      console.error("Payment failed", error);
+      if (button) button.disabled = false;
+    });
+  }
+
+  function processPaymentTimeouts(orders) {
+    orders.forEach(function (order) {
+      if (!isAwaitingPayment(order) || isOrderPaid(order) || !paymentDeadlinePassed(order)) return;
+      const key = "payment_deleted_" + order.id;
+      if (sessionStorage.getItem(key)) return;
+      db.collection("orders").doc(order.id).delete().then(function () {
+        sessionStorage.setItem(key, "1");
+        alert(t("orderDeletedNoPay"));
+      }).catch(function (error) {
+        console.error("Payment timeout delete failed", error);
+      });
+    });
+  }
+
+  function renderOrderCard(order) {
+    const items = Array.isArray(order.items) ? order.items : [];
+    const itemsHtml = groupItemsByCategory(items).map(function (group) {
+      const rows = group.entries.map(function (entry) {
+        const item = entry.item;
+        const available = item.available !== false;
+        const lineTotal = available ? (Number(item.price) || 0) * (Number(item.qty) || 1) : 0;
+        return (
+          '<div class="order-item-row' + (available ? "" : " item-unavailable") + '">' +
+          "<span>" + escapeHtml(item.name) + " x " + (item.qty || 1) + "</span>" +
+          "<span>" +
+          '<span class="avail-badge ' + (available ? "avail-yes" : "avail-no") + '">' +
+          escapeHtml(available ? t("available") : t("unavailable")) + "</span> " +
+          formatPrice(lineTotal) +
+          "</span></div>"
+        );
+      }).join("");
+      return '<div class="item-category-block"><div class="item-category-title">' +
+        escapeHtml(group.category) + "</div>" + rows + "</div>";
+    }).join("");
+
+    const normalizedStatus = normalizeOrderStatus(order.status);
+    const showDriver = hasAssignedDriver(order) || (normalizedStatus !== "waiting" && normalizedStatus !== "awaiting-payment");
+    const orderNo = orderNumberDisplay(order);
+
+    return (
+      '<div class="order-card">' +
+      '<div class="order-header">' +
+      "<div>" +
+      (orderNo ? '<div class="order-date"><strong>' + escapeHtml(t("orderNumber")) + ":</strong> " +
+        escapeHtml(orderNo) + "</div>" : "") +
+      '<div class="order-date">' + escapeHtml(formatDate(order.createdAt)) + "</div>" +
+      '<div class="order-date">' + escapeHtml(t("market")) + ": " +
+        escapeHtml(getMarketLabel(order.marketId || order.marketName)) + "</div>" +
+      '<span class="status-badge ' + statusClass(order.status) + '">' +
+        escapeHtml(statusLabel(order.status)) + "</span></div>" +
+      '<div class="order-total">' + formatPrice(computeOrderTotal(items)) + "</div></div>" +
+      '<div class="order-items">' + itemsHtml + "</div>" +
+      renderTrack(order.status) +
+      paymentPanelHtml(order) +
+      (showDriver ? driverHtml(order) : "") +
+      chatPanelHtml(order) +
+      feedbackHtml(order) +
+      "</div>"
+    );
+  }
+
   function renderOrders(orders) {
     try {
     currentOrders = sortOrdersDesc(orders);
+    processPaymentTimeouts(currentOrders);
     const root = document.getElementById("ordersList");
     if (!root) return;
     if (!currentOrders.length) {
@@ -484,56 +658,32 @@
       return;
     }
 
+    const activeOrders = currentOrders.filter(function (order) { return !isOrderClosed(order.status); });
+    const historyOrders = currentOrders.filter(function (order) { return isOrderClosed(order.status); });
     const activeIds = new Set(currentOrders.map(function (order) { return order.id; }));
-    root.innerHTML = currentOrders.map(function (order) {
-      const items = Array.isArray(order.items) ? order.items : [];
-      const itemsHtml = groupItemsByCategory(items).map(function (group) {
-        const rows = group.entries.map(function (entry) {
-          const item = entry.item;
-          const available = item.available !== false;
-          const lineTotal = available ? (Number(item.price) || 0) * (Number(item.qty) || 1) : 0;
-          return (
-            '<div class="order-item-row' + (available ? "" : " item-unavailable") + '">' +
-            "<span>" + escapeHtml(item.name) + " x " + (item.qty || 1) + "</span>" +
-            "<span>" +
-            '<span class="avail-badge ' + (available ? "avail-yes" : "avail-no") + '">' +
-            escapeHtml(available ? t("available") : t("unavailable")) + "</span> " +
-            formatPrice(lineTotal) +
-            "</span></div>"
-          );
-        }).join("");
-        return '<div class="item-category-block"><div class="item-category-title">' +
-          escapeHtml(group.category) + "</div>" + rows + "</div>";
-      }).join("");
+    let html = activeOrders.map(renderOrderCard).join("");
+    if (historyOrders.length) {
+      html += '<h2 style="font-size:20px;margin:28px 0 12px;">' + escapeHtml(t("historyTitle")) + "</h2>";
+      html += historyOrders.map(renderOrderCard).join("");
+    }
+    root.innerHTML = html;
 
-      const normalizedStatus = normalizeOrderStatus(order.status);
-      const showDriver = hasAssignedDriver(order) || normalizedStatus !== "waiting";
-      const orderNo = orderNumberDisplay(order);
-
-      return (
-        '<div class="order-card">' +
-        '<div class="order-header">' +
-        "<div>" +
-        (orderNo ? '<div class="order-date"><strong>' + escapeHtml(t("orderNumber")) + ":</strong> " +
-          escapeHtml(orderNo) + "</div>" : "") +
-        '<div class="order-date">' + escapeHtml(formatDate(order.createdAt)) + "</div>" +
-        '<div class="order-date">' + escapeHtml(t("market")) + ": " +
-          escapeHtml(getMarketLabel(order.marketId || order.marketName)) + "</div>" +
-        '<span class="status-badge ' + statusClass(order.status) + '">' +
-          escapeHtml(statusLabel(order.status)) + "</span></div>" +
-        '<div class="order-total">' + formatPrice(computeOrderTotal(items)) + "</div></div>" +
-        '<div class="order-items">' + itemsHtml + "</div>" +
-        renderTrack(order.status) +
-        (showDriver ? driverHtml(order) : "") +
-        chatPanelHtml(order) +
-        feedbackHtml(order) +
-        "</div>"
-      );
-    }).join("");
+    activeOrders.forEach(function (order) {
+      const cardRadio = document.querySelector('input[name="pay-' + order.id + '"][value="card"]');
+      const cashRadio = document.querySelector('input[name="pay-' + order.id + '"][value="cash"]');
+      const cardFields = document.getElementById("card-fields-" + order.id);
+      function syncCardFields() {
+        if (!cardFields || !cardRadio) return;
+        cardFields.style.display = cardRadio.checked ? "block" : "none";
+      }
+      if (cardRadio) cardRadio.addEventListener("change", syncCardFields);
+      if (cashRadio) cashRadio.addEventListener("change", syncCardFields);
+      syncCardFields();
+    });
 
     clearChatListeners(activeIds);
     currentOrders.forEach(function (order) {
-      if (isOrderCommunicationActive(order) || isOrderClosed(order.status)) {
+      if (isCustomerChatActive(order) || isOrderClosed(order.status)) {
         bindChatListener(order);
       }
     });
@@ -613,6 +763,8 @@
         sendChatMessage(button.dataset.orderId || "");
       } else if (button.dataset.orderAction === "submit-feedback") {
         submitFeedback(button.dataset.orderId || "");
+      } else if (button.dataset.orderAction === "pay-order") {
+        payOrder(button.dataset.orderId || "");
       } else if (button.dataset.orderAction === "video-call") {
         startInAppCall(button.dataset.orderId || "", "video");
       } else if (button.dataset.orderAction === "voice-call") {

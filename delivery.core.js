@@ -12,6 +12,7 @@
   };
   const isOrderClosed = OL.isOrderClosed || function () { return false; };
   const isOrderCommunicationActive = OL.isOrderCommunicationActive || function () { return false; };
+  const getOrderCustomerLocation = OL.getOrderCustomerLocation || function () { return null; };
   const orderChatCollection = OL.orderChatCollection || function (db, id) {
     return db.collection("orderChats").doc(id).collection("messages");
   };
@@ -70,7 +71,9 @@
       cardExpiry: "Son kullanma",
       available: "Mevcut",
       unavailable: "Yok",
-      waiting: "Siparis hazirlaniyor",
+      waiting: "Siparis inceleniyor",
+      awaitingPayment: "Odeme bekleniyor",
+      preparing: "Hazirlaniyor",
       onTheWay: "Yolda",
       arrived: "Teslim edildi",
       driver: "Surucu",
@@ -81,6 +84,7 @@
       trackingStopped: "Takip durduruldu",
       lastUpdate: "Son guncelleme",
       openMap: "Haritada ac",
+      customerLocation: "Musteri konumu (Google Maps)",
       locationUnavailable: "Konum alinamadi",
       updated: "Guncellendi",
       unknown: "Bilinmiyor",
@@ -137,7 +141,9 @@
       cardExpiry: "Expiry",
       available: "Available",
       unavailable: "Unavailable",
-      waiting: "Waiting / preparing",
+      waiting: "Waiting / reviewing",
+      awaitingPayment: "Awaiting payment",
+      preparing: "Preparing",
       onTheWay: "On the way",
       arrived: "Arrived",
       driver: "Driver",
@@ -148,6 +154,7 @@
       trackingStopped: "Tracking stopped",
       lastUpdate: "Last update",
       openMap: "Open map",
+      customerLocation: "Customer location (Google Maps)",
       locationUnavailable: "Location unavailable",
       updated: "Updated",
       unknown: "Unknown",
@@ -204,7 +211,9 @@
       cardExpiry: "تاريخ الانتهاء",
       available: "متوفر",
       unavailable: "غير متوفر",
-      waiting: "قيد التحضير",
+      waiting: "قيد المراجعة",
+      awaitingPayment: "في انتظار الدفع",
+      preparing: "قيد التحضير",
       onTheWay: "في الطريق",
       arrived: "تم التسليم",
       driver: "السائق",
@@ -215,6 +224,7 @@
       trackingStopped: "تم إيقاف التتبع",
       lastUpdate: "آخر تحديث",
       openMap: "فتح الخريطة",
+      customerLocation: "موقع العميل (Google Maps)",
       locationUnavailable: "الموقع غير متاح",
       updated: "تم التحديث",
       unknown: "غير معروف",
@@ -307,6 +317,8 @@
     const normalized = normalizeOrderStatus(status);
     return {
       waiting: t("waiting"),
+      "awaiting-payment": t("awaitingPayment"),
+      preparing: t("preparing"),
       "on-the-way": t("onTheWay"),
       arrived: t("arrived"),
     }[normalized] || normalized;
@@ -328,8 +340,9 @@
 
   function isActiveOrder(order) {
     if (isOrderClosed(order.status)) return false;
+    if (!orderAssignedToDriverIdentity(order, driverIdentity())) return false;
     const status = normalizeOrderStatus(order.status);
-    return status === "waiting" || status === "on-the-way" || status === "arrived";
+    return status === "preparing" || status === "on-the-way" || status === "arrived";
   }
 
   function applyLanguage() {
@@ -382,7 +395,9 @@
   function renderDriverChatMessages(messages, order) {
     const root = document.getElementById("driverChatMessages");
     if (!root) return;
-    root.innerHTML = messages.map(function (msg) {
+    root.innerHTML = messages.filter(function (msg) {
+      return String(msg.senderRole || "").toLowerCase() !== "market";
+    }).map(function (msg) {
       const role = chatRoleClass(msg.senderRole);
       const senderLabel = resolveChatSenderDisplayName(msg, order, {
         getMarketLabel: getMarketLabel,
@@ -495,16 +510,32 @@
 
   function renderLocationBox(order) {
     const box = document.getElementById("locationBox");
-    const loc = order && order.driverLocation;
-    if (!loc || loc.lat == null || loc.lng == null) {
+    const customer = getOrderCustomerLocation(order);
+    const driver = order && order.driverLocation;
+    if (!customer && !(driver && driver.lat != null)) {
       box.textContent = t("locationUnavailable");
       return;
     }
-    const mapUrl = "https://www.google.com/maps?q=" + encodeURIComponent(loc.lat) + "," + encodeURIComponent(loc.lng);
+    let mapUrl = "https://www.google.com/maps";
+    if (customer && driver && driver.lat != null) {
+      mapUrl = "https://www.google.com/maps/dir/?api=1&origin=" +
+        encodeURIComponent(driver.lat + "," + driver.lng) +
+        "&destination=" + encodeURIComponent(customer.lat + "," + customer.lng);
+    } else if (customer) {
+      mapUrl = "https://www.google.com/maps/search/?api=1&query=" +
+        encodeURIComponent(customer.lat + "," + customer.lng);
+    } else if (driver) {
+      mapUrl = "https://www.google.com/maps/search/?api=1&query=" +
+        encodeURIComponent(driver.lat + "," + driver.lng);
+    }
     box.innerHTML =
-      '<span class="live-badge">' + escapeHtml(t("trackingLive")) + "</span><br>" +
-      escapeHtml(t("lastUpdate")) + ": " + escapeHtml(formatDate(loc.updatedAt)) + "<br>" +
-      "Lat: " + escapeHtml(String(loc.lat)) + ", Lng: " + escapeHtml(String(loc.lng)) + "<br>" +
+      (driver && driver.lat != null
+        ? '<span class="live-badge">' + escapeHtml(t("trackingLive")) + "</span><br>" +
+          escapeHtml(t("lastUpdate")) + ": " + escapeHtml(formatDate(driver.updatedAt)) + "<br>"
+        : "") +
+      (customer
+        ? escapeHtml(t("customerLocation")) + ": " + escapeHtml(String(customer.lat)) + ", " + escapeHtml(String(customer.lng)) + "<br>"
+        : "") +
       '<a href="' + mapUrl + '" target="_blank" rel="noopener">' + escapeHtml(t("openMap")) + "</a>";
   }
 
@@ -545,7 +576,6 @@
     if (window.InAppCall) window.InAppCall.close();
     updateDriverGate();
     renderOrders(allMarketOrders);
-    renderHistorySections();
   }
 
   function callMetaForOrder(order) {
@@ -555,6 +585,8 @@
       marketName: order.marketName || getMarketLabel(order.marketId || MARKET_ID),
       driverName: (order.driver && order.driver.name) || driverName || "",
       customerName: order.userName || t("unknown"),
+      customerPhoto: order.userPhoto || "",
+      driverPhoto: "",
     };
   }
 
@@ -941,7 +973,6 @@
   });
 
   applyLanguage();
-  ensureHistorySections();
   updateDriverGate();
   var logoutBtn = document.getElementById("driverLogoutBtn");
   if (logoutBtn) logoutBtn.addEventListener("click", driverLogout);
@@ -960,12 +991,10 @@
       return isOrderClosed(order.status);
     });
     renderOrders(allMarketOrders);
-    renderHistorySections();
     if (activeOrderId) renderActiveOrderDetails();
   }
 
   if (MARKET_ID) {
-    startCallHistoryListener();
     db.collection("orders").where("marketId", "==", MARKET_ID).onSnapshot(function (snapshot) {
       applyOrdersSnapshot(snapshot);
     }, function (error) {
