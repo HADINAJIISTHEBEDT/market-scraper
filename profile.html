@@ -143,7 +143,7 @@
 
     <section class="panel">
       <h1 id="title">Profil bilgileri</h1>
-      <p id="subtitle" class="subtitle">Devam etmeden once ad, telefon numarasi ve adres bilgilerini doldurun.</p>
+      <p id="subtitle" class="subtitle">Ad ve teslimat adresi zorunludur. Telefon ve Google Maps konumu istege baglidir.</p>
       <form id="profileForm" class="profile-form">
         <label>
           <span id="nameLabel">Ad</span>
@@ -154,13 +154,20 @@
           <input id="emailInput" name="email" type="email" readonly />
         </label>
         <label>
-          <span id="phoneLabel">Telefon numarasi</span>
-          <input id="phoneInput" name="phone" type="tel" required />
+          <span id="phoneLabel">Telefon numarasi (istege bagli)</span>
+          <input id="phoneInput" name="phone" type="tel" />
         </label>
         <label>
           <span id="addressLabel">Adres</span>
           <textarea id="addressInput" name="address" required></textarea>
         </label>
+        <label>
+          <span id="mapLinkLabel">Google Maps baglantisi (istege bagli)</span>
+          <input id="mapLinkInput" name="mapLink" type="url" placeholder="https://maps.google.com/..." />
+        </label>
+        <div class="actions" style="margin-top:-6px;">
+          <button id="openMapsBtn" class="secondary-btn" type="button">Google Maps'te adres bul</button>
+        </div>
         <div class="actions">
           <button id="saveButton" class="primary-btn" type="submit">Kaydet ve devam et</button>
           <button id="logoutButton" class="secondary-btn" type="button">Cikis yap</button>
@@ -191,11 +198,13 @@
     const I18N = {
       tr: {
         title: "Profil bilgileri",
-        subtitle: "Devam etmeden once ad, telefon numarasi ve adres bilgilerini doldurun.",
+        subtitle: "Ad ve teslimat adresi zorunludur. Telefon ve Google Maps konumu istege baglidir.",
         nameLabel: "Ad",
         emailLabel: "E-posta",
-        phoneLabel: "Telefon numarasi",
+        phoneLabel: "Telefon numarasi (istege bagli)",
         addressLabel: "Adres",
+        mapLinkLabel: "Google Maps baglantisi (istege bagli)",
+        openMapsBtn: "Google Maps'te adres bul",
         saveButton: "Kaydet ve devam et",
         logoutButton: "Cikis yap",
         backLink: "Uygulamaya don",
@@ -211,11 +220,13 @@
       },
       en: {
         title: "Profile details",
-        subtitle: "Before continuing, fill in your name, phone number, and address.",
+        subtitle: "Name and delivery address are required. Phone and Google Maps location are optional.",
         nameLabel: "Name",
         emailLabel: "Email",
-        phoneLabel: "Phone number",
+        phoneLabel: "Phone number (optional)",
         addressLabel: "Address",
+        mapLinkLabel: "Google Maps link (optional)",
+        openMapsBtn: "Find address on Google Maps",
         saveButton: "Save and continue",
         logoutButton: "Logout",
         backLink: "Back to app",
@@ -234,8 +245,10 @@
         subtitle: "قبل المتابعة، املأ الاسم ورقم الهاتف والعنوان.",
         nameLabel: "الاسم",
         emailLabel: "البريد الإلكتروني",
-        phoneLabel: "رقم الهاتف",
+        phoneLabel: "رقم الهاتف (اختياري)",
         addressLabel: "العنوان",
+        mapLinkLabel: "رابط Google Maps (اختياري)",
+        openMapsBtn: "ابحث عن العنوان على Google Maps",
         saveButton: "احفظ وتابع",
         logoutButton: "تسجيل الخروج",
         backLink: "العودة إلى التطبيق",
@@ -277,6 +290,8 @@
       document.getElementById("emailLabel").textContent = t("emailLabel");
       document.getElementById("phoneLabel").textContent = t("phoneLabel");
       document.getElementById("addressLabel").textContent = t("addressLabel");
+      document.getElementById("mapLinkLabel").textContent = t("mapLinkLabel");
+      document.getElementById("openMapsBtn").textContent = t("openMapsBtn");
       document.getElementById("saveButton").textContent = t("saveButton");
       document.getElementById("logoutButton").textContent = t("logoutButton");
       document.getElementById("backLink").innerHTML = "&larr; " + t("backLink");
@@ -294,6 +309,7 @@
         document.getElementById("emailInput").value = user.email || data.email || "";
         document.getElementById("phoneInput").value = data.phone || localStorage.getItem("user_phone") || "";
         document.getElementById("addressInput").value = data.address || localStorage.getItem("user_address") || "";
+        document.getElementById("mapLinkInput").value = data.mapLink || localStorage.getItem("user_map_link") || "";
         setStatus("", false, true);
       } catch (error) {
         console.error("Profile load failed", error);
@@ -312,6 +328,7 @@
       const email = document.getElementById("emailInput").value.trim();
       const phone = document.getElementById("phoneInput").value.trim();
       const address = document.getElementById("addressInput").value.trim();
+      const mapLink = document.getElementById("mapLinkInput").value.trim();
 
       setStatus("statusSaving");
       try {
@@ -320,6 +337,7 @@
           email,
           phone,
           address,
+          mapLink,
           photoURL: currentUser.photoURL || "",
           lastProfileUpdateAt: new Date().toISOString()
         }, { merge: true });
@@ -328,6 +346,7 @@
         localStorage.setItem("user_email", email);
         localStorage.setItem("user_phone", phone);
         localStorage.setItem("user_address", address);
+        localStorage.setItem("user_map_link", mapLink);
         if (currentUser.photoURL) localStorage.setItem("user_photo", currentUser.photoURL);
         setStatus("statusSaved");
         setTimeout(() => {
@@ -363,6 +382,11 @@
     });
 
     document.getElementById("profileForm").addEventListener("submit", saveProfile);
+    document.getElementById("openMapsBtn").addEventListener("click", () => {
+      const query = document.getElementById("addressInput").value.trim() || document.getElementById("nameInput").value.trim();
+      const url = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(query || "Turkey");
+      window.open(url, "_blank", "noopener");
+    });
     document.getElementById("logoutButton").addEventListener("click", logout);
 
     applyLanguage();

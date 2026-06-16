@@ -385,6 +385,13 @@
       title: mode === "voice" ? t("voiceCall") : t("videoCall"),
       callerRole: "customer",
       localId: userUid || "",
+      meta: {
+        orderNumber: order.orderNumber != null ? order.orderNumber : "",
+        marketId: order.marketId || "",
+        marketName: getMarketLabel(order.marketId || order.marketName),
+        driverName: order.driver && order.driver.name ? order.driver.name : "",
+        customerName: userName || t("unknown"),
+      },
     }).catch(function (error) {
       console.error("In-app call failed", error);
     });

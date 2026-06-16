@@ -458,6 +458,18 @@
         font-weight: 700;
       }
 
+      #profilePromptBanner[hidden] {
+        display: none !important;
+      }
+
+      #profilePromptBanner:not([hidden]) {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
       body.feature-page-locked > :not(.feature-page-lock) {
         display: none !important;
       }
@@ -487,7 +499,7 @@
 
     <main id="homeView">
     <div id="commandBanner" class="command-banner" hidden></div>
-    <div id="profilePromptBanner" class="command-banner" hidden style="background:#fef3c7;border-color:#fcd34d;color:#92400e;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;">
+    <div id="profilePromptBanner" class="command-banner" hidden style="background:#fef3c7;border-color:#fcd34d;color:#92400e;">
       <span id="profilePromptText"></span>
       <a id="profilePromptLink" href="profile.html" style="color:#92400e;font-weight:800;text-decoration:underline;"></a>
     </div>

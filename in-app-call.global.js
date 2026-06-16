@@ -1,57 +1,37 @@
 (function () {
   "use strict";
 
-  var activeFrame = null;
   var db = null;
   var watchState = { orderIds: [], localId: "", localRole: "", displayName: "" };
   var orderUnsubs = new Map();
+  var candidateUnsubs = new Map();
   var ringTimer = null;
   var ringAudioCtx = null;
   var outgoingOrderId = "";
+  var pendingIncoming = null;
+  var activeCall = null;
 
   var CALL_I18N = {
     tr: {
-      voice: "Sesli arama", video: "Goruntulu arama", close: "Kapat", frameTitle: "Uygulama ici arama",
+      voice: "Sesli arama", video: "Goruntulu arama", close: "Kapat",
       incoming: "Gelen arama", from: "Arayan", accept: "Kabul et", decline: "Reddet",
-      calling: "Araniyor...", waitingAnswer: "Yanit bekleniyor",
+      calling: "Araniyor...", connected: "Baglandi", ended: "Arama bitti",
     },
     en: {
-      voice: "Voice call", video: "Video call", close: "Close", frameTitle: "In-app call",
+      voice: "Voice call", video: "Video call", close: "Close",
       incoming: "Incoming call", from: "From", accept: "Accept", decline: "Decline",
-      calling: "Calling...", waitingAnswer: "Waiting for answer",
+      calling: "Calling...", connected: "Connected", ended: "Call ended",
     },
     ar: {
-      voice: "مكالمة صوتية", video: "مكالمة فيديو", close: "إغلاق", frameTitle: "مكالمة داخل التطبيق",
+      voice: "مكالمة صوتية", video: "مكالمة فيديو", close: "إغلاق",
       incoming: "مكالمة واردة", from: "من", accept: "قبول", decline: "رفض",
-      calling: "جاري الاتصال...", waitingAnswer: "في انتظار الرد",
+      calling: "جاري الاتصال...", connected: "متصل", ended: "انتهت المكالمة",
     },
   };
 
   function callT(key) {
     var lang = localStorage.getItem("app_lang") || "tr";
     return (CALL_I18N[lang] && CALL_I18N[lang][key]) || CALL_I18N.tr[key] || key;
-  }
-
-  function getRoom(orderId) {
-    if (window.OrderLifecycle && window.OrderLifecycle.getVideoCallRoom) {
-      return window.OrderLifecycle.getVideoCallRoom(orderId);
-    }
-    return "marketfiyati-" + String(orderId || "order").slice(0, 48);
-  }
-
-  function buildEmbedUrl(orderId, displayName, mode) {
-    var room = getRoom(orderId);
-    var name = encodeURIComponent(String(displayName || "Guest").slice(0, 40));
-    var videoMuted = mode === "voice" ? "true" : "false";
-    var hash = [
-      "userInfo.displayName=" + name,
-      "config.prejoinPageEnabled=false",
-      "config.startWithVideoMuted=" + videoMuted,
-      "config.startAudioOnly=" + (mode === "voice" ? "true" : "false"),
-      "interfaceConfig.SHOW_JITSI_WATERMARK=false",
-      "interfaceConfig.MOBILE_APP_PROMO=false",
-    ].join("&");
-    return "https://meet.jit.si/" + encodeURIComponent(room) + "#" + hash;
   }
 
   function getDb() {
@@ -99,11 +79,10 @@
     }
   }
 
-  function ensureModal() {
-    var modal = document.getElementById("inAppCallModal");
-    if (modal) return modal;
+  function ensureUi() {
+    if (document.getElementById("inAppCallModal")) return;
 
-    modal = document.createElement("div");
+    var modal = document.createElement("div");
     modal.id = "inAppCallModal";
     modal.hidden = true;
     modal.innerHTML =
@@ -113,8 +92,11 @@
       '<span id="inAppCallTitle">Call</span>' +
       '<button type="button" class="in-app-call-close" data-in-app-call-close aria-label="Close">&times;</button>' +
       "</div>" +
-      '<iframe id="inAppCallFrame" allow="camera; microphone; fullscreen; display-capture"></iframe>' +
-      "</div>";
+      '<div class="in-app-call-body">' +
+      '<div id="inAppCallStatus" class="in-app-call-status"></div>' +
+      '<video id="inAppRemoteVideo" autoplay playsinline hidden></video>' +
+      '<audio id="inAppRemoteAudio" autoplay></audio>' +
+      "</div></div>";
 
     var incoming = document.createElement("div");
     incoming.id = "inAppIncomingCall";
@@ -134,10 +116,12 @@
       "#inAppCallModal,#inAppIncomingCall{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:12px}" +
       "#inAppCallModal[hidden],#inAppIncomingCall[hidden]{display:none!important}" +
       ".in-app-call-backdrop{position:absolute;inset:0;background:rgba(15,23,42,.72)}" +
-      ".in-app-call-panel{position:relative;width:min(960px,100%);height:min(640px,92vh);background:#0f172a;border-radius:14px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.35)}" +
+      ".in-app-call-panel{position:relative;width:min(420px,100%);background:#0f172a;border-radius:14px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.35)}" +
       ".in-app-call-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#1e293b;color:#f8fafc;font-weight:700}" +
       ".in-app-call-close{border:none;background:transparent;color:#f8fafc;font-size:28px;line-height:1;cursor:pointer;padding:0 4px}" +
-      "#inAppCallFrame{border:0;flex:1;width:100%;background:#000}" +
+      ".in-app-call-body{padding:24px;text-align:center;color:#e2e8f0;min-height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px}" +
+      ".in-app-call-status{font-size:16px;font-weight:700}" +
+      "#inAppRemoteVideo{width:100%;max-height:240px;background:#000;border-radius:10px}" +
       ".in-app-incoming-panel{position:relative;width:min(360px,100%);background:#fff;border-radius:16px;padding:24px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.35)}" +
       ".in-app-incoming-title{font-size:20px;font-weight:800;color:#0f172a;margin-bottom:8px}" +
       ".in-app-incoming-meta{font-size:14px;color:#64748b;margin-bottom:20px}" +
@@ -153,76 +137,196 @@
     modal.querySelectorAll("[data-in-app-call-close]").forEach(function (el) {
       el.addEventListener("click", close);
     });
-
     document.getElementById("inAppIncomingAccept").addEventListener("click", acceptIncoming);
     document.getElementById("inAppIncomingDecline").addEventListener("click", declineIncoming);
+  }
 
-    return modal;
+  function setCallStatus(text) {
+    var el = document.getElementById("inAppCallStatus");
+    if (el) el.textContent = text || "";
+  }
+
+  function showCallModal(title) {
+    ensureUi();
+    var modal = document.getElementById("inAppCallModal");
+    var titleEl = document.getElementById("inAppCallTitle");
+    if (titleEl) titleEl.textContent = title || callT("voice");
+    if (modal) modal.hidden = false;
+    document.body.style.overflow = "hidden";
   }
 
   function hideIncoming() {
     stopRing();
     var incoming = document.getElementById("inAppIncomingCall");
     if (incoming) incoming.hidden = true;
-    if (incoming) incoming.dataset.orderId = "";
   }
-
-  var pendingIncoming = null;
 
   function showIncoming(orderId, data) {
     pendingIncoming = { orderId: orderId, data: data };
-    ensureModal();
+    ensureUi();
     var incoming = document.getElementById("inAppIncomingCall");
     var title = document.getElementById("inAppIncomingTitle");
     var meta = document.getElementById("inAppIncomingMeta");
     var accept = document.getElementById("inAppIncomingAccept");
     var decline = document.getElementById("inAppIncomingDecline");
-    var modeLabel = data.mode === "voice" ? callT("voice") : callT("video");
+    var modeLabel = data.mode === "video" ? callT("video") : callT("voice");
     if (title) title.textContent = callT("incoming");
-    if (meta) meta.textContent = callT("from") + ": " + String(data.callerName || callT("waitingAnswer")) + " · " + modeLabel;
+    if (meta) meta.textContent = callT("from") + ": " + String(data.callerName || callT("calling")) + " · " + modeLabel;
     if (accept) accept.textContent = callT("accept");
     if (decline) decline.textContent = callT("decline");
-    if (incoming) {
-      incoming.dataset.orderId = orderId;
-      incoming.hidden = false;
-    }
+    if (incoming) incoming.hidden = false;
     playRingPattern();
   }
 
-  function joinCall(orderId, displayName, mode) {
-    ensureModal();
-    var modal = document.getElementById("inAppCallModal");
-    var frame = document.getElementById("inAppCallFrame");
-    var title = document.getElementById("inAppCallTitle");
-    var callMode = mode === "voice" ? "voice" : "video";
-    if (title) title.textContent = callMode === "voice" ? callT("voice") : callT("video");
-    if (frame) {
-      frame.title = callT("frameTitle");
-      frame.src = buildEmbedUrl(orderId, displayName, callMode);
-      activeFrame = frame;
+  function cleanupPeer() {
+    if (activeCall && activeCall.pc) {
+      try { activeCall.pc.close(); } catch (e) {}
     }
-    if (modal) modal.hidden = false;
-    document.body.style.overflow = "hidden";
+    if (activeCall && activeCall.localStream) {
+      activeCall.localStream.getTracks().forEach(function (track) { track.stop(); });
+    }
+    var remoteVideo = document.getElementById("inAppRemoteVideo");
+    var remoteAudio = document.getElementById("inAppRemoteAudio");
+    if (remoteVideo) {
+      remoteVideo.srcObject = null;
+      remoteVideo.hidden = true;
+    }
+    if (remoteAudio) remoteAudio.srcObject = null;
+    activeCall = null;
   }
 
-  function acceptIncoming() {
+  function bindRemoteStream(stream, mode) {
+    var remoteVideo = document.getElementById("inAppRemoteVideo");
+    var remoteAudio = document.getElementById("inAppRemoteAudio");
+    if (mode === "video" && remoteVideo) {
+      remoteVideo.srcObject = stream;
+      remoteVideo.hidden = false;
+    }
+    if (remoteAudio) remoteAudio.srcObject = stream;
+  }
+
+  function createPeerConnection(orderId, mode) {
+    var pc = new RTCPeerConnection({
+      iceServers: [{ urls: "stun:stun.l.google.com:19302" }, { urls: "stun:stun1.l.google.com:19302" }],
+    });
+    pc.ontrack = function (event) {
+      bindRemoteStream(event.streams[0], mode);
+      setCallStatus(callT("connected"));
+      stopRing();
+    };
+    pc.onicecandidate = function (event) {
+      if (!event.candidate || !callRef(orderId)) return;
+      callRef(orderId).collection("candidates").add({
+        candidate: event.candidate.toJSON(),
+        from: watchState.localId || "",
+        createdAt: new Date().toISOString(),
+      }).catch(function (error) {
+        console.error("ICE publish failed", error);
+      });
+    };
+    return pc;
+  }
+
+  function watchCandidates(orderId, pc) {
+    if (candidateUnsubs.has(orderId)) return;
+    var ref = callRef(orderId);
+    if (!ref) return;
+    var seen = new Set();
+    var unsub = ref.collection("candidates").orderBy("createdAt", "asc").onSnapshot(function (snapshot) {
+      snapshot.docChanges().forEach(function (change) {
+        if (change.type !== "added") return;
+        var data = change.doc.data() || {};
+        if (String(data.from || "") === String(watchState.localId || "")) return;
+        var key = change.doc.id;
+        if (seen.has(key)) return;
+        seen.add(key);
+        if (!data.candidate || !pc) return;
+        pc.addIceCandidate(new RTCIceCandidate(data.candidate)).catch(function (error) {
+          console.warn("addIceCandidate failed", error);
+        });
+      });
+    });
+    candidateUnsubs.set(orderId, unsub);
+  }
+
+  function unwatchCandidates(orderId) {
+    var unsub = candidateUnsubs.get(orderId);
+    if (unsub) unsub();
+    candidateUnsubs.delete(orderId);
+  }
+
+  async function startLocalMedia(mode) {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      throw new Error("Microphone not available in this browser");
+    }
+    return navigator.mediaDevices.getUserMedia({
+      audio: true,
+      video: mode === "video",
+    });
+  }
+
+  async function saveCallHistory(orderId, meta) {
+    var firestore = getDb();
+    if (!firestore || !window.OrderLifecycle || !window.OrderLifecycle.writeCallHistory) return;
+    var now = new Date().toISOString();
+    await window.OrderLifecycle.writeCallHistory(firestore, Object.assign({
+      orderId: orderId,
+      endedAt: now,
+    }, meta || {}));
+  }
+
+  async function beginCall(orderId, mode, isCaller, remoteMeta) {
+    cleanupPeer();
+    var stream = await startLocalMedia(mode);
+    var pc = createPeerConnection(orderId, mode);
+    stream.getTracks().forEach(function (track) {
+      pc.addTrack(track, stream);
+    });
+    activeCall = {
+      orderId: orderId,
+      mode: mode,
+      pc: pc,
+      localStream: stream,
+      startedAt: new Date().toISOString(),
+      meta: remoteMeta || {},
+    };
+    watchCandidates(orderId, pc);
+    showCallModal(mode === "video" ? callT("video") : callT("voice"));
+    setCallStatus(isCaller ? callT("calling") : callT("connected"));
+    return pc;
+  }
+
+  async function acceptIncoming() {
     if (!pendingIncoming) return;
     var orderId = pendingIncoming.orderId;
     var data = pendingIncoming.data || {};
     hideIncoming();
-    var ref = callRef(orderId);
-    if (ref) {
-      ref.set({
+    pendingIncoming = null;
+    try {
+      var meta = {
+        orderNumber: data.orderNumber || "",
+        marketId: data.marketId || "",
+        marketName: data.marketName || "",
+        driverName: data.driverName || "",
+        customerName: data.customerName || "",
+      };
+      var pc = await beginCall(orderId, data.mode || "voice", false, meta);
+      var ref = callRef(orderId);
+      if (!ref || !data.offer) return;
+      await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+      var answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      await ref.set({
         status: "active",
+        answer: { type: answer.type, sdp: answer.sdp },
         answeredBy: watchState.localId || "",
         answeredAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-      }, { merge: true }).catch(function (error) {
-        console.error("Accept call failed", error);
-      });
+      }, { merge: true });
+    } catch (error) {
+      console.error("Accept call failed", error);
+      close();
     }
-    joinCall(orderId, watchState.displayName || "Guest", data.mode || "voice");
-    pendingIncoming = null;
   }
 
   function declineIncoming() {
@@ -242,7 +346,7 @@
     }
   }
 
-  function handleCallSnapshot(orderId, snap) {
+  async function handleCallSnapshot(orderId, snap) {
     if (!snap.exists) return;
     var data = snap.data() || {};
     var status = String(data.status || "").toLowerCase();
@@ -250,34 +354,43 @@
     var localId = String(watchState.localId || "");
 
     if (status === "ringing" && callerId && callerId !== localId) {
-      if (document.getElementById("inAppIncomingCall") && !document.getElementById("inAppIncomingCall").hidden) return;
+      var incomingEl = document.getElementById("inAppIncomingCall");
+      if (incomingEl && !incomingEl.hidden) return;
       showIncoming(orderId, data);
       return;
     }
 
     if (status === "active" && callerId === localId && outgoingOrderId === orderId) {
-      stopRing();
-      joinCall(orderId, data.callerName || watchState.displayName || "Guest", data.mode || "voice");
-      outgoingOrderId = "";
+      try {
+        if (activeCall && activeCall.pc && data.answer) {
+          await activeCall.pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+        } else if (!activeCall) {
+          var pc = await beginCall(orderId, data.mode || "voice", true, data);
+          if (data.answer) {
+            await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+          }
+        }
+        stopRing();
+        setCallStatus(callT("connected"));
+        outgoingOrderId = "";
+      } catch (error) {
+        console.error("Caller connect failed", error);
+      }
       return;
     }
 
-    if (status === "active" && callerId !== localId) {
-      hideIncoming();
-    }
-
     if (status === "declined" || status === "ended") {
-      if (outgoingOrderId === orderId) {
-        outgoingOrderId = "";
-        stopRing();
-      }
+      if (outgoingOrderId === orderId) outgoingOrderId = "";
       hideIncoming();
+      stopRing();
     }
   }
 
   function clearWatch() {
     orderUnsubs.forEach(function (unsub) { unsub(); });
     orderUnsubs.clear();
+    candidateUnsubs.forEach(function (unsub) { unsub(); });
+    candidateUnsubs.clear();
   }
 
   function syncWatch(options) {
@@ -303,82 +416,97 @@
     });
   }
 
-  function open(orderIdOrOptions, displayName, mode) {
+  async function open(orderIdOrOptions, displayName, mode) {
     var orderId = orderIdOrOptions;
     var name = displayName;
     var callMode = mode;
     var callerRole = "customer";
     var localId = "";
+    var callMeta = {};
     if (orderIdOrOptions && typeof orderIdOrOptions === "object") {
       orderId = orderIdOrOptions.orderId || orderIdOrOptions.order_id;
       name = orderIdOrOptions.displayName;
       callMode = orderIdOrOptions.mode;
       callerRole = orderIdOrOptions.callerRole || callerRole;
       localId = orderIdOrOptions.localId || "";
+      callMeta = orderIdOrOptions.meta || {};
     }
     if (!orderId) return Promise.resolve();
     localId = localId || watchState.localId || localStorage.getItem("user_uid") || ("caller-" + Date.now());
     name = name || watchState.displayName || "Guest";
-    callMode = callMode === "voice" ? "voice" : "video";
+    callMode = callMode === "video" ? "video" : "voice";
     outgoingOrderId = String(orderId);
 
-    var payload = {
-      status: "ringing",
-      callerId: localId,
-      callerName: name,
-      callerRole: callerRole,
-      mode: callMode,
-      startedAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
     var ref = callRef(orderId);
-    if (ref) {
-      return ref.set(payload, { merge: true }).then(function () {
-        ensureModal();
-        var title = document.getElementById("inAppCallTitle");
-        if (title) title.textContent = callT("calling");
-        playRingPattern();
-        setTimeout(function () {
-          if (outgoingOrderId !== String(orderId)) return;
-          ref.get().then(function (snap) {
-            var status = snap.exists ? String(snap.data().status || "").toLowerCase() : "";
-            if (status === "ringing" && outgoingOrderId === String(orderId)) {
-              ref.set({ status: "active", autoConnected: true, updatedAt: new Date().toISOString() }, { merge: true });
-              stopRing();
-              joinCall(orderId, name, callMode);
-              outgoingOrderId = "";
-            }
-          });
-        }, 45000);
-      }).catch(function (error) {
-        stopRing();
-        outgoingOrderId = "";
-        joinCall(orderId, name, callMode);
-        return Promise.reject(error);
-      });
-    }
+    if (!ref) return Promise.resolve();
 
-    joinCall(orderId, name, callMode);
+    try {
+      await ref.collection("candidates").get().then(function (snap) {
+        var batch = getDb().batch();
+        snap.docs.forEach(function (doc) { batch.delete(doc.ref); });
+        return batch.commit();
+      }).catch(function () {});
+
+      var pc = await beginCall(orderId, callMode, true, callMeta);
+      var offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      await ref.set({
+        status: "ringing",
+        callerId: localId,
+        callerName: name,
+        callerRole: callerRole,
+        mode: callMode,
+        offer: { type: offer.type, sdp: offer.sdp },
+        orderNumber: callMeta.orderNumber || "",
+        marketId: callMeta.marketId || "",
+        marketName: callMeta.marketName || "",
+        driverName: callMeta.driverName || "",
+        customerName: callMeta.customerName || name,
+        startedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
+      playRingPattern();
+    } catch (error) {
+      console.error("Call start failed", error);
+      close();
+      return Promise.reject(error);
+    }
     return Promise.resolve();
   }
 
   function close() {
+    var endedOrderId = activeCall && activeCall.orderId;
+    var endedMeta = activeCall && activeCall.meta;
+    var startedAt = activeCall && activeCall.startedAt;
+    var endedMode = activeCall && activeCall.mode;
     stopRing();
     outgoingOrderId = "";
     hideIncoming();
+    pendingIncoming = null;
+    if (endedOrderId) {
+      unwatchCandidates(endedOrderId);
+      var ref = callRef(endedOrderId);
+      if (ref) {
+        ref.set({ status: "ended", updatedAt: new Date().toISOString() }, { merge: true }).catch(function () {});
+        if (startedAt && window.OrderLifecycle && window.OrderLifecycle.writeCallHistory) {
+          saveCallHistory(endedOrderId, Object.assign({}, endedMeta || {}, {
+            startedAt: startedAt,
+            callerName: watchState.displayName || "",
+            callerRole: watchState.localRole || "",
+            mode: endedMode || "voice",
+          }));
+        }
+      }
+    }
+    cleanupPeer();
     var modal = document.getElementById("inAppCallModal");
-    var frame = document.getElementById("inAppCallFrame");
-    if (frame) frame.src = "about:blank";
     if (modal) modal.hidden = true;
-    document.body.style.overflow = String();
-    activeFrame = null;
+    document.body.style.overflow = "";
   }
 
   window.InAppCall = {
     open: open,
     close: close,
     syncWatch: syncWatch,
-    buildEmbedUrl: buildEmbedUrl,
   };
 })();

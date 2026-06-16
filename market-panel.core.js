@@ -32,7 +32,11 @@
       driver: "Surucu",
       driverName: "Surucu adi",
       driverPhone: "Surucu telefonu",
-      assignDriver: "Surucu ata ve yola cikar",
+      historyTitle: "Gecmis siparisler",
+      callHistoryTitle: "Arama gecmisi",
+      noHistory: "Gecmis kayit yok.",
+      portalDenied: "Market paneli surucu panelinden acilamaz. Once cikis yapin.",
+      assignDriver: "Surucu ata",
       deliveryPage: "Surucu sayfasi",
       trackDriver: "Surucuyu takip et",
       savedDrivers: "Kayitli suruculer",
@@ -86,7 +90,11 @@
       driver: "Driver",
       driverName: "Driver name",
       driverPhone: "Driver phone",
-      assignDriver: "Assign driver & send",
+      historyTitle: "Order history",
+      callHistoryTitle: "Call history",
+      noHistory: "No history yet.",
+      portalDenied: "The market panel cannot be opened from the driver portal.",
+      assignDriver: "Assign driver",
       deliveryPage: "Driver delivery page",
       trackDriver: "Track driver",
       savedDrivers: "Saved drivers",
@@ -140,7 +148,11 @@
       driver: "السائق",
       driverName: "اسم السائق",
       driverPhone: "هاتف السائق",
-      assignDriver: "تعيين السائق وإرساله",
+      historyTitle: "سجل الطلبات",
+      callHistoryTitle: "سجل المكالمات",
+      noHistory: "لا يوجد سجل بعد.",
+      portalDenied: "لا يمكن فتح لوحة السوق من بوابة السائق.",
+      assignDriver: "تعيين السائق",
       deliveryPage: "صفحة تسليم السائق",
       trackDriver: "تتبع السائق",
       savedDrivers: "السائقون المحفوظون",
@@ -189,6 +201,9 @@
     return db.collection("orderChats").doc(id).collection("messages");
   };
   const normalizePhone = OL.normalizePhone || function (v) { return String(v || "").replace(/\D/g, ""); };
+  const getMarketLabel = window.MarketsConfig?.getMarketLabel || function (key) {
+    return String(key || MARKET_LABEL || "Market");
+  };
   let currentLang = localStorage.getItem("app_lang") || "tr";
   let currentOrders = [];
   let currentInboxEntries = [];
@@ -215,6 +230,19 @@
   }
   const db = firebase.firestore();
   try { db.settings({ experimentalForceLongPolling: true, merge: true }); } catch (e) {}
+
+  var portalCheck = window.PortalAccess && window.PortalAccess.guardMarketPanel
+    ? window.PortalAccess.guardMarketPanel(MARKET_ID)
+    : { ok: true };
+  if (!portalCheck.ok) {
+    showBootError(t("portalDenied"));
+    return;
+  }
+
+  var driverLink = document.getElementById("driverLink");
+  if (driverLink) driverLink.hidden = true;
+
+  let callHistoryEntries = [];
 
   function showBootError(message) {
     const loading = document.getElementById("marketLoading");
@@ -563,6 +591,74 @@
     });
   }
 
+  function renderMarketHistory(orders) {
+    let root = document.getElementById("marketHistoryList");
+    if (!root) return;
+    const closed = orders
+      .filter((order) => orderMatchesMarket(order, MARKET_ID) && isOrderClosed(order.status))
+      .sort((a, b) => String(b.closedAt || b.updatedAt || b.createdAt || "").localeCompare(String(a.closedAt || a.updatedAt || a.createdAt || "")))
+      .slice(0, 40);
+    if (!closed.length) {
+      root.innerHTML = `<p class="empty-msg">${escapeHtml(t("noHistory"))}</p>`;
+      return;
+    }
+    root.innerHTML = closed.map((order) => {
+      const orderNo = orderNumberDisplay(order);
+      const driver = order.driver || {};
+      return `
+        <div class="card">
+          <div class="card-title">${escapeHtml(MARKET_LABEL)}${orderNo ? ` · ${escapeHtml(orderNo)}` : ""}</div>
+          <div class="card-meta">${escapeHtml(t("driver"))}: ${escapeHtml(driver.name || t("unknown"))}</div>
+          <div class="card-meta">${escapeHtml(formatDate(order.closedAt || order.updatedAt || order.createdAt))}</div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  function renderMarketCallHistory() {
+    let root = document.getElementById("marketCallHistoryList");
+    if (!root) return;
+    const rows = callHistoryEntries.slice(0, 40);
+    if (!rows.length) {
+      root.innerHTML = `<p class="empty-msg">${escapeHtml(t("noHistory"))}</p>`;
+      return;
+    }
+    root.innerHTML = rows.map((entry) => `
+      <div class="card">
+        <div class="card-title">${escapeHtml(getMarketLabel(entry.marketId || entry.marketName))} · ${escapeHtml(entry.driverName || t("unknown"))}</div>
+        <div class="card-meta">${escapeHtml(formatDate(entry.startedAt || entry.createdAt))}</div>
+      </div>
+    `).join("");
+  }
+
+  function ensureHistorySections() {
+    if (document.getElementById("marketHistoryPanel")) return;
+    const guard = document.getElementById("marketGuard");
+    if (!guard) return;
+    const panel = document.createElement("div");
+    panel.id = "marketHistoryPanel";
+    panel.innerHTML = `
+      <h2 id="marketHistoryTitle" class="section-title" style="font-size:20px;margin:24px 0 12px;">${escapeHtml(t("historyTitle"))}</h2>
+      <div id="marketHistoryList"></div>
+      <h2 id="marketCallHistoryTitle" class="section-title" style="font-size:20px;margin:24px 0 12px;">${escapeHtml(t("callHistoryTitle"))}</h2>
+      <div id="marketCallHistoryList"></div>
+    `;
+    guard.appendChild(panel);
+  }
+
+  function startCallHistoryListener() {
+    db.collection("orderCallHistory").where("marketId", "==", MARKET_ID).onSnapshot((snapshot) => {
+      callHistoryEntries = snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() }))
+        .sort((a, b) => String(b.startedAt || b.createdAt || "").localeCompare(String(a.startedAt || a.createdAt || "")));
+      renderMarketCallHistory();
+    }, () => {
+      db.collection("orderCallHistory").onSnapshot((snapshot) => {
+        callHistoryEntries = snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() }));
+        renderMarketCallHistory();
+      });
+    });
+  }
+
   async function renderOrders(orders) {
     const filtered = orders
       .filter((order) => orderMatchesMarket(order, MARKET_ID))
@@ -653,6 +749,8 @@
         bindChatListener(order);
       }
     });
+    renderMarketHistory(filtered);
+    renderMarketCallHistory();
   }
 
   async function toggleItemAvailability(orderId, itemIndex, makeAvailable) {
@@ -716,17 +814,16 @@
       }
     }
     phone = normalizePhone(phone) || phone;
-    if (!name || !phone) return;
-    if (!driverId && !marketDrivers.some((entry) => normalizePhone(entry.phone) === phone)) {
+    if (!name) return;
+    if (!driverId && phone && !marketDrivers.some((entry) => normalizePhone(entry.phone) === phone)) {
       driverId = "drv_" + Date.now().toString(36);
       marketDrivers.push({ id: driverId, name, phone });
       await saveMarketDrivers();
     }
     await db.collection("orders").doc(orderId).update({
-      status: "on-the-way",
       marketId: MARKET_ID,
       marketName: MARKET_LABEL,
-      driver: { driverId, name, phone: normalizePhone(phone) || phone },
+      driver: { driverId, name, phone: phone || "" },
       driverAssignedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
@@ -828,6 +925,7 @@
     if (header) header.style.borderLeftColor = MARKET_COLOR;
     const badge = document.getElementById("marketBadge");
     if (badge) badge.style.background = MARKET_COLOR;
+    ensureHistorySections();
     bindMarketActions();
     applyLanguage();
     document.getElementById("langSelect").addEventListener("change", (event) => {
@@ -839,6 +937,7 @@
     });
     startMarketInboxListener();
     loadMarketDrivers();
+    startCallHistoryListener();
     startOrdersListener();
   }
 

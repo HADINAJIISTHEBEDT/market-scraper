@@ -63,7 +63,7 @@
 
   <div class="nav-bar">
     <span class="market-label" id="marketLabel">carrefour Delivery</span>
-    <a id="marketPanelLink" href="carrefour.html" style="color:#004e9a;font-weight:600;text-decoration:none;">Market panel</a>
+    <button type="button" class="btn-secondary" id="driverLogoutBtn" hidden>Log out</button>
     <select id="langSelect" class="lang-select">
       <option value="tr">Türkçe</option>
       <option value="en">English</option>
@@ -118,6 +118,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
   <script src="firebase-config.global.js"></script>
+  <script src="portal-access.global.js"></script>
   <script src="markets-config.global.js"></script>
   <script src="order-lifecycle.global.js"></script>
   <script src="in-app-call.js"></script>

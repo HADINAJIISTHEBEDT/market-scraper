@@ -198,6 +198,10 @@
       <h2 id="ordersTitle">All orders</h2>
       <p id="ordersLoading" class="empty-msg">Loading orders...</p>
       <div id="ordersList"></div>
+      <h2 id="adminHistoryTitle" style="font-size:20px;margin:24px 0 12px;">Order history</h2>
+      <div id="adminHistoryList"></div>
+      <h2 id="adminCallHistoryTitle" style="font-size:20px;margin:24px 0 12px;">Call history</h2>
+      <div id="adminCallHistoryList"></div>
     </section>
 
     <section class="panel-section" id="panel-users">
@@ -299,7 +303,8 @@
         deleteUserFirst: "Once kullaniciyi silin, sonra tamamlandi olarak isaretleyin.",
         inboxUserDeleted: "Kullanici silindi",
         sendingEmail: "Gmail gonderiliyor...",
-        block: "Engelle", unblock: "Engeli kaldir", blocked: "Engellendi"
+        block: "Engelle", unblock: "Engeli kaldir", blocked: "Engellendi",
+        historyTitle: "Siparis gecmisi", callHistoryTitle: "Arama gecmisi", noHistory: "Henuz gecmis yok."
       },
       en: {
         adminTitle: "Admin Panel", backLink: "Back to App", deniedTitle: "Access Denied",
@@ -325,7 +330,8 @@
         deleteUserFirst: "Delete the user first, then mark the request done.",
         inboxUserDeleted: "User deleted",
         sendingEmail: "Sending Gmail...",
-        block: "Block", unblock: "Unblock", blocked: "Blocked"
+        block: "Block", unblock: "Unblock", blocked: "Blocked",
+        historyTitle: "Order history", callHistoryTitle: "Call history", noHistory: "No history yet."
       },
       ar: {
         adminTitle: "لوحة الإدارة", backLink: "العودة إلى التطبيق", deniedTitle: "تم رفض الوصول",
@@ -351,7 +357,8 @@
         deleteUserFirst: "احذف المستخدم أولاً، ثم ضع علامة مكتمل على الطلب.",
         inboxUserDeleted: "تم حذف المستخدم",
         sendingEmail: "جار إرسال Gmail...",
-        block: "حظر", unblock: "إلغاء الحظر", blocked: "محظور"
+        block: "حظر", unblock: "إلغاء الحظر", blocked: "محظور",
+        historyTitle: "سجل الطلبات", callHistoryTitle: "سجل المكالمات", noHistory: "لا يوجد سجل بعد."
       }
     };
 
@@ -375,6 +382,7 @@
     let currentMarketFilter = "all";
     let currentAdminDriverMarket = MARKETS[0]?.key || "bim";
     let adminMarketDrivers = [];
+    let adminCallHistoryEntries = [];
     const marketChatUnsubs = new Map();
     const adminOrderChatUnsubs = new Map();
     let currentTiles = [];
@@ -525,7 +533,8 @@
         ordersTitle: "allOrders", usersTitle: "users", ordersLoading: "loading", usersLoading: "loading",
         deleteRequestsTitle: "deleteRequestsTitle", inboxTitle: "inboxTitle", inboxHelp: "inboxHelp",
         tabMarkets: "tabMarkets", marketsTitle: "marketsTitle", marketsHelp: "marketsHelp", marketFilterLabel: "marketFilterLabel", marketOrdersTitle: "marketOrdersTitle",
-        adminDriversTitle: "savedDrivers", adminDriversHelp: "marketsHelp", adminDriverMarketLabel: "marketFilterLabel"
+        adminDriversTitle: "savedDrivers", adminDriversHelp: "marketsHelp", adminDriverMarketLabel: "marketFilterLabel",
+        adminHistoryTitle: "historyTitle", adminCallHistoryTitle: "callHistoryTitle"
       };
       Object.entries(textIds).forEach(([id, key]) => {
         const el = document.getElementById(id);
@@ -1117,14 +1126,53 @@
       const name = document.getElementById(`admin-driver-name-${orderId}`)?.value.trim() || "";
       const phoneRaw = document.getElementById(`admin-driver-phone-${orderId}`)?.value.trim() || "";
       const phone = normalizePhone(phoneRaw) || phoneRaw;
-      if (!name || !phone) return;
+      if (!name) return;
       await updateDoc(doc(db, "orders", orderId), {
-        status: "on-the-way",
-        driver: { name, phone },
+        driver: { name, phone: phone || "" },
         driverAssignedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
       showToast(t("updated"));
+    }
+
+    function renderAdminOrderHistory(orders) {
+      const root = document.getElementById("adminHistoryList");
+      if (!root) return;
+      const closed = orders
+        .filter((order) => isOrderClosed(order.status))
+        .sort((a, b) => String(b.closedAt || b.updatedAt || b.createdAt || "").localeCompare(String(a.closedAt || a.updatedAt || a.createdAt || "")))
+        .slice(0, 40);
+      if (!closed.length) {
+        root.innerHTML = `<p class="empty-msg">${escapeHtml(t("noHistory"))}</p>`;
+        return;
+      }
+      root.innerHTML = closed.map((order) => {
+        const orderNo = orderNumberDisplay(order);
+        const driver = order.driver || {};
+        return `
+          <div class="card">
+            <div class="card-title">${escapeHtml(getMarketLabel(order.marketId || order.marketName))}${orderNo ? ` · ${escapeHtml(orderNo)}` : ""}</div>
+            <div class="card-meta">${escapeHtml(t("driver"))}: ${escapeHtml(driver.name || t("unknown"))}</div>
+            <div class="card-meta">${escapeHtml(formatDate(order.closedAt || order.updatedAt || order.createdAt))}</div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function renderAdminCallHistory() {
+      const root = document.getElementById("adminCallHistoryList");
+      if (!root) return;
+      const rows = adminCallHistoryEntries.slice(0, 40);
+      if (!rows.length) {
+        root.innerHTML = `<p class="empty-msg">${escapeHtml(t("noHistory"))}</p>`;
+        return;
+      }
+      root.innerHTML = rows.map((entry) => `
+        <div class="card">
+          <div class="card-title">${escapeHtml(getMarketLabel(entry.marketId || entry.marketName))} · ${escapeHtml(entry.driverName || t("unknown"))}</div>
+          <div class="card-meta">${escapeHtml(formatDate(entry.startedAt || entry.createdAt))}</div>
+        </div>
+      `).join("");
     }
 
     function renderOrders(orders) {
@@ -1137,6 +1185,7 @@
       if (!orders.length) {
         root.innerHTML = `<p class="empty-msg">${escapeHtml(t("noOrders"))}</p>`;
         clearAdminOrderChats(new Set());
+        renderAdminOrderHistory(orders);
         return;
       }
       const sorted = orders.slice().sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
@@ -1187,6 +1236,7 @@
       }).join("");
       clearAdminOrderChats(activeIds);
       activeIds.forEach((orderId) => bindAdminOrderChat(orderId));
+      renderAdminOrderHistory(orders);
     }
 
     window.updateStatus = async function(orderId) {
@@ -1636,6 +1686,11 @@ Pazar Fiyatı Admin`;
 
       onSnapshot(query(collection(db, "orders"), orderBy("createdAt", "desc")), (snapshot) => {
         renderOrders(snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() })));
+      });
+
+      onSnapshot(query(collection(db, "orderCallHistory"), orderBy("createdAt", "desc")), (snapshot) => {
+        adminCallHistoryEntries = snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() }));
+        renderAdminCallHistory();
       });
 
       onSnapshot(query(collection(db, "users"), orderBy("lastLoginAt", "desc")), (snapshot) => {

@@ -94,6 +94,11 @@
       videoCall: "Goruntulu ara",
       chatDisabled: "Siparis kapandi",
       marketPanelLink: "Market paneli",
+      logout: "Cikis yap",
+      historyTitle: "Gecmis siparisler",
+      callHistoryTitle: "Arama gecmisi",
+      noHistory: "Gecmis kayit yok.",
+      portalDenied: "Surucu paneli market panelinden acilamaz. Once cikis yapin.",
       bootErrorConfig: "Yapilandirma eksik. firebase-config.global.js dosyasini ayni klasorde tutun.",
       bootErrorFirebase: "Firebase yuklenemedi. Internet baglantinizi kontrol edin.",
       bootErrorOrders: "Siparisler yuklenemedi.",
@@ -156,6 +161,11 @@
       videoCall: "Video call",
       chatDisabled: "Order closed",
       marketPanelLink: "Market panel",
+      logout: "Log out",
+      historyTitle: "Order history",
+      callHistoryTitle: "Call history",
+      noHistory: "No history yet.",
+      portalDenied: "The driver portal cannot be opened from the market panel. Log out first.",
       bootErrorConfig: "Config missing. Keep firebase-config.global.js in the same folder.",
       bootErrorFirebase: "Firebase failed to load. Check your internet connection.",
       bootErrorOrders: "Could not load orders.",
@@ -218,6 +228,11 @@
       videoCall: "مكالمة فيديو",
       chatDisabled: "تم إغلاق الطلب",
       marketPanelLink: "لوحة السوق",
+      logout: "تسجيل الخروج",
+      historyTitle: "سجل الطلبات",
+      callHistoryTitle: "سجل المكالمات",
+      noHistory: "لا يوجد سجل بعد.",
+      portalDenied: "لا يمكن فتح بوابة السائق من لوحة السوق. سجّل الخروج أولاً.",
       bootErrorConfig: "الإعدادات ناقصة. احتفظ بملف firebase-config.global.js في نفس المجلد.",
       bootErrorFirebase: "تعذر تحميل Firebase. تحقق من اتصال الإنترنت.",
       bootErrorOrders: "تعذر تحميل الطلبات.",
@@ -252,8 +267,21 @@
   const db = firebase.firestore();
   try { db.settings({ experimentalForceLongPolling: true, merge: true }); } catch (e) {}
 
+  var portalCheck = window.PortalAccess && window.PortalAccess.guardDriverPanel
+    ? window.PortalAccess.guardDriverPanel(MARKET_ID)
+    : { ok: true };
+  if (!portalCheck.ok) {
+    showBootError(t("portalDenied"));
+    return;
+  }
+
+  var marketPanelLink = document.getElementById("marketPanelLink");
+  if (marketPanelLink) marketPanelLink.hidden = true;
+
   let currentOrders = [];
   let allMarketOrders = [];
+  let historyOrders = [];
+  let callHistoryEntries = [];
   let activeOrderId = "";
   let geoWatchId = null;
   let chatUnsub = null;
@@ -322,6 +350,12 @@
     if (phoneInput) phoneInput.placeholder = t("driverPhonePlaceholder");
     const phoneSave = document.getElementById("driverPhoneSave");
     if (phoneSave) phoneSave.textContent = t("driverLoginContinue") || t("driverPhoneSave");
+    const logoutBtn = document.getElementById("driverLogoutBtn");
+    if (logoutBtn) logoutBtn.textContent = t("logout");
+    const historyTitle = document.getElementById("historyTitle");
+    if (historyTitle) historyTitle.textContent = t("historyTitle");
+    const callHistoryTitle = document.getElementById("callHistoryTitle");
+    if (callHistoryTitle) callHistoryTitle.textContent = t("callHistoryTitle");
     document.getElementById("ordersTitle").textContent = t("ordersTitle");
     document.getElementById("activeOrderTitle").textContent = t("activeOrder");
     document.getElementById("startTrackingBtn").textContent = t("startTracking");
@@ -417,6 +451,7 @@
             title: t("voiceCall"),
             callerRole: "driver",
             localId: driverNameKey() + ":" + driverName,
+            meta: callMetaForOrder(order),
           }).catch(function (error) { console.error("Voice call failed", error); });
         };
       }
@@ -429,6 +464,7 @@
             title: t("videoCall"),
             callerRole: "driver",
             localId: driverNameKey() + ":" + driverName,
+            meta: callMetaForOrder(order),
           }).catch(function (error) { console.error("Video call failed", error); });
         };
       }
@@ -500,6 +536,111 @@
     return { name: driverName, phone: driverPhone };
   }
 
+  function driverLogout() {
+    localStorage.removeItem(driverNameKey());
+    localStorage.removeItem(driverPhoneKey());
+    driverName = "";
+    driverPhone = "";
+    if (window.PortalAccess && window.PortalAccess.clearPortal) window.PortalAccess.clearPortal();
+    if (window.InAppCall) window.InAppCall.close();
+    updateDriverGate();
+    renderOrders(allMarketOrders);
+    renderHistorySections();
+  }
+
+  function callMetaForOrder(order) {
+    return {
+      orderNumber: order.orderNumber != null ? order.orderNumber : "",
+      marketId: order.marketId || MARKET_ID || "",
+      marketName: order.marketName || getMarketLabel(order.marketId || MARKET_ID),
+      driverName: (order.driver && order.driver.name) || driverName || "",
+      customerName: order.userName || t("unknown"),
+    };
+  }
+
+  function renderHistorySections() {
+    var ordersRoot = document.getElementById("historyOrdersList");
+    var callsRoot = document.getElementById("historyCallsList");
+    if (!ordersRoot || !callsRoot) return;
+
+    var closed = historyOrders.filter(function (order) {
+      return orderVisibleToDriver(order) || orderAssignedToDriverIdentity(order, driverIdentity());
+    }).sort(function (a, b) {
+      return String(b.closedAt || b.updatedAt || b.createdAt || "").localeCompare(String(a.closedAt || a.updatedAt || a.createdAt || ""));
+    }).slice(0, 40);
+
+    if (!closed.length) {
+      ordersRoot.innerHTML = '<p class="empty-msg">' + escapeHtml(t("noHistory")) + "</p>";
+    } else {
+      ordersRoot.innerHTML = closed.map(function (order) {
+        var orderNo = orderNumberDisplay(order);
+        return (
+          '<div class="card">' +
+          '<div class="card-title">' + escapeHtml(getMarketLabel(order.marketId || order.marketName)) +
+          (orderNo ? " · " + escapeHtml(orderNo) : "") + "</div>" +
+          '<div class="card-meta">' + escapeHtml(t("driver")) + ": " + escapeHtml((order.driver && order.driver.name) || driverName || t("unknown")) + "</div>" +
+          '<div class="card-meta">' + escapeHtml(formatDate(order.closedAt || order.updatedAt || order.createdAt)) + "</div>" +
+          "</div>"
+        );
+      }).join("");
+    }
+
+    var calls = callHistoryEntries.filter(function (entry) {
+      return !driverName || !entry.driverName || String(entry.driverName).toLowerCase() === String(driverName).toLowerCase();
+    }).slice(0, 40);
+
+    if (!calls.length) {
+      callsRoot.innerHTML = '<p class="empty-msg">' + escapeHtml(t("noHistory")) + "</p>";
+    } else {
+      callsRoot.innerHTML = calls.map(function (entry) {
+        return (
+          '<div class="card">' +
+          '<div class="card-title">' + escapeHtml(getMarketLabel(entry.marketId || entry.marketName)) +
+          " · " + escapeHtml(entry.driverName || t("unknown")) + "</div>" +
+          '<div class="card-meta">' + escapeHtml(formatDate(entry.startedAt || entry.createdAt)) +
+          " · " + escapeHtml(entry.mode === "video" ? callTMode("video") : callTMode("voice")) + "</div>" +
+          "</div>"
+        );
+      }).join("");
+    }
+  }
+
+  function callTMode(mode) {
+    return mode === "video" ? t("videoCall") : t("voiceCall");
+  }
+
+  function ensureHistorySections() {
+    if (document.getElementById("driverHistoryPanel")) return;
+    var app = document.getElementById("driverApp");
+    if (!app) return;
+    var panel = document.createElement("div");
+    panel.id = "driverHistoryPanel";
+    panel.innerHTML =
+      '<h2 id="historyTitle" style="font-size:20px;margin:24px 0 12px;">History</h2>' +
+      '<div id="historyOrdersList"></div>' +
+      '<h2 id="callHistoryTitle" style="font-size:20px;margin:24px 0 12px;">Calls</h2>' +
+      '<div id="historyCallsList"></div>';
+    app.appendChild(panel);
+  }
+
+  function startCallHistoryListener() {
+    db.collection("orderCallHistory").where("marketId", "==", MARKET_ID).onSnapshot(function (snapshot) {
+      callHistoryEntries = snapshot.docs.map(function (entry) {
+        return Object.assign({ id: entry.id }, entry.data());
+      }).sort(function (a, b) {
+        return String(b.startedAt || b.createdAt || "").localeCompare(String(a.startedAt || a.createdAt || ""));
+      });
+      renderHistorySections();
+    }, function () {
+      db.collection("orderCallHistory").onSnapshot(function (snapshot) {
+        callHistoryEntries = snapshot.docs.map(function (entry) {
+          return Object.assign({ id: entry.id }, entry.data());
+        });
+        renderHistorySections();
+      });
+    });
+  }
+
   function orderVisibleToDriver(order) {
     if (!MARKET_ID || !orderMatchesMarket(order, MARKET_ID)) return false;
     if (!driverName) return false;
@@ -509,6 +650,7 @@
   function updateDriverGate() {
     var gate = document.getElementById("driverGate");
     var app = document.getElementById("driverApp");
+    var logoutBtn = document.getElementById("driverLogoutBtn");
     if (!MARKET_ID) {
       if (gate) gate.hidden = false;
       if (app) app.hidden = true;
@@ -522,6 +664,7 @@
     }
     if (gate) gate.hidden = true;
     if (app) app.hidden = false;
+    if (logoutBtn) logoutBtn.hidden = false;
   }
 
   function renderActiveOrderDetails() {
@@ -798,7 +941,10 @@
   });
 
   applyLanguage();
+  ensureHistorySections();
   updateDriverGate();
+  var logoutBtn = document.getElementById("driverLogoutBtn");
+  if (logoutBtn) logoutBtn.addEventListener("click", driverLogout);
   var savedNameInput = document.getElementById("driverNameInput");
   if (savedNameInput && driverName) savedNameInput.value = driverName;
   var savedPhoneInput = document.getElementById("driverPhoneInput");
@@ -810,11 +956,16 @@
     }).filter(function (order) {
       return orderMatchesMarket(order, MARKET_ID);
     });
+    historyOrders = allMarketOrders.filter(function (order) {
+      return isOrderClosed(order.status);
+    });
     renderOrders(allMarketOrders);
+    renderHistorySections();
     if (activeOrderId) renderActiveOrderDetails();
   }
 
   if (MARKET_ID) {
+    startCallHistoryListener();
     db.collection("orders").where("marketId", "==", MARKET_ID).onSnapshot(function (snapshot) {
       applyOrdersSnapshot(snapshot);
     }, function (error) {

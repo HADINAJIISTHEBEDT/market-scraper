@@ -166,7 +166,7 @@ const I18N = {
     navLogin: "Giris",
     navLogout: "Cikis",
     navAdmin: "Admin Paneli",
-    profileIncomplete: "Lutfen profilinizi tamamlayin. Ozellikle teslimat adresinizi eksiksiz yazin.",
+    profileIncomplete: "Lutfen profilinizi tamamlayin. Teslimat adresinizi eksiksiz yazin.",
     profileIncompleteLink: "Profili tamamla",
     addToCart: "Sepete ekle",
     addedToCart: "Eklendi!",
@@ -226,7 +226,7 @@ const I18N = {
     navLogin: "Login",
     navLogout: "Logout",
     navAdmin: "Admin",
-    profileIncomplete: "Please complete your profile. Your delivery address should be filled in fully.",
+    profileIncomplete: "Please complete your profile. Fill in your full delivery address.",
     profileIncompleteLink: "Complete profile",
     addToCart: "Add to Cart",
     addedToCart: "Added!",
@@ -687,9 +687,8 @@ function applyRemoteSettings(settings) {
 function isProfileIncomplete() {
   if (!localStorage.getItem("user_uid")) return false;
   const address = String(localStorage.getItem("user_address") || "").trim();
-  const phone = String(localStorage.getItem("user_phone") || "").trim();
   const name = String(localStorage.getItem("user_name") || "").trim();
-  return address.length < 8 || phone.length < 7 || name.length < 2;
+  return address.length < 8 || name.length < 2;
 }
 
 function showProfilePromptIfNeeded() {
@@ -697,10 +696,12 @@ function showProfilePromptIfNeeded() {
   if (!banner) return;
   if (!isProfileIncomplete()) {
     banner.hidden = true;
+    banner.style.display = "";
     sessionStorage.removeItem("profile_prompt");
     return;
   }
   banner.hidden = false;
+  banner.style.display = "";
   const text = document.getElementById("profilePromptText");
   const link = document.getElementById("profilePromptLink");
   if (text) text.textContent = t("profileIncomplete");

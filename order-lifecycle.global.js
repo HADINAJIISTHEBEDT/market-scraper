@@ -167,6 +167,35 @@
     return db.collection("orderChats").doc(String(orderId || "")).collection("messages");
   }
 
+  function orderCallDoc(db, orderId) {
+    return db.collection("orderCalls").doc(String(orderId || ""));
+  }
+
+  function writeCallHistory(db, entry) {
+    var now = new Date().toISOString();
+    return db.collection("orderCallHistory").add({
+      orderId: String(entry.orderId || ""),
+      orderNumber: entry.orderNumber != null ? entry.orderNumber : "",
+      marketId: String(entry.marketId || ""),
+      marketName: String(entry.marketName || ""),
+      driverName: String(entry.driverName || ""),
+      customerName: String(entry.customerName || ""),
+      callerName: String(entry.callerName || ""),
+      callerRole: String(entry.callerRole || ""),
+      mode: String(entry.mode || "voice"),
+      startedAt: String(entry.startedAt || now),
+      endedAt: String(entry.endedAt || now),
+      createdAt: now,
+    });
+  }
+
+  function isUserProfileComplete(profile) {
+    profile = profile || {};
+    var address = String(profile.address || "").trim();
+    var name = String(profile.name || "").trim();
+    return name.length >= 2 && address.length >= 8;
+  }
+
   function computeOrderTotal(items) {
     return (Array.isArray(items) ? items : []).reduce(function (sum, item) {
       if (item && item.available === false) return sum;
@@ -241,6 +270,9 @@
     getVideoCallRoom: getVideoCallRoom,
     getVideoCallUrl: getVideoCallUrl,
     orderChatCollection: orderChatCollection,
+    orderCallDoc: orderCallDoc,
+    writeCallHistory: writeCallHistory,
+    isUserProfileComplete: isUserProfileComplete,
     computeOrderTotal: computeOrderTotal,
     writeOrderInboxNotifications: writeOrderInboxNotifications,
   };
