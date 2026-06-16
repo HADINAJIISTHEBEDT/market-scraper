@@ -37,6 +37,7 @@
       trackDriver: "Surucuyu takip et",
       savedDrivers: "Kayitli suruculer",
       addDriver: "Surucu ekle",
+      deleteDriver: "Surucuyu sil",
       selectDriver: "Surucu sec",
       chatTitle: "Canli sohbet",
       chatPlaceholder: "Musteriye mesaj yazin...",
@@ -90,6 +91,7 @@
       trackDriver: "Track driver",
       savedDrivers: "Saved drivers",
       addDriver: "Add driver",
+      deleteDriver: "Delete driver",
       selectDriver: "Select driver",
       chatTitle: "Live chat",
       chatPlaceholder: "Message the customer...",
@@ -143,6 +145,7 @@
       trackDriver: "تتبع السائق",
       savedDrivers: "السائقون المحفوظون",
       addDriver: "إضافة سائق",
+      deleteDriver: "حذف السائق",
       selectDriver: "اختر السائق",
       chatTitle: "دردشة مباشرة",
       chatPlaceholder: "اكتب رسالة للعميل...",
@@ -444,7 +447,10 @@
       }
     }
     const rows = marketDrivers.map((driver) => (
-      `<div class="order-item-row"><span>${escapeHtml(driver.name || t("unknown"))} · ${escapeHtml(driver.phone || "")}</span></div>`
+      `<div class="order-item-row" style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+        <span>${escapeHtml(driver.name || t("unknown"))} · ${escapeHtml(driver.phone || "")}</span>
+        <button class="btn-danger" type="button" data-market-action="delete-driver" data-driver-id="${escapeHtml(driver.id)}">${escapeHtml(t("deleteDriver"))}</button>
+      </div>`
     )).join("");
     root.innerHTML = `
       <div class="card-title">${escapeHtml(t("savedDrivers"))}</div>
@@ -487,6 +493,14 @@
     await saveMarketDrivers();
     document.getElementById("newDriverName").value = "";
     document.getElementById("newDriverPhone").value = "";
+    showToast(t("updated"));
+    renderOrders(currentOrders);
+  }
+
+  async function deleteMarketDriver(driverId) {
+    if (!driverId) return;
+    marketDrivers = marketDrivers.filter((entry) => entry.id !== driverId);
+    await saveMarketDrivers();
     showToast(t("updated"));
     renderOrders(currentOrders);
   }
@@ -754,6 +768,8 @@
           await assignDriver(orderId);
         } else if (action === "add-driver") {
           await addMarketDriver();
+        } else if (action === "delete-driver") {
+          await deleteMarketDriver(button.dataset.driverId || "");
         } else if (action === "send-chat") {
           await sendChatMessage(orderId);
         }

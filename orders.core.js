@@ -383,8 +383,23 @@
       displayName: userName || t("unknown"),
       mode: mode === "voice" ? "voice" : "video",
       title: mode === "voice" ? t("voiceCall") : t("videoCall"),
+      callerRole: "customer",
+      localId: userUid || "",
     }).catch(function (error) {
       console.error("In-app call failed", error);
+    });
+  }
+
+  function syncCustomerCallWatch() {
+    if (!window.InAppCall || !window.InAppCall.syncWatch || !userUid) return;
+    var activeIds = currentOrders
+      .filter(function (order) { return isOrderCommunicationActive(order); })
+      .map(function (order) { return order.id; });
+    window.InAppCall.syncWatch({
+      orderIds: activeIds,
+      localId: userUid,
+      localRole: "customer",
+      displayName: userName || t("unknown"),
     });
   }
 
@@ -515,6 +530,7 @@
         bindChatListener(order);
       }
     });
+    syncCustomerCallWatch();
     } catch (error) {
       showOrdersLoadError(error);
     }

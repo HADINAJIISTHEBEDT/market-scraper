@@ -415,6 +415,8 @@
             displayName: driverDisplayName || t("driver"),
             mode: "voice",
             title: t("voiceCall"),
+            callerRole: "driver",
+            localId: driverNameKey() + ":" + driverName,
           }).catch(function (error) { console.error("Voice call failed", error); });
         };
       }
@@ -425,6 +427,8 @@
             displayName: driverDisplayName || t("driver"),
             mode: "video",
             title: t("videoCall"),
+            callerRole: "driver",
+            localId: driverNameKey() + ":" + driverName,
           }).catch(function (error) { console.error("Video call failed", error); });
         };
       }
@@ -583,6 +587,7 @@
       document.getElementById("activeOrderCard").hidden = true;
       activeOrderId = "";
       clearDriverChatListener();
+      syncDriverCallWatch();
       return;
     }
 
@@ -607,6 +612,17 @@
     }).join("");
 
     renderActiveOrderDetails();
+    syncDriverCallWatch();
+  }
+
+  function syncDriverCallWatch() {
+    if (!window.InAppCall || !window.InAppCall.syncWatch || !driverName) return;
+    window.InAppCall.syncWatch({
+      orderIds: currentOrders.map(function (order) { return order.id; }),
+      localId: driverNameKey() + ":" + driverName,
+      localRole: "driver",
+      displayName: driverName || t("driver"),
+    });
   }
 
   function pushDriverLocation(position) {
@@ -765,6 +781,7 @@
     localStorage.setItem(driverPhoneKey(), driverPhone);
     updateDriverGate();
     renderOrders(allMarketOrders);
+    syncDriverCallWatch();
   });
 
   document.getElementById("driverNameInput")?.addEventListener("keydown", function (event) {

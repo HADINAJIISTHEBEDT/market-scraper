@@ -166,6 +166,8 @@ const I18N = {
     navLogin: "Giris",
     navLogout: "Cikis",
     navAdmin: "Admin Paneli",
+    profileIncomplete: "Lutfen profilinizi tamamlayin. Ozellikle teslimat adresinizi eksiksiz yazin.",
+    profileIncompleteLink: "Profili tamamla",
     addToCart: "Sepete ekle",
     addedToCart: "Eklendi!",
     backToSearch: "Aramaya don",
@@ -224,6 +226,8 @@ const I18N = {
     navLogin: "Login",
     navLogout: "Logout",
     navAdmin: "Admin",
+    profileIncomplete: "Please complete your profile. Your delivery address should be filled in fully.",
+    profileIncompleteLink: "Complete profile",
     addToCart: "Add to Cart",
     addedToCart: "Added!",
     backToSearch: "Back to search",
@@ -282,6 +286,8 @@ const I18N = {
     navLogin: "تسجيل الدخول",
     navLogout: "تسجيل الخروج",
     navAdmin: "الإدارة",
+    profileIncomplete: "يرجى إكمال ملفك الشخصي. يجب ملء عنوان التسليم بالكامل.",
+    profileIncompleteLink: "إكمال الملف الشخصي",
     addToCart: "أضف إلى السلة",
     backToSearch: "\u0627\u0644\u0639\u0648\u062f\u0629 \u0625\u0644\u0649 \u0627\u0644\u0628\u062d\u062b",
     addedToCart: "\u062a\u0645\u062a \u0627\u0644\u0625\u0636\u0627\u0641\u0629!",
@@ -674,9 +680,33 @@ function applyRemoteSettings(settings) {
 
   renderHomepageTiles(settings.homepageTiles);
   updateNavbar();
+  showProfilePromptIfNeeded();
 }
 
 // ── Navbar auth helpers ───────────────────────────────────────
+function isProfileIncomplete() {
+  if (!localStorage.getItem("user_uid")) return false;
+  const address = String(localStorage.getItem("user_address") || "").trim();
+  const phone = String(localStorage.getItem("user_phone") || "").trim();
+  const name = String(localStorage.getItem("user_name") || "").trim();
+  return address.length < 8 || phone.length < 7 || name.length < 2;
+}
+
+function showProfilePromptIfNeeded() {
+  const banner = document.getElementById("profilePromptBanner");
+  if (!banner) return;
+  if (!isProfileIncomplete()) {
+    banner.hidden = true;
+    sessionStorage.removeItem("profile_prompt");
+    return;
+  }
+  banner.hidden = false;
+  const text = document.getElementById("profilePromptText");
+  const link = document.getElementById("profilePromptLink");
+  if (text) text.textContent = t("profileIncomplete");
+  if (link) link.textContent = t("profileIncompleteLink");
+}
+
 function updateNavbar() {
   const navUser = document.getElementById("navUser");
   const navCartBtn = document.getElementById("navCartBtn");
@@ -700,6 +730,7 @@ function updateNavbar() {
     window.FeatureAccess?.initComingSoonPanel?.();
     window.FeatureAccess?.initLockedFooterLinks?.();
     if (navLoginBtn) navLoginBtn.hidden = false;
+    showProfilePromptIfNeeded();
     return;
   }
 
@@ -721,6 +752,7 @@ function updateNavbar() {
   }
 
   window.FeatureAccess?.initLockedFooterLinks?.();
+  showProfilePromptIfNeeded();
 }
 
 window.doLogout = function() {

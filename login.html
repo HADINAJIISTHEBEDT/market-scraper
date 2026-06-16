@@ -908,6 +908,7 @@
 
     document.getElementById("googleSignInBtn").addEventListener("click", continueWithGoogle);
     document.getElementById("goHomeBtn").addEventListener("click", () => {
+      sessionStorage.setItem("profile_prompt", "1");
       window.location.href = "index.html";
     });
     document.getElementById("ownerPasswordBtn").addEventListener("click", unlockOwnerPage);

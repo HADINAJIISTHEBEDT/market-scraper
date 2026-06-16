@@ -1068,7 +1068,10 @@
         });
       }
       const rows = adminMarketDrivers.map((driver) =>
-        `<div class="order-item-row"><span>${escapeHtml(driver.name || t("unknown"))} · ${escapeHtml(driver.phone || "")}</span></div>`
+        `<div class="order-item-row" style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+          <span>${escapeHtml(driver.name || t("unknown"))} · ${escapeHtml(driver.phone || "")}</span>
+          <button class="btn-danger" type="button" data-admin-action="delete-market-driver" data-driver-id="${escapeHtml(driver.id)}">${escapeHtml(t("delete"))}</button>
+        </div>`
       ).join("");
       root.innerHTML = `
         <div class="card" style="margin-top:12px;">
@@ -1096,6 +1099,18 @@
       }, { merge: true });
       renderAdminDriversPanel();
       showToast(t("updated"));
+    }
+
+    async function deleteAdminMarketDriver(driverId) {
+      if (!driverId) return;
+      adminMarketDrivers = adminMarketDrivers.filter((entry) => entry.id !== driverId);
+      await setDoc(doc(db, "marketDrivers", currentAdminDriverMarket), {
+        marketId: currentAdminDriverMarket,
+        drivers: adminMarketDrivers,
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
+      renderAdminDriversPanel();
+      showToast(t("removed"));
     }
 
     async function reassignOrderDriver(orderId) {
@@ -1548,6 +1563,7 @@ Pazar Fiyatı Admin`;
           else if (action === "delete-order") await window.deleteOrder(orderId);
           else if (action === "reassign-driver") await reassignOrderDriver(orderId);
           else if (action === "add-market-driver") await addAdminMarketDriver();
+          else if (action === "delete-market-driver") await deleteAdminMarketDriver(button.dataset.driverId || "");
         } catch (error) {
           console.error("Admin action failed", action, error);
           showToast(`${t("saveFailed")}: ${error.message}`, true);
