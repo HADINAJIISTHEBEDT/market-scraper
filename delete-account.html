@@ -26,12 +26,12 @@
     <p><strong id="emailLabel">Gmail:</strong> <span id="requestEmail"></span></p>
     <p id="promiseText">We will send your request to the admin. Your data will be deleted within a maximum of 7 days, and we will send you an email as soon as possible.</p>
     <label>
-      <span id="messageLabel">Message to admin</span>
-      <textarea id="requestMessage" placeholder="Write your message here"></textarea>
+      <span id="messageLabel">Please tell us the reason</span>
+      <textarea id="requestMessage" placeholder="Please tell us why you want to delete your account" required minlength="10"></textarea>
     </label>
     <div class="actions">
       <button id="requestDeleteBtn" class="danger" type="button">Send delete request</button>
-      <a id="backLink" class="secondary" href="index.html">Back to app</a>
+      <a id="backLink" class="secondary" href="index.html" data-app-nav="index.html">Back to app</a>
     </div>
     <div id="statusBox" class="status" hidden></div>
   </main>
@@ -51,46 +51,49 @@
           title: "Hesabini sil",
           intro: "Profilinde kayitli Gmail hesabi icin silme istegi gondermek uzere asagidaki dugmeye bas.",
           emailLabel: "Gmail:",
-          promiseText: "Silme istegini admine gonderecegiz. Verilerin en fazla 7 gun icinde silinecek ve en kisa surede sana e-posta gonderecegiz.",
-          messageLabel: "Admine mesaj",
-          messagePlaceholder: "Mesajini buraya yaz",
+          promiseText: "Silme istegini admine gonderecegiz. Verilerin en fazla 7 gun icinde silinecek ve islem tamamlaninca sana e-posta gonderecegiz.",
+          messageLabel: "Lutfen silme nedeninizi yazin",
+          messagePlaceholder: "Hesabinizi neden silmek istediginizi kisa bir sekilde aciklayin",
           requestDeleteBtn: "Silme istegi gonder",
           backLink: "Uygulamaya don",
           missingLogin: "Silme istegi gondermek icin once giris yapmalisin.",
           sending: "Istek gonderiliyor...",
-          sent: "Istek admine gonderildi. Verilerin en fazla 7 gun icinde silinecek ve en kisa surede sana e-posta gonderecegiz.",
+          sent: "Istek admine gonderildi. Islem tamamlaninca sana e-posta gonderecegiz.",
           failed: "Istek gonderilemedi",
-          messageRequired: "Lutfen admine bir mesaj yazin."
+          messageRequired: "Lutfen hesabinizi neden silmek istediginizi yazin.",
+          reasonTooShort: "Lutfen en az 10 karakterlik bir aciklama yazin."
         },
         en: {
           title: "Delete your account",
           intro: "Press the button below to send a deletion request for the Gmail account saved in your profile.",
           emailLabel: "Gmail:",
-          promiseText: "We will send your request to the admin. Your data will be deleted within a maximum of 7 days, and we will send you an email as soon as possible.",
-          messageLabel: "Message to admin",
-          messagePlaceholder: "Write your message here",
+          promiseText: "We will send your request to the admin. Your data will be deleted within a maximum of 7 days, and we will email you when it is completed.",
+          messageLabel: "Please tell us the reason",
+          messagePlaceholder: "Please tell us why you want to delete your account",
           requestDeleteBtn: "Send delete request",
           backLink: "Back to app",
           missingLogin: "Please sign in before sending a deletion request.",
           sending: "Sending request...",
-          sent: "Your request was sent to the admin. Your data will be deleted within a maximum of 7 days, and we will send you an email as soon as possible.",
+          sent: "Your request was sent to the admin. We will email you when your account deletion is completed.",
           failed: "Could not send request",
-          messageRequired: "Please write a message to the admin."
+          messageRequired: "Please tell us why you want to delete your account.",
+          reasonTooShort: "Please write at least 10 characters explaining your reason."
         },
         ar: {
           title: "حذف حسابك",
           intro: "اضغط الزر أدناه لإرسال طلب حذف لحساب Gmail المحفوظ في ملفك.",
           emailLabel: "Gmail:",
-          promiseText: "سنرسل طلبك إلى المسؤول. سيتم حذف بياناتك خلال مدة أقصاها 7 أيام، وسنرسل لك بريداً إلكترونياً في أقرب وقت ممكن.",
-          messageLabel: "رسالة إلى المسؤول",
-          messagePlaceholder: "اكتب رسالتك هنا",
+          promiseText: "سنرسل طلبك إلى المسؤول. سيتم حذف بياناتك خلال مدة أقصاها 7 أيام، وسنرسل لك بريداً إلكترونياً عند اكتمال العملية.",
+          messageLabel: "يرجى إخبارنا بالسبب",
+          messagePlaceholder: "يرجى إخبارنا لماذا تريد حذف حسابك",
           requestDeleteBtn: "إرسال طلب الحذف",
           backLink: "العودة إلى التطبيق",
           missingLogin: "يرجى تسجيل الدخول قبل إرسال طلب الحذف.",
           sending: "جار إرسال الطلب...",
-          sent: "تم إرسال طلبك إلى المسؤول. سيتم حذف بياناتك خلال مدة أقصاها 7 أيام، وسنرسل لك بريداً إلكترونياً في أقرب وقت ممكن.",
+          sent: "تم إرسال طلبك إلى المسؤول. سنرسل لك بريداً إلكترونياً عند اكتمال حذف الحساب.",
           failed: "تعذر إرسال الطلب",
-          messageRequired: "يرجى كتابة رسالة إلى المسؤول."
+          messageRequired: "يرجى إخبارنا لماذا تريد حذف حسابك.",
+          reasonTooShort: "يرجى كتابة شرح لا يقل عن 10 أحرف."
         }
       };
 
@@ -138,6 +141,12 @@
         const message = document.getElementById("requestMessage").value.trim();
         if (!message) {
           setStatus(t("messageRequired"), true);
+          document.getElementById("requestMessage").focus();
+          return;
+        }
+        if (message.length < 10) {
+          setStatus(t("reasonTooShort"), true);
+          document.getElementById("requestMessage").focus();
           return;
         }
         setStatus(t("sending"));
@@ -149,6 +158,7 @@
             email: userEmail,
             name: userName || "",
             message,
+            reason: message,
             status: "pending",
             requestedAt,
             lang: userLang,
@@ -159,6 +169,7 @@
             email: userEmail,
             name: userName || "",
             message,
+            reason: message,
             status: "pending",
             requestedAt,
             lang: userLang,

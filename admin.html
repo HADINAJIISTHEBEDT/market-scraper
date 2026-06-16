@@ -299,7 +299,7 @@
         updateStatus: "Durumu guncelle", delete: "Sil", saveUser: "Kullaniciyi kaydet", updated: "Guncellendi",
         saved: "Kaydedildi", removed: "Silindi", id: "ID", role: "Rol", name: "Ad", phone: "Telefon", address: "Adres", email: "E-posta",
         deleteRequestsTitle: "Hesap silme istekleri", noDeleteRequests: "Henuz silme istegi yok.", requestedAt: "Istek tarihi", markRequestDone: "Tamamlandi olarak isaretle",
-        inboxTitle: "Gelen kutusu", inboxHelp: "Silme istegi mesajlari burada saklanir. Tek tek silebilirsiniz.", noInboxMessages: "Henuz mesaj yok.", message: "Mesaj", deleteMessage: "Mesaji sil",
+        inboxTitle: "Gelen kutusu", inboxHelp: "Silme istegi mesajlari burada saklanir. Tek tek silebilirsiniz.", noInboxMessages: "Henuz mesaj yok.", message: "Mesaj", deleteMessage: "Mesaji sil", deleteReason: "Silme nedeni",
         marketsTitle: "Marketler", marketsHelp: "Tum marketlerden gelen siparisleri ve canli konusmalari takip edin.", marketFilterLabel: "Market filtrele", marketOrdersTitle: "Market siparisleri", noMarketOrders: "Bu market icin siparis yok.", chatTitle: "Canli sohbet", allMarkets: "Tum marketler", marketOrders: "Siparis", marketChats: "Mesaj", payment: "Odeme", available: "Mevcut", unavailable: "Yok",
         inboxDone: "Tamamlandi", inboxCompleted: "Hesap silindi", inboxEmailQueued: "E-posta siraya alindi", inboxEmailSent: "E-posta gonderildi", inboxEmailFailed: "E-posta gonderilemedi",
         emailQueued: "E-posta gonderim siraya alindi", emailQueueFailed: "E-posta siraya alinamadi", emailServerNotConfigured: "Render SMTP ayarlari eksik",
@@ -329,7 +329,7 @@
         updateStatus: "Update status", delete: "Delete", saveUser: "Save user", updated: "Updated",
         saved: "Saved", removed: "Removed", id: "ID", role: "Role", name: "Name", phone: "Phone", address: "Address", email: "Email",
         deleteRequestsTitle: "Account delete requests", noDeleteRequests: "No delete requests yet.", requestedAt: "Requested at", markRequestDone: "Mark request done",
-        inboxTitle: "Inbox", inboxHelp: "Delete request messages are saved here. You can delete individual messages.", noInboxMessages: "No messages yet.", message: "Message", deleteMessage: "Delete message",
+        inboxTitle: "Inbox", inboxHelp: "Delete request messages are saved here. You can delete individual messages.", noInboxMessages: "No messages yet.", message: "Message", deleteMessage: "Delete message", deleteReason: "Deletion reason",
         marketsTitle: "Markets overview", marketsHelp: "Track orders and live conversations from every market.", marketFilterLabel: "Filter market", marketOrdersTitle: "Market orders", noMarketOrders: "No orders for this market.", chatTitle: "Live chat", allMarkets: "All markets", marketOrders: "Orders", marketChats: "Messages", payment: "Payment", available: "Available", unavailable: "Unavailable",
         inboxDone: "Done", inboxCompleted: "Account deleted", inboxEmailQueued: "Email queued", inboxEmailSent: "Email sent", inboxEmailFailed: "Email failed",
         emailQueued: "Email send queued", emailQueueFailed: "Could not queue email", emailServerNotConfigured: "Render SMTP settings are missing",
@@ -359,7 +359,7 @@
         updateStatus: "تحديث الحالة", delete: "حذف", saveUser: "حفظ المستخدم", updated: "تم التحديث",
         saved: "تم الحفظ", removed: "تم الحذف", id: "المعرف", role: "الدور", name: "الاسم", phone: "الهاتف", address: "العنوان", email: "البريد الإلكتروني",
         deleteRequestsTitle: "طلبات حذف الحساب", noDeleteRequests: "لا توجد طلبات حذف بعد.", requestedAt: "تاريخ الطلب", markRequestDone: "وضع علامة مكتمل",
-        inboxTitle: "صندوق الوارد", inboxHelp: "يتم حفظ رسائل طلبات الحذف هنا. يمكنك حذف الرسائل يدوياً.", noInboxMessages: "لا توجد رسائل بعد.", message: "الرسالة", deleteMessage: "حذف الرسالة",
+        inboxTitle: "صندوق الوارد", inboxHelp: "يتم حفظ رسائل طلبات الحذف هنا. يمكنك حذف الرسائل يدوياً.", noInboxMessages: "لا توجد رسائل بعد.", message: "الرسالة", deleteMessage: "حذف الرسالة", deleteReason: "سبب الحذف",
         marketsTitle: "نظرة عامة على الأسواق", marketsHelp: "تتبع الطلبات والمحادثات المباشرة من كل سوق.", marketFilterLabel: "تصفية السوق", marketOrdersTitle: "طلبات السوق", noMarketOrders: "لا توجد طلبات لهذا السوق.", chatTitle: "محادثة مباشرة", allMarkets: "كل الأسواق", marketOrders: "طلبات", marketChats: "رسائل", payment: "الدفع", available: "متوفر", unavailable: "غير متوفر",
         inboxDone: "مكتمل", inboxCompleted: "تم حذف الحساب", inboxEmailQueued: "تمت جدولة البريد", inboxEmailSent: "تم إرسال البريد", inboxEmailFailed: "فشل إرسال البريد",
         emailQueued: "تمت إضافة البريد الإلكتروني إلى قائمة الإرسال", emailQueueFailed: "تعذر إضافة البريد الإلكتروني إلى قائمة الإرسال", emailServerNotConfigured: "إعدادات SMTP على Render غير مكتملة",
@@ -745,6 +745,10 @@
       return `${t("payment")}: Cash`;
     }
 
+    function getDeleteRequestReason(request) {
+      return String(request?.reason || request?.message || "").trim();
+    }
+
     function getInboxStatus(request) {
       const status = String(request.status || "pending").toLowerCase();
       if (status === "done" || status === "done-pending-email") return "done";
@@ -757,7 +761,7 @@
 
     function isActiveDeleteRequest(request) {
       const status = getInboxStatus(request);
-      return (status === "pending" || status === "user-deleted") && String(request.message || "").trim().length > 0;
+      return (status === "pending" || status === "user-deleted") && getDeleteRequestReason(request).length > 0;
     }
 
     function isPendingDeleteRequest(request) {
@@ -822,7 +826,7 @@
               <div class="card-meta">${escapeHtml(request.name || "")}</div>
               <div class="card-meta">${escapeHtml(t("requestedAt"))}: ${escapeHtml(formatDate(request.requestedAt))}</div>
               <div class="card-meta"><span class="status-badge ${inboxStatusClass(status)}">${escapeHtml(inboxStatusLabel(status))}</span></div>
-              ${request.message ? `<div class="message-box"><strong>${escapeHtml(t("message"))}:</strong> ${escapeHtml(request.message)}</div>` : ""}
+              ${getDeleteRequestReason(request) ? `<div class="message-box"><strong>${escapeHtml(t("deleteReason"))}:</strong> ${escapeHtml(getDeleteRequestReason(request))}</div>` : ""}
             </div>
           </div>
           ${renderDeleteRequestActions(request.id, status, inboxEntryId)}
@@ -834,7 +838,7 @@
     function renderInbox(messages) {
       const root = document.getElementById("inboxList");
       if (!root) return;
-      const entries = messages.filter((entry) => String(entry.message || "").trim());
+      const entries = messages.filter((entry) => getDeleteRequestReason(entry).length > 0);
       if (!entries.length) {
         root.innerHTML = `<p class="empty-msg">${escapeHtml(t("noInboxMessages"))}</p>`;
         return;
@@ -874,7 +878,7 @@
             </div>
             <button class="btn-danger" type="button" data-admin-action="delete-inbox" data-inbox-id="${escapeHtml(entry.id)}">${escapeHtml(t("deleteMessage"))}</button>
           </div>
-          <div class="message-box">${escapeHtml(entry.message)}</div>
+          <div class="message-box"><strong>${escapeHtml(t("deleteReason"))}:</strong> ${escapeHtml(getDeleteRequestReason(entry))}</div>
         </div>
       `;
         }
@@ -907,7 +911,7 @@
             </div>
             <button class="btn-danger" type="button" data-admin-action="delete-inbox" data-inbox-id="${escapeHtml(inboxEntryId)}">${escapeHtml(t("deleteMessage"))}</button>
           </div>
-          <div class="message-box">${escapeHtml(entry.message)}</div>
+          <div class="message-box"><strong>${escapeHtml(t("deleteReason"))}:</strong> ${escapeHtml(getDeleteRequestReason(entry))}</div>
           ${actionsHtml}
         </div>
       `;
@@ -1424,7 +1428,7 @@
     const legacyInboxMigrated = new Set();
 
     async function ensureLegacyInboxEntry(request) {
-      const message = String(request.message || "").trim();
+      const message = getDeleteRequestReason(request);
       if (!message) return;
       const inboxRef = doc(db, "adminInbox", request.id);
       const inboxSnap = await getDoc(inboxRef);
@@ -1434,6 +1438,7 @@
         email: request.email || "",
         name: request.name || "",
         message,
+        reason: message,
         status: getInboxStatus(request),
         requestedAt: request.requestedAt || new Date().toISOString(),
         source: "legacy-delete-request",
@@ -1449,6 +1454,21 @@
       if (cachedRequest) return cachedRequest;
       const requestSnap = await getDoc(doc(db, "deleteRequests", userId));
       return requestSnap.exists() ? { id: requestSnap.id, ...requestSnap.data() } : null;
+    }
+
+    async function ensureMailServiceReady() {
+      await wakeMailService();
+      const response = await fetch(`${MAIL_API_BASE}/health`, { cache: "no-store" });
+      let data = {};
+      try {
+        data = await response.json();
+      } catch (error) {
+        data = {};
+      }
+      if (!response.ok || !data.mail) {
+        throw new Error(data.mailError || t("emailServerNotConfigured"));
+      }
+      return data;
     }
 
     async function deliverEmailViaServerOnce(userId, emailPayload, inboxEntryId) {
@@ -1480,14 +1500,20 @@
     }
 
     async function deliverEmailViaServer(userId, emailPayload, inboxEntryId) {
-      await wakeMailService();
-      try {
-        return await deliverEmailViaServerOnce(userId, emailPayload, inboxEntryId);
-      } catch (firstError) {
-        await new Promise((resolve) => setTimeout(resolve, 2500));
-        await wakeMailService();
-        return await deliverEmailViaServerOnce(userId, emailPayload, inboxEntryId);
+      let lastError = null;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          await ensureMailServiceReady();
+          return await deliverEmailViaServerOnce(userId, emailPayload, inboxEntryId);
+        } catch (error) {
+          lastError = error;
+          console.warn(`Email send attempt ${attempt} failed`, error);
+          if (attempt < 3) {
+            await new Promise((resolve) => setTimeout(resolve, 3000 * attempt));
+          }
+        }
       }
+      throw lastError || new Error(t("emailQueueFailed"));
     }
 
     async function wakeMailService() {
@@ -1603,7 +1629,8 @@ Pazar Fiyatı Admin`;
         const preserve = {
           userDeletedAt: now,
           status: "user-deleted",
-          message: request.message || "",
+          message: request.message || getDeleteRequestReason(request),
+          reason: getDeleteRequestReason(request),
           email: request.email || user.email || "",
           name: request.name || user.name || "",
           requestedAt: request.requestedAt || now,
@@ -1620,8 +1647,8 @@ Pazar Fiyatı Admin`;
       try {
         const user = await getUserForAdmin(userId);
         const request = await getDeleteRequestForUser(userId);
-        if (request && String(request.message || "").trim()) {
-          await wakeMailService();
+        if (request && getDeleteRequestReason(request)) {
+          await ensureMailServiceReady();
           await queueAccountDeletedEmail(userId, request);
         }
         await removeUserAccount(userId, user, request);
@@ -1640,7 +1667,7 @@ Pazar Fiyatı Admin`;
 
     window.markDeleteRequestDone = async function(userId, button, inboxEntryId) {
       const request = await getDeleteRequestForUser(userId);
-      if (!request || !String(request.message || "").trim()) {
+      if (!request || !getDeleteRequestReason(request)) {
         showToast(t("noDeleteRequests"), true);
         return;
       }
@@ -1653,7 +1680,7 @@ Pazar Fiyatı Admin`;
       }
 
       try {
-        await wakeMailService();
+        await ensureMailServiceReady();
         const sentAt = await queueAccountDeletedEmail(userId, request);
         if (isUserRegistered(userId)) {
           const user = await getUserForAdmin(userId);
@@ -1667,7 +1694,8 @@ Pazar Fiyatı Admin`;
           doneEmailQueuedAt: now,
           emailSentAt: sentAt || now,
           emailDeliveryError: "",
-          message: request.message || "",
+          message: request.message || getDeleteRequestReason(request),
+          reason: getDeleteRequestReason(request),
         };
         await syncAdminInboxEntry(entryId, { userId, ...doneUpdate }, null, request);
         await setDoc(doc(db, "deleteRequests", userId), {
