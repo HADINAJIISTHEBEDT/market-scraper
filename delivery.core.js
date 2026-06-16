@@ -12,6 +12,8 @@
   };
   const isOrderClosed = OL.isOrderClosed || function () { return false; };
   const isOrderCommunicationActive = OL.isOrderCommunicationActive || function () { return false; };
+  const isDeliveryChatActive = OL.isDeliveryChatActive || function () { return false; };
+  const archiveOrderConversation = OL.archiveOrderConversation || function () { return Promise.resolve(); };
   const getOrderCustomerLocation = OL.getOrderCustomerLocation || function () { return null; };
   const orderChatCollection = OL.orderChatCollection || function (db, id) {
     return db.collection("orderChats").doc(id).collection("messages");
@@ -418,7 +420,7 @@
   function bindDriverChatListener(order) {
     clearDriverChatListener();
     if (!order || !order.id) return;
-    if (!isOrderCommunicationActive(order) && !isOrderClosed(order.status)) return;
+    if (!isDeliveryChatActive(order) && !isOrderCommunicationActive(order) && !isOrderClosed(order.status)) return;
     chatUnsub = orderChatCollection(db, order.id)
       .orderBy("createdAt", "asc")
       .onSnapshot(function (snapshot) {
@@ -446,10 +448,11 @@
     }
 
     const commActive = isOrderCommunicationActive(order);
+    const chatActive = isDeliveryChatActive(order) || commActive;
     callRow.hidden = !commActive;
-    chatPanel.hidden = !commActive && !isOrderClosed(order.status);
-    chatPanel.classList.toggle("chat-disabled", !commActive);
-    if (chatCompose) chatCompose.style.display = commActive ? "" : "none";
+    chatPanel.hidden = !chatActive && !isOrderClosed(order.status);
+    chatPanel.classList.toggle("chat-disabled", !chatActive);
+    if (chatCompose) chatCompose.style.display = chatActive ? "" : "none";
 
     if (commActive) {
       callRow.innerHTML =
@@ -491,7 +494,7 @@
 
   function sendDriverChatMessage() {
     const order = currentOrders.find(function (entry) { return entry.id === activeOrderId; });
-    if (!order || !isOrderCommunicationActive(order)) return;
+    if (!order || (!isDeliveryChatActive(order) && !isOrderCommunicationActive(order))) return;
     const input = document.getElementById("driverChatInput");
     const text = String(input && input.value || "").trim();
     if (!text) return;
@@ -888,6 +891,8 @@
       feedbackRequested: true,
       closedAt: now,
       updatedAt: now,
+    }).then(function () {
+      return archiveOrderConversation(db, orderId, order, "order_closed");
     }).then(function () {
       return writeOrderInboxNotifications(db, {
         inboxType: "order_closed",

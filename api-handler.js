@@ -20,6 +20,7 @@ const {
   processPendingMail,
   sendAccountEmail,
 } = require("./mail-service");
+const { processExpiredUnpaidOrders } = require("./order-expiry-service");
 
 const MIME = {
   ".html": "text/html",
@@ -188,6 +189,18 @@ async function routeApiRequest(method, urlPath, body) {
         ok: false,
         error: err.message || "Email send failed",
         mail: getMailStatus(),
+      });
+    }
+  }
+
+  if (urlPath === "/process-expired-orders") {
+    try {
+      const result = await processExpiredUnpaidOrders(body || {});
+      return jsonResponse(200, result);
+    } catch (err) {
+      return jsonResponse(500, {
+        ok: false,
+        error: err.message || "Expired order processing failed",
       });
     }
   }

@@ -115,6 +115,7 @@
       '<div id="inAppCallControls" class="in-app-call-controls">' +
       '<button type="button" id="inAppFlipCamera" class="in-app-call-btn" hidden></button>' +
       '<button type="button" id="inAppSpeakerToggle" class="in-app-call-btn"></button>' +
+      '<button type="button" id="inAppEndCallBtn" class="in-app-end-call" data-in-app-call-close aria-label="End call"></button>' +
       "</div></div></div>";
 
     var incoming = document.createElement("div");
@@ -152,6 +153,8 @@
       ".in-app-voice-name{font-size:20px;font-weight:800;color:#f8fafc}" +
       ".in-app-call-controls{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:4px}" +
       ".in-app-call-btn{border:none;border-radius:999px;padding:10px 16px;font:inherit;font-weight:700;cursor:pointer;background:#334155;color:#f8fafc}" +
+      ".in-app-end-call{width:64px;height:64px;border:none;border-radius:999px;background:#dc2626;color:#fff;font-size:28px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 24px rgba(220,38,38,.35)}" +
+      ".in-app-end-call::before{content:'\\2716';font-weight:700}" +
       ".in-app-incoming-panel{position:relative;width:min(360px,100%);background:#fff;border-radius:16px;padding:24px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.35)}" +
       ".in-app-incoming-title{font-size:20px;font-weight:800;color:#0f172a;margin-bottom:8px}" +
       ".in-app-incoming-meta{font-size:14px;color:#64748b;margin-bottom:20px}" +
@@ -171,6 +174,11 @@
     document.getElementById("inAppIncomingDecline").addEventListener("click", declineIncoming);
     document.getElementById("inAppFlipCamera").addEventListener("click", flipCamera);
     document.getElementById("inAppSpeakerToggle").addEventListener("click", toggleSpeaker);
+    var endBtn = document.getElementById("inAppEndCallBtn");
+    if (endBtn) {
+      endBtn.title = callT("close");
+      endBtn.addEventListener("click", close);
+    }
   }
 
   function initialsFromName(name) {

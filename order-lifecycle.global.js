@@ -192,6 +192,40 @@
     return true;
   }
 
+  function isDeliveryChatActive(order) {
+    if (!order || isOrderClosed(order.status)) return false;
+    if (!hasAssignedDriver(order)) return false;
+    var status = normalizeOrderStatus(order.status);
+    return status === "preparing" || status === "on-the-way" || status === "arrived";
+  }
+
+  function archiveOrderConversation(db, orderId, order, reason) {
+    order = order || {};
+    reason = String(reason || "archived");
+    return orderChatCollection(db, orderId).orderBy("createdAt", "asc").get().then(function (snapshot) {
+      var messages = snapshot.docs.map(function (entry) {
+        return Object.assign({ id: entry.id }, entry.data());
+      });
+      if (!messages.length) return null;
+      var now = new Date().toISOString();
+      return db.collection("orderConversations").doc(String(orderId || "")).set({
+        orderId: String(orderId || ""),
+        orderNumber: order.orderNumber != null ? order.orderNumber : "",
+        userId: String(order.userId || ""),
+        userName: String(order.userName || ""),
+        userEmail: String(order.userEmail || ""),
+        marketId: String(order.marketId || ""),
+        marketName: String(order.marketName || ""),
+        driverName: String(order.driver && order.driver.name || ""),
+        messages: messages,
+        messageCount: messages.length,
+        archivedAt: now,
+        archiveReason: reason,
+        updatedAt: now,
+      }, { merge: true });
+    });
+  }
+
   function formatTelHref(phone) {
     var digits = normalizePhone(phone);
     if (!digits) return "";
@@ -303,6 +337,8 @@
     parseMapCoordinates: parseMapCoordinates,
     getOrderCustomerLocation: getOrderCustomerLocation,
     isCustomerChatActive: isCustomerChatActive,
+    isDeliveryChatActive: isDeliveryChatActive,
+    archiveOrderConversation: archiveOrderConversation,
     normalizeOrderStatus: normalizeOrderStatus,
     formatOrderNumber: formatOrderNumber,
     orderNumberDisplay: orderNumberDisplay,

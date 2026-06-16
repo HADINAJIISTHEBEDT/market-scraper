@@ -85,7 +85,10 @@
     .chat-msg.customer { background: #dbeafe; margin-right: auto; }
     .chat-msg.market { background: #dcfce7; margin-left: auto; }
     .chat-msg.driver { background: #fef3c7; margin-right: auto; }
+    .chat-msg.admin { background: #ede9fe; margin-left: auto; }
     .chat-msg-meta { font-size: 11px; color: #64748b; margin-bottom: 4px; }
+    .chat-compose { display: flex; gap: 8px; margin-top: 10px; align-items: center; }
+    .chat-compose .field-input { flex: 1; min-width: 0; }
     .market-stat { border-left: 4px solid #2563eb; }
   </style>
 </head>
@@ -292,7 +295,7 @@
         addTileTitle: "Kart ekle", tileLabel: "Etiket", tileImage: "Gorsel URL", addTile: "Kart ekle", saveHomepage: "Ana sayfayi kaydet",
         allOrders: "Tum siparisler", loading: "Yukleniyor...", noOrders: "Henuz siparis yok.", noUsers: "Henuz kullanici yok.", noTiles: "Henuz kart yok.",
         waiting: "Siparis inceleniyor", awaitingPayment: "Odeme bekleniyor", preparing: "Hazirlaniyor", onTheWay: "Yolda", arrived: "Teslim edildi", orderClosed: "Siparis kapatildi", orderNumber: "Siparis no", unknown: "Bilinmiyor",
-        driver: "Surucu", reassignDriver: "Surucu ata", chatHistory: "Sohbet gecmisi", savedDrivers: "Kayitli suruculer", addDriver: "Surucu ekle", driverName: "Surucu adi", driverPhone: "Surucu telefonu",
+        driver: "Surucu", reassignDriver: "Surucu ata", chatHistory: "Sohbet gecmisi", sendChat: "Mesaj gonder", chatPlaceholder: "Musteriye yanit yazin...", savedDrivers: "Kayitli suruculer", addDriver: "Surucu ekle", driverName: "Surucu adi", driverPhone: "Surucu telefonu",
         updateStatus: "Durumu guncelle", delete: "Sil", saveUser: "Kullaniciyi kaydet", updated: "Guncellendi",
         saved: "Kaydedildi", removed: "Silindi", id: "ID", role: "Rol", name: "Ad", phone: "Telefon", address: "Adres", email: "E-posta",
         deleteRequestsTitle: "Hesap silme istekleri", noDeleteRequests: "Henuz silme istegi yok.", requestedAt: "Istek tarihi", markRequestDone: "Tamamlandi olarak isaretle",
@@ -319,7 +322,7 @@
         addTileTitle: "Add tile", tileLabel: "Label", tileImage: "Image URL", addTile: "Add tile", saveHomepage: "Save homepage",
         allOrders: "All orders", loading: "Loading...", noOrders: "No orders yet.", noUsers: "No users yet.", noTiles: "No tiles yet.",
         waiting: "Waiting / reviewing", awaitingPayment: "Awaiting payment", preparing: "Preparing", onTheWay: "On the way", arrived: "Arrived", orderClosed: "Order closed", orderNumber: "Order no", unknown: "Unknown",
-        driver: "Driver", reassignDriver: "Assign driver", chatHistory: "Chat history", savedDrivers: "Saved drivers", addDriver: "Add driver", driverName: "Driver name", driverPhone: "Driver phone",
+        driver: "Driver", reassignDriver: "Assign driver", chatHistory: "Chat history", sendChat: "Send message", chatPlaceholder: "Reply to customer...", savedDrivers: "Saved drivers", addDriver: "Add driver", driverName: "Driver name", driverPhone: "Driver phone",
         updateStatus: "Update status", delete: "Delete", saveUser: "Save user", updated: "Updated",
         saved: "Saved", removed: "Removed", id: "ID", role: "Role", name: "Name", phone: "Phone", address: "Address", email: "Email",
         deleteRequestsTitle: "Account delete requests", noDeleteRequests: "No delete requests yet.", requestedAt: "Requested at", markRequestDone: "Mark request done",
@@ -346,7 +349,7 @@
         addTileTitle: "إضافة بطاقة", tileLabel: "التسمية", tileImage: "رابط الصورة", addTile: "إضافة بطاقة", saveHomepage: "حفظ الصفحة الرئيسية",
         allOrders: "كل الطلبات", loading: "جار التحميل...", noOrders: "لا توجد طلبات بعد.", noUsers: "لا يوجد مستخدمون بعد.", noTiles: "لا توجد بطاقات بعد.",
         waiting: "قيد المراجعة", awaitingPayment: "في انتظار الدفع", preparing: "قيد التحضير", onTheWay: "في الطريق", arrived: "تم التسليم", orderClosed: "تم إغلاق الطلب", orderNumber: "رقم الطلب", unknown: "غير معروف",
-        driver: "السائق", reassignDriver: "تعيين السائق", chatHistory: "سجل الدردشة", savedDrivers: "السائقون المحفوظون", addDriver: "إضافة سائق", driverName: "اسم السائق", driverPhone: "هاتف السائق",
+        driver: "السائق", reassignDriver: "تعيين السائق", chatHistory: "سجل الدردشة", sendChat: "إرسال رسالة", chatPlaceholder: "الرد على العميل...", savedDrivers: "السائقون المحفوظون", addDriver: "إضافة سائق", driverName: "اسم السائق", driverPhone: "هاتف السائق",
         updateStatus: "تحديث الحالة", delete: "حذف", saveUser: "حفظ المستخدم", updated: "تم التحديث",
         saved: "تم الحفظ", removed: "تم الحذف", id: "المعرف", role: "الدور", name: "الاسم", phone: "الهاتف", address: "العنوان", email: "البريد الإلكتروني",
         deleteRequestsTitle: "طلبات حذف الحساب", noDeleteRequests: "لا توجد طلبات حذف بعد.", requestedAt: "تاريخ الطلب", markRequestDone: "وضع علامة مكتمل",
@@ -928,6 +931,32 @@
       root.scrollTop = root.scrollHeight;
     }
 
+    function adminChatComposeHtml(orderId) {
+      return `
+        <div class="chat-compose">
+          <input class="field-input" id="admin-chat-input-${escapeHtml(orderId)}" placeholder="${escapeHtml(t("chatPlaceholder"))}" />
+          <button class="btn-primary" type="button" data-admin-action="send-chat" data-order-id="${escapeHtml(orderId)}">${escapeHtml(t("sendChat"))}</button>
+        </div>
+      `;
+    }
+
+    async function sendAdminChatMessage(orderId) {
+      const order = currentOrders.find((entry) => entry.id === orderId);
+      if (!order || isOrderClosed(order.status)) return;
+      const input = document.getElementById(`admin-chat-input-${orderId}`);
+      const text = String(input?.value || "").trim();
+      if (!text) return;
+      await addDoc(collection(db, "orderChats", orderId, "messages"), {
+        senderId: "admin",
+        senderRole: "admin",
+        senderName: "Admin",
+        text,
+        createdAt: new Date().toISOString(),
+      });
+      input.value = "";
+      showToast(t("updated"));
+    }
+
     function bindAdminMarketChat(orderId) {
       if (marketChatUnsubs.has(orderId)) return;
       const q = query(
@@ -1026,6 +1055,7 @@
             </div>
             <div>${itemsHtml}</div>
             <div class="chat-box" id="admin-chat-${escapeHtml(order.id)}"></div>
+            ${adminChatComposeHtml(order.id)}
           </div>
         `;
       }).join("");
@@ -1236,6 +1266,7 @@
             </div>`}
             <div class="card-meta" style="margin-top:10px;">${escapeHtml(t("chatHistory"))}</div>
             <div class="chat-box" id="admin-chat-${escapeHtml(order.id)}"></div>
+            ${closed ? "" : adminChatComposeHtml(order.id)}
           </div>
         `;
       }).join("");
@@ -1251,6 +1282,10 @@
     };
 
     window.deleteOrder = async function(orderId) {
+      const order = currentOrders.find((entry) => entry.id === orderId);
+      if (order && window.OrderLifecycle?.archiveOrderConversation) {
+        await window.OrderLifecycle.archiveOrderConversation(db, orderId, order, "admin_deleted");
+      }
       await deleteDoc(doc(db, "orders", orderId));
       showToast(t("removed"));
     };
@@ -1619,8 +1654,22 @@ Pazar Fiyatı Admin`;
           else if (action === "reassign-driver") await reassignOrderDriver(orderId);
           else if (action === "add-market-driver") await addAdminMarketDriver();
           else if (action === "delete-market-driver") await deleteAdminMarketDriver(button.dataset.driverId || "");
+          else if (action === "send-chat") await sendAdminChatMessage(orderId);
         } catch (error) {
           console.error("Admin action failed", action, error);
+          showToast(`${t("saveFailed")}: ${error.message}`, true);
+        }
+      });
+      root.addEventListener("keydown", async (event) => {
+        if (event.key !== "Enter") return;
+        const input = event.target.closest("[id^='admin-chat-input-']");
+        if (!input) return;
+        event.preventDefault();
+        const orderId = input.id.replace("admin-chat-input-", "");
+        try {
+          await sendAdminChatMessage(orderId);
+        } catch (error) {
+          console.error("Admin chat send failed", error);
           showToast(`${t("saveFailed")}: ${error.message}`, true);
         }
       });

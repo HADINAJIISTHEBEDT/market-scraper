@@ -10,22 +10,27 @@
   var outgoingOrderId = "";
   var pendingIncoming = null;
   var activeCall = null;
+  var useFrontCamera = true;
+  var speakerEnabled = true;
 
   var CALL_I18N = {
     tr: {
       voice: "Sesli arama", video: "Goruntulu arama", close: "Kapat",
       incoming: "Gelen arama", from: "Arayan", accept: "Kabul et", decline: "Reddet",
       calling: "Araniyor...", connected: "Baglandi", ended: "Arama bitti",
+      flipCamera: "Kamerayi cevir", speakerOn: "Hoparlor acik", speakerOff: "Hoparlor kapali",
     },
     en: {
       voice: "Voice call", video: "Video call", close: "Close",
       incoming: "Incoming call", from: "From", accept: "Accept", decline: "Decline",
       calling: "Calling...", connected: "Connected", ended: "Call ended",
+      flipCamera: "Flip camera", speakerOn: "Speaker on", speakerOff: "Speaker off",
     },
     ar: {
       voice: "مكالمة صوتية", video: "مكالمة فيديو", close: "إغلاق",
       incoming: "مكالمة واردة", from: "من", accept: "قبول", decline: "رفض",
       calling: "جاري الاتصال...", connected: "متصل", ended: "انتهت المكالمة",
+      flipCamera: "قلب الكamera", speakerOn: "مكبر الصوت", speakerOff: "كتم مكبر الصوت",
     },
   };
 
@@ -94,9 +99,24 @@
       "</div>" +
       '<div class="in-app-call-body">' +
       '<div id="inAppCallStatus" class="in-app-call-status"></div>' +
-      '<video id="inAppRemoteVideo" autoplay playsinline hidden></video>' +
+      '<div id="inAppCallVideoStage" class="in-app-video-stage" hidden>' +
+      '<video id="inAppRemoteVideo" autoplay playsinline></video>' +
+      '<video id="inAppLocalVideo" autoplay playsinline muted></video>' +
+      '<div class="in-app-call-avatars">' +
+      '<img id="inAppRemoteAvatar" class="in-app-call-avatar" alt="" hidden />' +
+      '<img id="inAppLocalAvatar" class="in-app-call-avatar local" alt="" hidden />' +
+      "</div></div>" +
+      '<div id="inAppCallVoiceStage" class="in-app-voice-stage" hidden>' +
+      '<img id="inAppVoiceAvatar" class="in-app-voice-avatar" alt="" hidden />' +
+      '<div id="inAppVoiceInitials" class="in-app-voice-initials"></div>' +
+      '<div id="inAppVoiceName" class="in-app-voice-name"></div>' +
+      "</div>" +
       '<audio id="inAppRemoteAudio" autoplay></audio>' +
-      "</div></div>";
+      '<div id="inAppCallControls" class="in-app-call-controls">' +
+      '<button type="button" id="inAppFlipCamera" class="in-app-call-btn" hidden></button>' +
+      '<button type="button" id="inAppSpeakerToggle" class="in-app-call-btn"></button>' +
+      '<button type="button" id="inAppEndCallBtn" class="in-app-end-call" data-in-app-call-close aria-label="End call"></button>' +
+      "</div></div></div>";
 
     var incoming = document.createElement("div");
     incoming.id = "inAppIncomingCall";
@@ -119,9 +139,22 @@
       ".in-app-call-panel{position:relative;width:min(420px,100%);background:#0f172a;border-radius:14px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.35)}" +
       ".in-app-call-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#1e293b;color:#f8fafc;font-weight:700}" +
       ".in-app-call-close{border:none;background:transparent;color:#f8fafc;font-size:28px;line-height:1;cursor:pointer;padding:0 4px}" +
-      ".in-app-call-body{padding:24px;text-align:center;color:#e2e8f0;min-height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px}" +
+      ".in-app-call-body{padding:24px;text-align:center;color:#e2e8f0;min-height:160px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px}" +
       ".in-app-call-status{font-size:16px;font-weight:700}" +
-      "#inAppRemoteVideo{width:100%;max-height:240px;background:#000;border-radius:10px}" +
+      ".in-app-video-stage{position:relative;width:100%;max-width:360px}" +
+      "#inAppRemoteVideo{width:100%;max-height:280px;background:#000;border-radius:12px;display:block}" +
+      "#inAppLocalVideo{position:absolute;right:10px;bottom:10px;width:92px;height:122px;object-fit:cover;border-radius:10px;border:2px solid #fff;background:#111;box-shadow:0 8px 24px rgba(0,0,0,.35)}" +
+      ".in-app-call-avatars{display:flex;justify-content:center;gap:12px;margin-top:10px;flex-wrap:wrap}" +
+      ".in-app-call-avatar{width:56px;height:56px;border-radius:999px;object-fit:cover;border:2px solid #94a3b8;background:#334155}" +
+      ".in-app-call-avatar.local{border-color:#38bdf8}" +
+      ".in-app-voice-stage{display:flex;flex-direction:column;align-items:center;gap:10px;padding:8px 0 4px}" +
+      ".in-app-voice-avatar{width:96px;height:96px;border-radius:999px;object-fit:cover;border:3px solid #38bdf8;background:#334155}" +
+      ".in-app-voice-initials{width:96px;height:96px;border-radius:999px;display:flex;align-items:center;justify-content:center;background:#334155;color:#f8fafc;font-size:32px;font-weight:800}" +
+      ".in-app-voice-name{font-size:20px;font-weight:800;color:#f8fafc}" +
+      ".in-app-call-controls{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:4px}" +
+      ".in-app-call-btn{border:none;border-radius:999px;padding:10px 16px;font:inherit;font-weight:700;cursor:pointer;background:#334155;color:#f8fafc}" +
+      ".in-app-end-call{width:64px;height:64px;border:none;border-radius:999px;background:#dc2626;color:#fff;font-size:28px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 24px rgba(220,38,38,.35)}" +
+      ".in-app-end-call::before{content:'\\2716';font-weight:700}" +
       ".in-app-incoming-panel{position:relative;width:min(360px,100%);background:#fff;border-radius:16px;padding:24px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.35)}" +
       ".in-app-incoming-title{font-size:20px;font-weight:800;color:#0f172a;margin-bottom:8px}" +
       ".in-app-incoming-meta{font-size:14px;color:#64748b;margin-bottom:20px}" +
@@ -139,6 +172,125 @@
     });
     document.getElementById("inAppIncomingAccept").addEventListener("click", acceptIncoming);
     document.getElementById("inAppIncomingDecline").addEventListener("click", declineIncoming);
+    document.getElementById("inAppFlipCamera").addEventListener("click", flipCamera);
+    document.getElementById("inAppSpeakerToggle").addEventListener("click", toggleSpeaker);
+    var endBtn = document.getElementById("inAppEndCallBtn");
+    if (endBtn) {
+      endBtn.title = callT("close");
+      endBtn.addEventListener("click", close);
+    }
+  }
+
+  function initialsFromName(name) {
+    var parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return "?";
+    return parts.slice(0, 2).map(function (part) { return part.charAt(0).toUpperCase(); }).join("");
+  }
+
+  function setAvatarImage(imgEl, photoUrl, fallbackName) {
+    if (!imgEl) return false;
+    if (photoUrl) {
+      imgEl.src = photoUrl;
+      imgEl.hidden = false;
+      imgEl.onerror = function () {
+        imgEl.hidden = true;
+      };
+      return true;
+    }
+    imgEl.hidden = true;
+    return false;
+  }
+
+  function resolveCallPeople(meta, role) {
+    meta = meta || {};
+    role = String(role || watchState.localRole || "customer");
+    var customerName = meta.customerName || meta.remoteName || "Customer";
+    var driverName = meta.driverName || "Driver";
+    var customerPhoto = meta.customerPhoto || "";
+    var driverPhoto = meta.driverPhoto || "";
+    if (role === "driver") {
+      return {
+        localName: driverName,
+        localPhoto: driverPhoto,
+        remoteName: customerName,
+        remotePhoto: customerPhoto,
+      };
+    }
+    return {
+      localName: customerName,
+      localPhoto: customerPhoto || localStorage.getItem("user_photo") || "",
+      remoteName: driverName,
+      remotePhoto: driverPhoto,
+    };
+  }
+
+  function updateCallLayout(mode, meta) {
+    var videoStage = document.getElementById("inAppCallVideoStage");
+    var voiceStage = document.getElementById("inAppCallVoiceStage");
+    var flipBtn = document.getElementById("inAppFlipCamera");
+    var speakerBtn = document.getElementById("inAppSpeakerToggle");
+    var people = resolveCallPeople(meta, watchState.localRole);
+    if (flipBtn) {
+      flipBtn.textContent = callT("flipCamera");
+      flipBtn.hidden = mode !== "video";
+    }
+    if (speakerBtn) speakerBtn.textContent = speakerEnabled ? callT("speakerOn") : callT("speakerOff");
+    if (mode === "video") {
+      if (videoStage) videoStage.hidden = false;
+      if (voiceStage) voiceStage.hidden = true;
+      setAvatarImage(document.getElementById("inAppRemoteAvatar"), people.remotePhoto, people.remoteName);
+      setAvatarImage(document.getElementById("inAppLocalAvatar"), people.localPhoto, people.localName);
+    } else {
+      if (videoStage) videoStage.hidden = true;
+      if (voiceStage) voiceStage.hidden = false;
+      var voiceAvatar = document.getElementById("inAppVoiceAvatar");
+      var voiceInitials = document.getElementById("inAppVoiceInitials");
+      var voiceName = document.getElementById("inAppVoiceName");
+      if (voiceName) voiceName.textContent = people.remoteName;
+      if (!setAvatarImage(voiceAvatar, people.remotePhoto, people.remoteName) && voiceInitials) {
+        voiceInitials.textContent = initialsFromName(people.remoteName);
+        voiceInitials.hidden = false;
+      } else if (voiceInitials) {
+        voiceInitials.hidden = true;
+      }
+    }
+  }
+
+  function bindLocalPreview(stream) {
+    var localVideo = document.getElementById("inAppLocalVideo");
+    if (localVideo && stream) {
+      localVideo.srcObject = stream;
+      localVideo.hidden = false;
+    }
+  }
+
+  async function flipCamera() {
+    if (!activeCall || activeCall.mode !== "video" || !activeCall.pc) return;
+    useFrontCamera = !useFrontCamera;
+    try {
+      var stream = await startLocalMedia("video", useFrontCamera ? "user" : "environment");
+      var newVideoTrack = stream.getVideoTracks()[0];
+      if (!newVideoTrack) return;
+      var sender = activeCall.pc.getSenders().find(function (entry) {
+        return entry.track && entry.track.kind === "video";
+      });
+      if (sender) await sender.replaceTrack(newVideoTrack);
+      if (activeCall.localStream) {
+        activeCall.localStream.getVideoTracks().forEach(function (track) { track.stop(); });
+      }
+      activeCall.localStream = stream;
+      bindLocalPreview(stream);
+    } catch (error) {
+      console.error("Camera flip failed", error);
+    }
+  }
+
+  function toggleSpeaker() {
+    speakerEnabled = !speakerEnabled;
+    var remoteAudio = document.getElementById("inAppRemoteAudio");
+    if (remoteAudio) remoteAudio.muted = !speakerEnabled;
+    var speakerBtn = document.getElementById("inAppSpeakerToggle");
+    if (speakerBtn) speakerBtn.textContent = speakerEnabled ? callT("speakerOn") : callT("speakerOff");
   }
 
   function setCallStatus(text) {
@@ -186,12 +338,18 @@
       activeCall.localStream.getTracks().forEach(function (track) { track.stop(); });
     }
     var remoteVideo = document.getElementById("inAppRemoteVideo");
+    var localVideo = document.getElementById("inAppLocalVideo");
     var remoteAudio = document.getElementById("inAppRemoteAudio");
-    if (remoteVideo) {
-      remoteVideo.srcObject = null;
-      remoteVideo.hidden = true;
+    if (remoteVideo) remoteVideo.srcObject = null;
+    if (localVideo) {
+      localVideo.srcObject = null;
+      localVideo.hidden = true;
     }
-    if (remoteAudio) remoteAudio.srcObject = null;
+    if (remoteAudio) {
+      remoteAudio.srcObject = null;
+      remoteAudio.muted = false;
+    }
+    speakerEnabled = true;
     activeCall = null;
   }
 
@@ -202,10 +360,13 @@
       remoteVideo.srcObject = stream;
       remoteVideo.hidden = false;
     }
-    if (remoteAudio) remoteAudio.srcObject = stream;
+    if (remoteAudio) {
+      remoteAudio.srcObject = stream;
+      remoteAudio.muted = !speakerEnabled;
+    }
   }
 
-  function createPeerConnection(orderId, mode) {
+  function createPeerConnection(orderId, mode, isCaller) {
     var pc = new RTCPeerConnection({
       iceServers: [{ urls: "stun:stun.l.google.com:19302" }, { urls: "stun:stun1.l.google.com:19302" }],
     });
@@ -255,14 +416,15 @@
     candidateUnsubs.delete(orderId);
   }
 
-  async function startLocalMedia(mode) {
+  async function startLocalMedia(mode, facingMode) {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       throw new Error("Microphone not available in this browser");
     }
-    return navigator.mediaDevices.getUserMedia({
-      audio: true,
-      video: mode === "video",
-    });
+    var constraints = { audio: true };
+    if (mode === "video") {
+      constraints.video = facingMode ? { facingMode: facingMode } : true;
+    }
+    return navigator.mediaDevices.getUserMedia(constraints);
   }
 
   async function saveCallHistory(orderId, meta) {
@@ -277,8 +439,10 @@
 
   async function beginCall(orderId, mode, isCaller, remoteMeta) {
     cleanupPeer();
-    var stream = await startLocalMedia(mode);
-    var pc = createPeerConnection(orderId, mode);
+    useFrontCamera = true;
+    speakerEnabled = true;
+    var stream = await startLocalMedia(mode, mode === "video" ? "user" : undefined);
+    var pc = createPeerConnection(orderId, mode, isCaller);
     stream.getTracks().forEach(function (track) {
       pc.addTrack(track, stream);
     });
@@ -292,6 +456,8 @@
     };
     watchCandidates(orderId, pc);
     showCallModal(mode === "video" ? callT("video") : callT("voice"));
+    updateCallLayout(mode, remoteMeta);
+    if (mode === "video") bindLocalPreview(stream);
     setCallStatus(isCaller ? callT("calling") : callT("connected"));
     return pc;
   }
@@ -303,14 +469,7 @@
     hideIncoming();
     pendingIncoming = null;
     try {
-      var meta = {
-        orderNumber: data.orderNumber || "",
-        marketId: data.marketId || "",
-        marketName: data.marketName || "",
-        driverName: data.driverName || "",
-        customerName: data.customerName || "",
-      };
-      var pc = await beginCall(orderId, data.mode || "voice", false, meta);
+      var pc = await beginCall(orderId, data.mode || "voice", false, data);
       var ref = callRef(orderId);
       if (!ref || !data.offer) return;
       await pc.setRemoteDescription(new RTCSessionDescription(data.offer));

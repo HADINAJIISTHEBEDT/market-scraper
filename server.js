@@ -7,6 +7,7 @@ const path = require("path");
 const { exec, spawn } = require("child_process");
 const { createNodeRequestListener } = require("./api-handler");
 const { initializeMailService } = require("./mail-service");
+const { processExpiredUnpaidOrders } = require("./order-expiry-service");
 
 let NGROK_URL = null;
 
@@ -164,9 +165,17 @@ function startServer(port) {
   });
 
   server.listen(port, "0.0.0.0", () => {
-    void initializeMailService().catch((err) => {
-      console.error("[Mail] Startup initialization failed:", err.message);
-    });
+    void initializeMailService()
+      .then(() => processExpiredUnpaidOrders())
+      .catch((err) => {
+        console.error("[Mail] Startup initialization failed:", err.message);
+      });
+
+    setInterval(() => {
+      void processExpiredUnpaidOrders().catch((err) => {
+        console.error("[OrderExpiry] Periodic check failed:", err.message);
+      });
+    }, 60 * 1000);
 
     const localUrl = `${HAS_SSL ? "https" : "http"}://localhost:${port}`;
 

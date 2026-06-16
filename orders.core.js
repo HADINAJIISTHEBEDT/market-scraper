@@ -43,6 +43,9 @@
   const paymentDeadlinePassed = OL.paymentDeadlinePassed || function () { return false; };
   const PAYMENT_TIMEOUT_MS = OL.PAYMENT_TIMEOUT_MS || 20 * 60 * 1000;
   const getOrderCustomerLocation = OL.getOrderCustomerLocation || function () { return null; };
+  const isDeliveryChatActive = OL.isDeliveryChatActive || function () { return false; };
+  const archiveOrderConversation = OL.archiveOrderConversation || function () { return Promise.resolve(); };
+  const MAIL_API_BASE = "https://market-scraper-0k36.onrender.com";
 
   const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(window.FIREBASE_CONFIG);
   const db = firebase.firestore();
@@ -72,6 +75,7 @@
       voiceCall: "Sesli ara",
       videoCall: "Goruntulu ara",
       chatTitle: "Admin destegi",
+      chatWithDelivery: "Teslimat sohbeti",
       chatPlaceholder: "Admin'e mesaj yazin...",
       chatDisabled: "Siparis kapandi — sohbet devre disi",
       chatWaiting: "Admin ile siparis hakkinda yazisabilirsiniz",
@@ -119,6 +123,7 @@
       voiceCall: "Voice call",
       videoCall: "Video call",
       chatTitle: "Admin support",
+      chatWithDelivery: "Delivery chat",
       chatPlaceholder: "Message admin...",
       chatDisabled: "Order closed — chat disabled",
       chatWaiting: "You can message admin about this order",
@@ -166,6 +171,7 @@
       voiceCall: "مكالمة صوتية",
       videoCall: "مكالمة فيديو",
       chatTitle: "دعم الإدارة",
+      chatWithDelivery: "محادثة التسليم",
       chatPlaceholder: "اكتب رسالة للإدارة...",
       chatDisabled: "تم إغلاق الطلب — الدردشة معطلة",
       chatWaiting: "يمكنك مراسلة الإدارة حول هذا الطلب",
@@ -337,6 +343,8 @@
   function chatPanelHtml(order) {
     const closed = isOrderClosed(order.status);
     const chatActive = isCustomerChatActive(order);
+    const deliveryChat = isDeliveryChatActive(order);
+    const title = deliveryChat ? t("chatWithDelivery") : t("chatTitle");
     if (closed) {
       return (
         '<div class="chat-panel chat-disabled">' +
@@ -352,7 +360,7 @@
     }
     return (
       '<div class="chat-panel">' +
-      '<div class="order-date" style="padding:10px 10px 0;">' + escapeHtml(t("chatTitle")) + "</div>" +
+      '<div class="order-date" style="padding:10px 10px 0;">' + escapeHtml(title) + "</div>" +
       '<div class="chat-messages" id="chat-messages-' + escapeHtml(order.id) + '"></div>' +
       '<div class="chat-compose">' +
       '<input class="chat-input" id="chat-input-' + escapeHtml(order.id) + '" placeholder="' +
@@ -589,11 +597,26 @@
       if (!isAwaitingPayment(order) || isOrderPaid(order) || !paymentDeadlinePassed(order)) return;
       const key = "payment_deleted_" + order.id;
       if (sessionStorage.getItem(key)) return;
-      db.collection("orders").doc(order.id).delete().then(function () {
-        sessionStorage.setItem(key, "1");
-        alert(t("orderDeletedNoPay"));
+      sessionStorage.setItem(key, "1");
+      fetch(MAIL_API_BASE + "/process-expired-orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: order.id }),
+      }).then(function (response) {
+        return response.json().catch(function () { return {}; }).then(function (data) {
+          if (!response.ok) throw new Error(data.error || "Cancel failed");
+          if (data.processed) alert(t("orderDeletedNoPay"));
+        });
       }).catch(function (error) {
-        console.error("Payment timeout delete failed", error);
+        console.error("Payment timeout cancel failed", error);
+        archiveOrderConversation(db, order.id, order, "payment_timeout").finally(function () {
+          return db.collection("orders").doc(order.id).delete();
+        }).then(function () {
+          alert(t("orderDeletedNoPay"));
+        }).catch(function (fallbackError) {
+          console.error("Payment timeout fallback delete failed", fallbackError);
+          sessionStorage.removeItem(key);
+        });
       });
     });
   }
