@@ -248,15 +248,28 @@ export async function initMarketPanel(marketId, options = {}) {
   function renderChatMessages(orderId, messages) {
     const root = document.getElementById(`chat-messages-${orderId}`);
     if (!root) return;
+    const order = currentOrders.find((entry) => entry.id === orderId);
+    const resolveName = window.OrderLifecycle?.resolveChatSenderDisplayName || function (msg) {
+      return msg.senderName || t("unknown");
+    };
+    const roleClass = window.OrderLifecycle?.chatRoleClass || function (role) {
+      return role === "market" ? "market" : role === "driver" ? "driver" : "customer";
+    };
     if (!messages.length) {
       root.innerHTML = `<div class="card-meta">${escapeHtml(t("chatTitle"))}</div>`;
       return;
     }
     root.innerHTML = messages.map((msg) => {
-      const role = msg.senderRole === "market" ? "market" : "customer";
+      const role = roleClass(msg.senderRole);
+      const senderLabel = resolveName(msg, order, {
+        getMarketLabel,
+        adminLabel: "Admin",
+        driverLabel: t("driver"),
+        unknownLabel: t("unknown"),
+      });
       return `
         <div class="chat-msg ${role}">
-          <div class="chat-msg-meta">${escapeHtml(msg.senderName || t("unknown"))} · ${escapeHtml(formatDate(msg.createdAt))}</div>
+          <div class="chat-msg-meta">${escapeHtml(senderLabel)} · ${escapeHtml(formatDate(msg.createdAt))}</div>
           <div>${escapeHtml(msg.text || "")}</div>
         </div>
       `;
@@ -413,7 +426,7 @@ export async function initMarketPanel(marketId, options = {}) {
     await addDoc(collection(db, "orderChats", orderId, "messages"), {
       senderId: localStorage.getItem("user_uid") || "market",
       senderRole: "market",
-      senderName: localStorage.getItem("user_name") || "Market",
+      senderName: getMarketLabel(currentMarketId),
       marketId: currentMarketId,
       text,
       createdAt: new Date().toISOString(),

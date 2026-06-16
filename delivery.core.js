@@ -7,12 +7,21 @@
   const orderNumberDisplay = OL.orderNumberDisplay || function () { return ""; };
   const orderMatchesMarket = OL.orderMatchesMarket || function () { return true; };
   const orderAssignedToDriver = OL.orderAssignedToDriver || function () { return true; };
+  const orderAssignedToDriverIdentity = OL.orderAssignedToDriverIdentity || function (order, identity) {
+    return orderAssignedToDriver(order, identity && identity.phone);
+  };
   const isOrderClosed = OL.isOrderClosed || function () { return false; };
   const isOrderCommunicationActive = OL.isOrderCommunicationActive || function () { return false; };
   const orderChatCollection = OL.orderChatCollection || function (db, id) {
     return db.collection("orderChats").doc(id).collection("messages");
   };
   const writeOrderInboxNotifications = OL.writeOrderInboxNotifications || function () { return Promise.resolve(); };
+  const resolveChatSenderDisplayName = OL.resolveChatSenderDisplayName || function (msg) {
+    return (msg && msg.senderName) || "Unknown";
+  };
+  const chatRoleClass = OL.chatRoleClass || function (role) {
+    return role === "driver" ? "driver" : role === "market" ? "market" : "customer";
+  };
   const groupItemsByCategory = OL.groupItemsByCategory || function (items) {
     return [{ category: "General", entries: (items || []).map(function (item, index) { return { item: item, index: index }; }) }];
   };
@@ -26,16 +35,21 @@
     new URLSearchParams(window.location.search).get("market") || ""
   );
   function driverPhoneKey() { return "driver_phone_" + (MARKET_ID || "default"); }
+  function driverNameKey() { return "driver_name_" + (MARKET_ID || "default"); }
   let driverPhone = localStorage.getItem(driverPhoneKey()) || "";
+  let driverName = localStorage.getItem(driverNameKey()) || "";
 
   const I18N = {
     tr: {
       pageTitle: "Surucu takibi",
       pageHelp: "Aktif teslimatlar icin canli GPS paylasin ve siparis durumunu guncelleyin.",
-      driverPhoneTitle: "Surucu telefonu",
-      driverPhoneHelp: "Size atanan siparisleri gormek icin telefon numaranizi girin.",
-      driverPhonePlaceholder: "Telefon numaraniz",
-      driverPhoneSave: "Devam et",
+      driverGateTitle: "Surucu girisi",
+      driverGateHelp: "Marketin atadigi adi girin. Telefon opsiyoneldir.",
+      driverNamePlaceholder: "Surucu adi (market panelindeki ile ayni)",
+      driverNameRequired: "Surucu adi gerekli.",
+      driverPhonePlaceholder: "Telefon (opsiyonel)",
+      driverLoginContinue: "Devam et",
+      noOrdersForDriver: "Bu ada atanmis aktif siparis yok. Market panelindeki surucu adi ile birebir ayni yazin.",
       marketOnly: "Bu surucu sayfasi sadece kendi marketiniz icindir.",
       wrongMarket: "Gecersiz market. Surucu sayfasini market panelinden acin.",
       ordersTitle: "Aktif teslimatlar",
@@ -88,15 +102,21 @@
     en: {
       pageTitle: "Driver tracking",
       pageHelp: "Share live GPS for active deliveries and update order status.",
-      driverPhoneTitle: "Driver phone",
-      driverPhoneHelp: "Enter your phone number to see orders assigned to you.",
-      driverPhonePlaceholder: "Your phone number",
+      driverGateTitle: "Driver login",
+      driverGateHelp: "Enter the name assigned to you in the market panel. Phone is optional.",
+      driverNamePlaceholder: "Driver name (same as in market panel)",
+      driverNameRequired: "Driver name is required.",
+      driverPhonePlaceholder: "Phone (optional)",
+      driverLoginContinue: "Continue",
+      driverPhoneTitle: "Driver login",
+      driverPhoneHelp: "Enter the name assigned to you in the market panel. Phone is optional.",
       driverPhoneSave: "Continue",
       marketOnly: "This driver page is only for your market.",
       wrongMarket: "Invalid market. Open the driver page from your market panel.",
       ordersTitle: "Active deliveries",
       noOrders: "No active orders.",
-      noOrdersForPhone: "No active orders for this phone. Enter the same number assigned in the market panel (e.g. 532... or 0532...).",
+      noOrdersForDriver: "No active orders for this name. Enter the exact name from the market panel.",
+      noOrdersForPhone: "No active orders for this name. Enter the exact name from the market panel.",
       selectOrder: "Select to track",
       activeOrder: "Active order",
       orderNumber: "Order no",
@@ -144,15 +164,21 @@
     ar: {
       pageTitle: "تتبع السائق",
       pageHelp: "شارك GPS المباشر للتسليمات النشطة وحدّث حالة الطلب.",
-      driverPhoneTitle: "هاتف السائق",
-      driverPhoneHelp: "أدخل رقم هاتفك لرؤية الطلبات المعينة لك.",
-      driverPhonePlaceholder: "رقم هاتفك",
+      driverGateTitle: "تسجيل دخول السائق",
+      driverGateHelp: "أدخل الاسم المعين لك في لوحة السوق. الهاتف اختياري.",
+      driverNamePlaceholder: "اسم السائق (نفس الاسم في لوحة السوق)",
+      driverNameRequired: "اسم السائق مطلوب.",
+      driverPhonePlaceholder: "الهاتف (اختياري)",
+      driverLoginContinue: "متابعة",
+      driverPhoneTitle: "تسجيل دخول السائق",
+      driverPhoneHelp: "أدخل الاسم المعين لك في لوحة السوق. الهاتف اختياري.",
       driverPhoneSave: "متابعة",
       marketOnly: "صفحة السائق هذه مخصصة لسوقك فقط.",
       wrongMarket: "سوق غير صالح. افتح صفحة السائق من لوحة السوق.",
       ordersTitle: "التسليمات النشطة",
       noOrders: "لا توجد طلبات نشطة.",
-      noOrdersForPhone: "لا توجد طلبات نشطة لهذا الرقم. أدخل نفس الرقم من لوحة السوق.",
+      noOrdersForDriver: "لا توجد طلبات نشطة لهذا الاسم. أدخل نفس الاسم من لوحة السوق.",
+      noOrdersForPhone: "لا توجد طلبات نشطة لهذا الاسم. أدخل نفس الاسم من لوحة السوق.",
       selectOrder: "اختر للتتبع",
       activeOrder: "الطلب النشط",
       orderNumber: "رقم الطلب",
@@ -287,13 +313,15 @@
     const marketLabel = document.getElementById("marketLabel");
     if (marketLabel) marketLabel.textContent = MARKET_ID ? getMarketLabel(MARKET_ID) : t("wrongMarket");
     const gateTitle = document.getElementById("driverGateTitle");
-    if (gateTitle) gateTitle.textContent = t("driverPhoneTitle");
+    if (gateTitle) gateTitle.textContent = t("driverGateTitle");
     const gateHelp = document.getElementById("driverGateHelp");
-    if (gateHelp) gateHelp.textContent = t("driverPhoneHelp");
+    if (gateHelp) gateHelp.textContent = t("driverGateHelp");
+    const nameInput = document.getElementById("driverNameInput");
+    if (nameInput) nameInput.placeholder = t("driverNamePlaceholder");
     const phoneInput = document.getElementById("driverPhoneInput");
     if (phoneInput) phoneInput.placeholder = t("driverPhonePlaceholder");
     const phoneSave = document.getElementById("driverPhoneSave");
-    if (phoneSave) phoneSave.textContent = t("driverPhoneSave");
+    if (phoneSave) phoneSave.textContent = t("driverLoginContinue") || t("driverPhoneSave");
     document.getElementById("ordersTitle").textContent = t("ordersTitle");
     document.getElementById("activeOrderTitle").textContent = t("activeOrder");
     document.getElementById("startTrackingBtn").textContent = t("startTracking");
@@ -317,14 +345,20 @@
     }
   }
 
-  function renderDriverChatMessages(messages) {
+  function renderDriverChatMessages(messages, order) {
     const root = document.getElementById("driverChatMessages");
     if (!root) return;
     root.innerHTML = messages.map(function (msg) {
-      const role = msg.senderRole === "driver" ? "driver" : "customer";
+      const role = chatRoleClass(msg.senderRole);
+      const senderLabel = resolveChatSenderDisplayName(msg, order, {
+        getMarketLabel: getMarketLabel,
+        adminLabel: "Admin",
+        driverLabel: t("driver"),
+        unknownLabel: t("unknown"),
+      });
       return (
         '<div class="chat-msg ' + role + '">' +
-        '<div class="chat-msg-meta">' + escapeHtml(msg.senderName || t("unknown")) + " · " +
+        '<div class="chat-msg-meta">' + escapeHtml(senderLabel) + " · " +
         escapeHtml(formatDate(msg.createdAt)) + "</div>" +
         "<div>" + escapeHtml(msg.text || "") + "</div></div>"
       );
@@ -341,7 +375,7 @@
       .onSnapshot(function (snapshot) {
         renderDriverChatMessages(snapshot.docs.map(function (entry) {
           return Object.assign({ id: entry.id }, entry.data());
-        }));
+        }), order);
       });
   }
 
@@ -458,10 +492,14 @@
     }).join("");
   }
 
+  function driverIdentity() {
+    return { name: driverName, phone: driverPhone };
+  }
+
   function orderVisibleToDriver(order) {
     if (!MARKET_ID || !orderMatchesMarket(order, MARKET_ID)) return false;
-    if (!driverPhone) return false;
-    return orderAssignedToDriver(order, driverPhone);
+    if (!driverName) return false;
+    return orderAssignedToDriverIdentity(order, driverIdentity());
   }
 
   function updateDriverGate() {
@@ -473,7 +511,7 @@
       showBootError(t("wrongMarket"));
       return;
     }
-    if (!driverPhone) {
+    if (!driverName) {
       if (gate) gate.hidden = false;
       if (app) app.hidden = true;
       return;
@@ -526,7 +564,7 @@
       return orderMatchesMarket(order, MARKET_ID);
     });
     const assignedOrders = marketOrders.filter(function (order) {
-      return orderAssignedToDriver(order, driverPhone);
+      return orderAssignedToDriverIdentity(order, driverIdentity());
     });
     const active = assignedOrders.filter(function (order) {
       return isActiveOrder(order);
@@ -539,7 +577,7 @@
     if (!active.length) {
       var emptyMsg = t("noOrders");
       if (marketOrders.length && !assignedOrders.length) {
-        emptyMsg = t("noOrdersForPhone");
+        emptyMsg = t("noOrdersForDriver");
       }
       root.innerHTML = '<p class="empty-msg">' + escapeHtml(emptyMsg) + "</p>";
       document.getElementById("activeOrderCard").hidden = true;
@@ -713,18 +751,39 @@
   });
 
   document.getElementById("driverPhoneSave").addEventListener("click", function () {
-    var input = document.getElementById("driverPhoneInput");
-    driverPhone = String(input && input.value || "").trim();
-    if (!driverPhone) return;
+    var nameInput = document.getElementById("driverNameInput");
+    var phoneInput = document.getElementById("driverPhoneInput");
+    driverName = String(nameInput && nameInput.value || "").trim();
+    if (!driverName) {
+      alert(t("driverNameRequired"));
+      return;
+    }
+    driverPhone = String(phoneInput && phoneInput.value || "").trim();
     var normalizePhone = OL.normalizePhone || function (v) { return String(v || "").replace(/\D/g, ""); };
-    driverPhone = normalizePhone(driverPhone) || driverPhone;
+    if (driverPhone) driverPhone = normalizePhone(driverPhone) || driverPhone;
+    localStorage.setItem(driverNameKey(), driverName);
     localStorage.setItem(driverPhoneKey(), driverPhone);
     updateDriverGate();
     renderOrders(allMarketOrders);
   });
 
+  document.getElementById("driverNameInput")?.addEventListener("keydown", function (event) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      document.getElementById("driverPhoneSave")?.click();
+    }
+  });
+  document.getElementById("driverPhoneInput")?.addEventListener("keydown", function (event) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      document.getElementById("driverPhoneSave")?.click();
+    }
+  });
+
   applyLanguage();
   updateDriverGate();
+  var savedNameInput = document.getElementById("driverNameInput");
+  if (savedNameInput && driverName) savedNameInput.value = driverName;
   var savedPhoneInput = document.getElementById("driverPhoneInput");
   if (savedPhoneInput && driverPhone) savedPhoneInput.value = driverPhone;
 
@@ -748,11 +807,6 @@
       }, function (fallbackError) {
         console.error("Orders fallback listener failed", fallbackError);
         showBootError(fallbackError.message || t("bootErrorOrders"));
-      });
-    });
-  }
-})();
-ssage || t("bootErrorOrders"));
       });
     });
   }

@@ -269,7 +269,7 @@
       throw new Error("Missing global config");
     }
 
-    const { ORDER_STATUSES, normalizeOrderStatus, orderNumberDisplay, isOrderClosed, normalizePhone, hasAssignedDriver, computeOrderTotal } = window.OrderLifecycle;
+    const { ORDER_STATUSES, normalizeOrderStatus, orderNumberDisplay, isOrderClosed, normalizePhone, hasAssignedDriver, computeOrderTotal, resolveChatSenderDisplayName, chatRoleClass } = window.OrderLifecycle;
     const { MARKETS, orderMatchesMarket, getMarketLabel } = window.MarketsConfig;
 
     const firebaseConfig = window.FIREBASE_CONFIG;
@@ -891,15 +891,22 @@
     function renderAdminChatMessages(orderId, messages) {
       const root = document.getElementById(`admin-chat-${orderId}`);
       if (!root) return;
+      const order = currentOrders.find((entry) => entry.id === orderId);
       if (!messages.length) {
         root.innerHTML = `<div class="card-meta">${escapeHtml(t("chatTitle"))}...</div>`;
         return;
       }
       root.innerHTML = messages.map((msg) => {
-        const role = msg.senderRole === "driver" ? "driver" : msg.senderRole === "market" ? "market" : "customer";
+        const role = chatRoleClass(msg.senderRole);
+        const senderLabel = resolveChatSenderDisplayName(msg, order, {
+          getMarketLabel,
+          adminLabel: "Admin",
+          driverLabel: t("driver"),
+          unknownLabel: t("unknown"),
+        });
         return `
           <div class="chat-msg ${role}">
-            <div class="chat-msg-meta">${escapeHtml(msg.senderName || t("unknown"))} · ${escapeHtml(formatDate(msg.createdAt))}</div>
+            <div class="chat-msg-meta">${escapeHtml(senderLabel)} · ${escapeHtml(formatDate(msg.createdAt))}</div>
             <div>${escapeHtml(msg.text || "")}</div>
           </div>
         `;

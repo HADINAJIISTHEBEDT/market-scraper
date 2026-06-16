@@ -29,6 +29,12 @@
   const hasAssignedDriver = OL.hasAssignedDriver;
   const orderChatCollection = OL.orderChatCollection;
   const writeOrderInboxNotifications = OL.writeOrderInboxNotifications;
+  const resolveChatSenderDisplayName = OL.resolveChatSenderDisplayName;
+  const chatRoleClass = OL.chatRoleClass || function (role) {
+    if (role === "driver") return "driver";
+    if (role === "market") return "market";
+    return "customer";
+  };
 
   const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(window.FIREBASE_CONFIG);
   const db = firebase.firestore();
@@ -264,9 +270,11 @@
     );
   }
 
-  function chatRoleClass(role) {
+  function chatRoleClassLocal(role) {
+    if (chatRoleClass) return chatRoleClass(role);
     if (role === "driver") return "driver";
     if (role === "market") return "market";
+    if (role === "admin") return "admin";
     return "customer";
   }
 
@@ -302,11 +310,20 @@
   function renderChatMessages(orderId, messages) {
     const root = document.getElementById("chat-messages-" + orderId);
     if (!root) return;
+    const order = currentOrders.find(function (entry) { return entry.id === orderId; });
     root.innerHTML = messages.map(function (msg) {
-      const role = chatRoleClass(msg.senderRole);
+      const role = chatRoleClassLocal(msg.senderRole);
+      const senderLabel = resolveChatSenderDisplayName
+        ? resolveChatSenderDisplayName(msg, order, {
+          getMarketLabel: getMarketLabel,
+          adminLabel: "Admin",
+          driverLabel: t("driver"),
+          unknownLabel: t("unknown"),
+        })
+        : (msg.senderName || t("unknown"));
       return (
         '<div class="chat-msg ' + role + '">' +
-        '<div class="chat-msg-meta">' + escapeHtml(msg.senderName || t("unknown")) + " · " +
+        '<div class="chat-msg-meta">' + escapeHtml(senderLabel) + " · " +
         escapeHtml(formatDate(msg.createdAt)) + "</div>" +
         "<div>" + escapeHtml(msg.text || "") + "</div></div>"
       );

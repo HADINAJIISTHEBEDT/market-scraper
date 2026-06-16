@@ -105,9 +105,31 @@
     return false;
   }
 
+  function normalizeDriverName(value) {
+    return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
+  }
+
+  function driverNamesMatch(a, b) {
+    var left = normalizeDriverName(a);
+    var right = normalizeDriverName(b);
+    if (!left || !right) return false;
+    return left === right;
+  }
+
   function orderAssignedToDriver(order, driverPhone) {
     if (!driverPhone) return false;
     return phonesMatch(order.driver && order.driver.phone, driverPhone);
+  }
+
+  function orderAssignedToDriverIdentity(order, identity) {
+    identity = identity || {};
+    var driver = order && order.driver;
+    if (!driver || !identity.name) return false;
+    if (!driverNamesMatch(driver.name, identity.name)) return false;
+    if (identity.phone && driver.phone) {
+      return phonesMatch(driver.phone, identity.phone);
+    }
+    return true;
   }
 
   function hasAssignedDriver(order) {
@@ -152,6 +174,33 @@
     }, 0);
   }
 
+  function chatRoleClass(role) {
+    var key = String(role || "").trim().toLowerCase();
+    if (key === "driver") return "driver";
+    if (key === "market") return "market";
+    if (key === "admin") return "admin";
+    return "customer";
+  }
+
+  function resolveChatSenderDisplayName(msg, order, options) {
+    options = options || {};
+    var getMarketLabel = options.getMarketLabel || function (key) {
+      var raw = String(key || "").trim();
+      return raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : "Unknown";
+    };
+    var role = String(msg && msg.senderRole || "").trim().toLowerCase();
+    if (role === "admin") {
+      return options.adminLabel || "Admin";
+    }
+    if (role === "market") {
+      return getMarketLabel(msg.marketId || (order && (order.marketId || order.marketName)) || "");
+    }
+    if (role === "driver") {
+      return (order && order.driver && order.driver.name) || (msg && msg.senderName) || options.driverLabel || "Driver";
+    }
+    return (msg && msg.senderName) || options.unknownLabel || "Unknown";
+  }
+
   function groupItemsByCategory(items) {
     var groups = [];
     var map = new Map();
@@ -178,7 +227,12 @@
     orderMatchesMarket: orderMatchesMarket,
     normalizePhone: normalizePhone,
     phonesMatch: phonesMatch,
+    normalizeDriverName: normalizeDriverName,
+    driverNamesMatch: driverNamesMatch,
     orderAssignedToDriver: orderAssignedToDriver,
+    orderAssignedToDriverIdentity: orderAssignedToDriverIdentity,
+    chatRoleClass: chatRoleClass,
+    resolveChatSenderDisplayName: resolveChatSenderDisplayName,
     groupItemsByCategory: groupItemsByCategory,
     isOrderClosed: isOrderClosed,
     hasAssignedDriver: hasAssignedDriver,
