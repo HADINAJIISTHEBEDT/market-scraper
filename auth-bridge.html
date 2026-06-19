@@ -17,17 +17,79 @@
       padding: 24px;
       text-align: center;
     }
+    .actions { margin-top: 16px; display: grid; gap: 10px; }
+    button, a.btn {
+      display: inline-block;
+      padding: 12px 18px;
+      border-radius: 10px;
+      border: none;
+      background: #1F3FA0;
+      color: #fff;
+      font: inherit;
+      font-weight: 700;
+      text-decoration: none;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
-  <p id="status">Opening Google sign-in...</p>
+  <div>
+    <p id="status">Opening Google sign-in...</p>
+    <div id="actions" class="actions" hidden></div>
+  </div>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getAuth, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import {
+      browserLocalPersistence,
+      getAuth,
+      getRedirectResult,
+      GoogleAuthProvider,
+      setPersistence,
+      signInWithPopup,
+      signInWithRedirect,
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
     import firebaseConfig from "./firebase-config.js";
 
     const AUTH_MESSAGE = "pazarquery-auth";
+    const APP_HOME = "https://market-scraper-0k36.onrender.com/index.html";
+    const APP_LOGIN = "https://market-scraper-0k36.onrender.com/login.html";
+    const APP_PACKAGE = "com.marketfiyati.app";
     const statusEl = document.getElementById("status");
+    const actionsEl = document.getElementById("actions");
+
+    function isEmbeddedAndroidApp() {
+      try {
+        if (window.AndroidApp && window.AndroidApp.isAndroidApp && window.AndroidApp.isAndroidApp()) {
+          return true;
+        }
+      } catch (error) {
+        console.warn("Android bridge unavailable", error);
+      }
+      return new URLSearchParams(window.location.search).get("from") === "app";
+    }
+
+    function isRecoverableRedirectError(error) {
+      const code = String(error?.code || "");
+      const message = String(error?.message || "");
+      return code === "auth/no-auth-event" ||
+        message.includes("missing initial state") ||
+        message.includes("sessionStorage is inaccessible");
+    }
+
+    function appIntentUrl(pageUrl) {
+      const withoutScheme = pageUrl.replace(/^https:\/\//, "");
+      return "intent://" + withoutScheme +
+        "#Intent;scheme=https;package=" + APP_PACKAGE +
+        ";S.browser_fallback_url=" + encodeURIComponent(pageUrl) + ";end";
+    }
+
+    function showOpenAppActions(pageUrl, label) {
+      actionsEl.hidden = false;
+      actionsEl.innerHTML =
+        '<a class="btn" href="' + appIntentUrl(pageUrl) + '">' + label + "</a>" +
+        '<button type="button" id="closeWindowBtn">Close this tab</button>';
+      document.getElementById("closeWindowBtn").addEventListener("click", () => window.close());
+    }
 
     function notify(payload) {
       if (window.opener && !window.opener.closed) {
@@ -35,43 +97,91 @@
       }
     }
 
-    function finish(message, isError) {
+    function finish(message, isError, pageAfterSuccess) {
       statusEl.textContent = message;
       if (isError) {
         notify({ error: message });
-        setTimeout(() => window.close(), 2500);
+        if (isEmbeddedAndroidApp()) {
+          window.location.replace("login.html");
+          return;
+        }
+        if (!window.opener) {
+          showOpenAppActions(APP_LOGIN, "Open Pazar Fiyati app");
+        } else {
+          setTimeout(() => window.close(), 2500);
+        }
         return;
       }
-      window.close();
+      if (isEmbeddedAndroidApp()) {
+        window.location.replace("login.html");
+        return;
+      }
+      if (window.opener && !window.opener.closed) {
+        window.close();
+        return;
+      }
+      showOpenAppActions(pageAfterSuccess || APP_HOME, "Open Pazar Fiyati app");
     }
 
-    if (!window.opener) {
-      finish("Open login from the app folder, then try again.", true);
-    } else {
-      const app = initializeApp(firebaseConfig);
-      const auth = getAuth(app);
-      const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: "select_account" });
-
-      signInWithPopup(auth, provider)
-        .then((result) => {
-          const user = result.user;
-          if (!user?.email) {
-            finish("No email returned from Google.", true);
-            return;
-          }
-          notify({
-            uid: user.uid,
-            email: user.email,
-            displayName: user.displayName || "",
-            photoURL: user.photoURL || "",
-          });
-          finish("Signed in. You can close this window.", false);
-        })
-        .catch((error) => {
-          console.error("Auth bridge failed", error);
-          finish(error.message || "Google sign-in failed.", true);
+    function finishSignedInUser(user) {
+      if (!user?.email) {
+        finish("No email returned from Google.", true);
+        return;
+      }
+      if (window.opener && !window.opener.closed) {
+        notify({
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName || "",
+          photoURL: user.photoURL || "",
         });
+      }
+      finish("Signed in. Returning to the app...", false, APP_HOME);
+    }
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
+
+    async function startAndroidRedirectSignIn() {
+      await setPersistence(auth, browserLocalPersistence);
+      try {
+        const result = await getRedirectResult(auth);
+        if (result?.user) {
+          finishSignedInUser(result.user);
+          return;
+        }
+      } catch (error) {
+        if (!isRecoverableRedirectError(error)) {
+          console.error("Auth bridge redirect result failed", error);
+          finish(error.message || "Google sign-in failed.", true);
+          return;
+        }
+        console.warn("Redirect result unavailable, starting fresh sign-in", error);
+      }
+      try {
+        await signInWithRedirect(auth, provider);
+      } catch (error) {
+        console.error("Auth bridge redirect failed", error);
+        finish(error.message || "Google sign-in failed.", true);
+      }
+    }
+
+    async function startPopupSignIn() {
+      try {
+        const result = await signInWithPopup(auth, provider);
+        finishSignedInUser(result.user);
+      } catch (error) {
+        console.error("Auth bridge popup failed", error);
+        finish(error.message || "Google sign-in failed.", true);
+      }
+    }
+
+    if (isEmbeddedAndroidApp()) {
+      startAndroidRedirectSignIn();
+    } else {
+      startPopupSignIn();
     }
   </script>
 </body>

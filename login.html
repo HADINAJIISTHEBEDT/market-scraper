@@ -406,7 +406,7 @@
   </main>
 
   <footer class="footer">
-    <a href="index.html" id="backLink">&larr; Aramaya don</a>
+    <a href="index.html" id="backLink" data-app-nav="index.html">&larr; Aramaya don</a>
     <div class="footer-links">
       <a href="privacy-policy.html" id="privacyLink">Privacy Policy</a>
       <a href="delete-account.html" id="deleteAccountLink" class="locked-feature-link">Delete Account</a>
@@ -558,6 +558,18 @@
       return (I18N[currentLang] && I18N[currentLang][key]) || I18N.tr[key] || key;
     }
 
+    function navigateToAppPage(path) {
+      if (window.FeatureAccess?.navigateToAppPage) {
+        window.FeatureAccess.navigateToAppPage(path || "index.html");
+        return;
+      }
+      window.location.href = path || "index.html";
+    }
+
+    function isAndroidApp() {
+      return window.FeatureAccess?.isAndroidApp?.() || false;
+    }
+
     function normalizeGmail(email) {
       const value = String(email || "").trim().toLowerCase();
       const [local, domain] = value.split("@");
@@ -699,6 +711,14 @@
       document.title = t("topLabel");
     }
 
+    function isRecoverableRedirectError(error) {
+      const code = String(error?.code || "");
+      const message = String(error?.message || "");
+      return code === "auth/no-auth-event" ||
+        message.includes("missing initial state") ||
+        message.includes("sessionStorage is inaccessible");
+    }
+
     function getFriendlyError(error) {
       const code = String(error?.code || "");
       if (code === "auth/unauthorized-domain") return t("errorUnauthorizedDomain");
@@ -706,7 +726,8 @@
       if (code === "auth/operation-not-allowed") return t("errorOperationNotAllowed");
       if (code === "auth/network-request-failed") return t("errorNetwork");
       if (code === "auth/cancelled-popup-request") return t("errorCancelled");
-      return `${t("errorGeneric")} (${code || "unknown"})`;
+      if (isRecoverableRedirectError(error)) return t("errorCancelled");
+      return `${t("errorGeneric")} (${code || error?.message || "unknown"})`;
     }
 
     function storeUserLocally(user, profile = {}) {
@@ -735,6 +756,8 @@
         name: existing.name || user.displayName || user.email || "User",
         email: user.email || existing.email || "",
         photoURL: user.photoURL || existing.photoURL || "",
+        phone: existing.phone || localStorage.getItem("user_phone") || "",
+        address: existing.address || localStorage.getItem("user_address") || "",
         role: isOwnerEmail(user.email || existing.email) ? "admin" : (existing.role || "user"),
         lastDeviceId: deviceId,
         lastSessionId: sessionId,
@@ -834,6 +857,10 @@
       } catch (error) {
         console.error("Owner role save failed", error);
       }
+      if (isAndroidApp()) {
+        navigateToAppPage("admin.html");
+        return;
+      }
       window.location.href = "admin.html";
     }
 
@@ -849,6 +876,18 @@
           setRawStatus(error.message || getFriendlyError(error), true);
         }
         return;
+      }
+
+      if (isAndroidApp()) {
+        try {
+          await setPersistence(auth, browserLocalPersistence);
+          navigateToAppPage("auth-bridge.html?from=app");
+          return;
+        } catch (error) {
+          console.error("Google sign-in failed", error);
+          setRawStatus(getFriendlyError(error), true);
+          return;
+        }
       }
 
       try {
@@ -875,17 +914,22 @@
     async function handleExistingSession() {
       if (isFilePage) return;
       await setPersistence(auth, browserLocalPersistence);
-      try {
-        const result = await getRedirectResult(auth);
-        if (result?.user) {
-          sessionStorage.setItem("login_auth_handled", result.user.uid);
-          await routeSignedInUser(result.user);
-          return;
+      if (!isAndroidApp()) {
+        try {
+          const result = await getRedirectResult(auth);
+          if (result?.user) {
+            sessionStorage.setItem("login_auth_handled", result.user.uid);
+            await routeSignedInUser(result.user);
+            return;
+          }
+        } catch (error) {
+          if (!isRecoverableRedirectError(error)) {
+            console.error("Google redirect sign-in failed", error);
+            setRawStatus(getFriendlyError(error), true);
+            return;
+          }
+          console.warn("Redirect result unavailable, checking existing session", error);
         }
-      } catch (error) {
-        console.error("Google redirect sign-in failed", error);
-        setRawStatus(getFriendlyError(error), true);
-        return;
       }
 
       onAuthStateChanged(auth, async (user) => {
@@ -909,7 +953,7 @@
     document.getElementById("googleSignInBtn").addEventListener("click", continueWithGoogle);
     document.getElementById("goHomeBtn").addEventListener("click", () => {
       sessionStorage.setItem("profile_prompt", "1");
-      window.location.href = "index.html";
+      navigateToAppPage("index.html");
     });
     document.getElementById("ownerPasswordBtn").addEventListener("click", unlockOwnerPage);
     document.getElementById("ownerPasswordInput").addEventListener("keydown", (event) => {

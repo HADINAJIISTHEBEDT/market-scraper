@@ -24,6 +24,7 @@
     <h1 id="title">Delete Your Account</h1>
     <p id="intro">Press the button below to send a deletion request for the Gmail account saved in your profile.</p>
     <p><strong id="emailLabel">Gmail:</strong> <span id="requestEmail"></span></p>
+    <p><strong id="addressLabel">Address:</strong> <span id="requestAddress"></span></p>
     <p id="promiseText">We will send your request to the admin. Your data will be deleted within a maximum of 7 days, and we will send you an email as soon as possible.</p>
     <label>
       <span id="messageLabel">Please tell us the reason</span>
@@ -40,7 +41,7 @@
   <script src="app-settings.js"></script>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { initializeFirestore, doc, setDoc, addDoc, collection } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { initializeFirestore, doc, setDoc, addDoc, collection, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
     import firebaseConfig from "./firebase-config.js";
 
     await window.AppSettings.ready();
@@ -51,6 +52,8 @@
           title: "Hesabini sil",
           intro: "Profilinde kayitli Gmail hesabi icin silme istegi gondermek uzere asagidaki dugmeye bas.",
           emailLabel: "Gmail:",
+          addressLabel: "Adres:",
+          noAddress: "Profilde kayitli adres yok",
           promiseText: "Silme istegini admine gonderecegiz. Verilerin en fazla 7 gun icinde silinecek ve islem tamamlaninca sana e-posta gonderecegiz.",
           messageLabel: "Lutfen silme nedeninizi yazin",
           messagePlaceholder: "Hesabinizi neden silmek istediginizi kisa bir sekilde aciklayin",
@@ -67,6 +70,8 @@
           title: "Delete your account",
           intro: "Press the button below to send a deletion request for the Gmail account saved in your profile.",
           emailLabel: "Gmail:",
+          addressLabel: "Address:",
+          noAddress: "No address saved in profile",
           promiseText: "We will send your request to the admin. Your data will be deleted within a maximum of 7 days, and we will email you when it is completed.",
           messageLabel: "Please tell us the reason",
           messagePlaceholder: "Please tell us why you want to delete your account",
@@ -83,6 +88,8 @@
           title: "حذف حسابك",
           intro: "اضغط الزر أدناه لإرسال طلب حذف لحساب Gmail المحفوظ في ملفك.",
           emailLabel: "Gmail:",
+          addressLabel: "العنوان:",
+          noAddress: "لا يوجد عنوان محفوظ في الملف",
           promiseText: "سنرسل طلبك إلى المسؤول. سيتم حذف بياناتك خلال مدة أقصاها 7 أيام، وسنرسل لك بريداً إلكترونياً عند اكتمال العملية.",
           messageLabel: "يرجى إخبارنا بالسبب",
           messagePlaceholder: "يرجى إخبارنا لماذا تريد حذف حسابك",
@@ -124,12 +131,32 @@
         document.getElementById("title").textContent = t("title");
         document.getElementById("intro").textContent = t("intro");
         document.getElementById("emailLabel").textContent = t("emailLabel");
+        document.getElementById("addressLabel").textContent = t("addressLabel");
         document.getElementById("promiseText").textContent = t("promiseText");
         document.getElementById("messageLabel").textContent = t("messageLabel");
         document.getElementById("requestMessage").placeholder = t("messagePlaceholder");
         document.getElementById("requestDeleteBtn").textContent = t("requestDeleteBtn");
         document.getElementById("backLink").textContent = t("backLink");
         document.title = t("title");
+      }
+
+      async function resolveUserAddress() {
+        const fromStorage = String(localStorage.getItem("user_address") || "").trim();
+        if (fromStorage) return fromStorage;
+        if (!userUid) return "";
+        try {
+          const snap = await getDoc(doc(db, "users", userUid));
+          if (snap.exists()) {
+            const address = String(snap.data().address || "").trim();
+            if (address) {
+              localStorage.setItem("user_address", address);
+              return address;
+            }
+          }
+        } catch (error) {
+          console.warn("Could not load profile address", error);
+        }
+        return "";
       }
 
       async function sendDeleteRequest() {
@@ -153,10 +180,14 @@
         try {
           const requestedAt = new Date().toISOString();
           const userLang = localStorage.getItem("app_lang") || "tr";
+          const address = await resolveUserAddress();
+          const phone = String(localStorage.getItem("user_phone") || "").trim();
           const inboxRef = await addDoc(collection(db, "adminInbox"), {
             userId: userUid,
             email: userEmail,
             name: userName || "",
+            address,
+            phone,
             message,
             reason: message,
             status: "pending",
@@ -168,6 +199,8 @@
             userId: userUid,
             email: userEmail,
             name: userName || "",
+            address,
+            phone,
             message,
             reason: message,
             status: "pending",
@@ -183,6 +216,9 @@
 
       applyLanguage();
       document.getElementById("requestEmail").textContent = userEmail || t("missingLogin");
+      resolveUserAddress().then((address) => {
+        document.getElementById("requestAddress").textContent = address || t("noAddress");
+      });
       document.getElementById("requestDeleteBtn").addEventListener("click", sendDeleteRequest);
     }
   </script>

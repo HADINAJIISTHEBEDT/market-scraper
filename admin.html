@@ -210,6 +210,9 @@
     <section class="panel-section" id="panel-users">
       <h2 id="usersTitle">Signed-in users</h2>
       <p id="usersLoading" class="empty-msg">Loading users...</p>
+      <div class="actions-row" style="margin-bottom:14px;">
+        <button class="btn-danger" type="button" data-admin-action="delete-all-users" id="deleteAllUsersBtn">Delete all users</button>
+      </div>
       <h3 id="deleteRequestsTitle">Delete requests</h3>
       <div id="deleteRequestsList"></div>
       <div id="usersList"></div>
@@ -304,6 +307,10 @@
         inboxDone: "Tamamlandi", inboxCompleted: "Hesap silindi", inboxEmailQueued: "E-posta siraya alindi", inboxEmailSent: "E-posta gonderildi", inboxEmailFailed: "E-posta gonderilemedi",
         emailQueued: "E-posta gonderim siraya alindi", emailQueueFailed: "E-posta siraya alinamadi", emailServerNotConfigured: "Render SMTP ayarlari eksik",
         deleteUserFirst: "Once kullaniciyi silin, sonra tamamlandi olarak isaretleyin.",
+        removeRequest: "Istegi kaldir",
+        deleteAllUsers: "Tum kullanicilari sil",
+        deleteAllUsersConfirm: "{count} kullanicinin profili kalici olarak silinecek. E-posta gonderilmez. Devam edilsin mi?",
+        deleteAllUsersDone: "{count} kullanici silindi.",
         inboxUserDeleted: "Kullanici silindi",
         sendingEmail: "Gmail gonderiliyor...",
         block: "Engelle", unblock: "Engeli kaldir", blocked: "Engellendi",
@@ -334,6 +341,10 @@
         inboxDone: "Done", inboxCompleted: "Account deleted", inboxEmailQueued: "Email queued", inboxEmailSent: "Email sent", inboxEmailFailed: "Email failed",
         emailQueued: "Email send queued", emailQueueFailed: "Could not queue email", emailServerNotConfigured: "Render SMTP settings are missing",
         deleteUserFirst: "Delete the user first, then mark the request done.",
+        removeRequest: "Remove request",
+        deleteAllUsers: "Delete all users",
+        deleteAllUsersConfirm: "This will permanently delete {count} user profile(s). No emails will be sent. Continue?",
+        deleteAllUsersDone: "Deleted {count} user(s).",
         inboxUserDeleted: "User deleted",
         sendingEmail: "Sending Gmail...",
         block: "Block", unblock: "Unblock", blocked: "Blocked",
@@ -364,6 +375,10 @@
         inboxDone: "مكتمل", inboxCompleted: "تم حذف الحساب", inboxEmailQueued: "تمت جدولة البريد", inboxEmailSent: "تم إرسال البريد", inboxEmailFailed: "فشل إرسال البريد",
         emailQueued: "تمت إضافة البريد الإلكتروني إلى قائمة الإرسال", emailQueueFailed: "تعذر إضافة البريد الإلكتروني إلى قائمة الإرسال", emailServerNotConfigured: "إعدادات SMTP على Render غير مكتملة",
         deleteUserFirst: "احذف المستخدم أولاً، ثم ضع علامة مكتمل على الطلب.",
+        removeRequest: "إزالة الطلب",
+        deleteAllUsers: "حذف جميع المستخدمين",
+        deleteAllUsersConfirm: "سيتم حذف {count} ملف مستخدم نهائياً. لن يتم إرسال رسائل بريد. هل تريد المتابعة؟",
+        deleteAllUsersDone: "تم حذف {count} مستخدم.",
         inboxUserDeleted: "تم حذف المستخدم",
         sendingEmail: "جار إرسال Gmail...",
         block: "حظر", unblock: "إلغاء الحظر", blocked: "محظور",
@@ -434,6 +449,12 @@
       setTimeout(() => { toast.style.display = "none"; }, 2200);
     }
 
+    function getUserAddress(user, request) {
+      user = user || {};
+      request = request || {};
+      return String(user.address || request.address || "").trim();
+    }
+
     function setSaveStatus(message, isError = false) {
       const status = document.getElementById("settingsSaveStatus");
       if (!status) return;
@@ -441,13 +462,40 @@
       status.style.color = isError ? "#b91c1c" : "#166534";
     }
 
-    function withTimeout(promise, ms) {
+    function withTimeout(promise, ms, message) {
+      const timeoutMessage = message || "Firebase save timed out. Check your internet connection or Firebase permissions.";
       return Promise.race([
         promise,
         new Promise((_, reject) => {
-          setTimeout(() => reject(new Error("Firebase save timed out. Check your internet connection or Firebase permissions.")), ms);
+          setTimeout(() => reject(new Error(timeoutMessage)), ms);
         }),
       ]);
+    }
+
+    async function retryAsync(fn, attempts = 3, delayMs = 1500) {
+      let lastError = null;
+      for (let attempt = 1; attempt <= attempts; attempt++) {
+        try {
+          return await fn();
+        } catch (error) {
+          lastError = error;
+          console.warn(`Retry ${attempt}/${attempts} failed`, error);
+          if (attempt < attempts) {
+            await new Promise((resolve) => setTimeout(resolve, delayMs * attempt));
+          }
+        }
+      }
+      throw lastError || new Error("Operation failed after retries.");
+    }
+
+    async function safeFirestoreWrite(label, fn) {
+      try {
+        await retryAsync(fn, 3, 1500);
+        return true;
+      } catch (error) {
+        console.warn(`${label} failed after retries`, error);
+        return false;
+      }
     }
 
     function toFirestoreValue(value) {
@@ -538,6 +586,7 @@
         adminTitle: "adminTitle", backLink: "backLink", deniedTitle: "deniedTitle", deniedMessage: "deniedMessage",
         deniedBack: "deniedBack", statTotalLabel: "totalOrders", statPendingLabel: "pending", statUsersLabel: "users",
         statTilesLabel: "tiles", tabSettings: "tabSettings", tabHomepage: "tabHomepage", tabOrders: "tabOrders", tabUsers: "tabUsers", tabMarkets: "tabMarkets", tabInbox: "tabInbox",
+        deleteAllUsersBtn: "deleteAllUsers",
         settingsTitle: "settingsTitle", settingsHelp: "settingsHelp", featuresAccessLabel: "featuresAccessLabel",
         featuresLockOption: "featuresLockOption", featuresUnlockOption: "featuresUnlockOption",
         announcementLabel: "announcementLabel", appPauseModeLabel: "appPauseModeLabel", appRunOption: "appRunOption", appPauseOption: "appPauseOption", commandMessageLabel: "commandMessageLabel",
@@ -794,13 +843,15 @@
       renderInbox(currentInboxMessages);
     }
 
-    function renderDeleteRequestActions(userId, status, inboxEntryId) {
-      const canDelete = isUserRegistered(userId);
-      const canMarkDone = status === "pending" || status === "user-deleted";
-      const inboxId = inboxEntryId || getInboxEntryIdForRequest({ id: userId });
+    function renderDeleteRequestActions(userId, status, inboxEntryId, request) {
+      const registered = isUserRegistered(userId);
+      const canMarkDone = (status === "pending" || status === "user-deleted") && status !== "done";
+      const inboxId = inboxEntryId || getInboxEntryIdForRequest(request || { id: userId });
+      const deleteAction = registered ? "delete-user" : "dismiss-delete-request";
+      const deleteLabel = registered ? t("delete") : t("removeRequest");
       return `
         <div class="actions-row">
-          <button class="btn-danger" type="button" data-admin-action="delete-user" data-user-id="${escapeHtml(userId)}" data-inbox-id="${escapeHtml(inboxId)}" ${canDelete ? "" : "disabled"}>${escapeHtml(t("delete"))}</button>
+          <button class="btn-danger" type="button" data-admin-action="${deleteAction}" data-user-id="${escapeHtml(userId)}" data-inbox-id="${escapeHtml(inboxId)}">${escapeHtml(deleteLabel)}</button>
           <button class="btn-secondary" type="button" data-admin-action="mark-done" data-user-id="${escapeHtml(userId)}" data-inbox-id="${escapeHtml(inboxId)}" ${canMarkDone ? "" : "disabled"}>${escapeHtml(t("markRequestDone"))}</button>
         </div>
       `;
@@ -826,10 +877,11 @@
               <div class="card-meta">${escapeHtml(request.name || "")}</div>
               <div class="card-meta">${escapeHtml(t("requestedAt"))}: ${escapeHtml(formatDate(request.requestedAt))}</div>
               <div class="card-meta"><span class="status-badge ${inboxStatusClass(status)}">${escapeHtml(inboxStatusLabel(status))}</span></div>
+              ${getUserAddress(null, request) ? `<div class="card-meta"><strong>${escapeHtml(t("address"))}:</strong> ${escapeHtml(getUserAddress(null, request))}</div>` : ""}
               ${getDeleteRequestReason(request) ? `<div class="message-box"><strong>${escapeHtml(t("deleteReason"))}:</strong> ${escapeHtml(getDeleteRequestReason(request))}</div>` : ""}
             </div>
           </div>
-          ${renderDeleteRequestActions(request.id, status, inboxEntryId)}
+          ${renderDeleteRequestActions(request.id, status, inboxEntryId, request)}
         </div>
       `;
       }).join("");
@@ -888,7 +940,7 @@
         const userId = entry.userId || entry.id;
         const inboxEntryId = entry.id;
         const actionsHtml = (status === "pending" || status === "user-deleted")
-          ? renderDeleteRequestActions(userId, status, inboxEntryId)
+          ? renderDeleteRequestActions(userId, status, inboxEntryId, entry)
           : "";
         const emailBadge = emailState === "sent"
           ? `<span class="status-badge status-done">${escapeHtml(t("inboxEmailSent"))}</span>`
@@ -908,6 +960,7 @@
                 <span class="status-badge ${inboxStatusClass(status)}">${escapeHtml(inboxStatusLabel(status))}</span>
                 ${emailBadge}
               </div>
+              ${getUserAddress(null, entry) ? `<div class="card-meta"><strong>${escapeHtml(t("address"))}:</strong> ${escapeHtml(getUserAddress(null, entry))}</div>` : ""}
             </div>
             <button class="btn-danger" type="button" data-admin-action="delete-inbox" data-inbox-id="${escapeHtml(inboxEntryId)}">${escapeHtml(t("deleteMessage"))}</button>
           </div>
@@ -1354,7 +1407,12 @@
       const cachedUser = currentUsers.find((entry) => entry.id === userId);
       if (cachedUser) return cachedUser;
       const userSnap = await getDoc(doc(db, "users", userId));
-      return userSnap.exists() ? { id: userSnap.id, ...userSnap.data() } : {};
+      const user = userSnap.exists() ? { id: userSnap.id, ...userSnap.data() } : { id: userId };
+      if (!getUserAddress(user)) {
+        const request = await getDeleteRequestForUser(userId);
+        if (request?.address) user.address = request.address;
+      }
+      return user;
     }
 
     function getKnownDeviceIds(user) {
@@ -1405,6 +1463,7 @@
         userId,
         email: updates.email || existing.email || request?.email || user?.email || "",
         name: updates.name || existing.name || request?.name || user?.name || "",
+        address: updates.address || existing.address || request?.address || user?.address || "",
         message,
         requestedAt: updates.requestedAt || existing.requestedAt || request?.requestedAt || new Date().toISOString(),
         source: existing.source || updates.source || "delete-request",
@@ -1472,7 +1531,7 @@
     }
 
     async function deliverEmailViaServerOnce(userId, emailPayload, inboxEntryId) {
-      const response = await fetch(`${MAIL_API_BASE}/send-account-email`, {
+      const response = await withTimeout(fetch(`${MAIL_API_BASE}/send-account-email`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1480,7 +1539,7 @@
           deleteRequestId: userId,
           inboxEntryId: inboxEntryId || userId,
         }),
-      });
+      }), 90000, "Email send request timed out. The message may still arrive; check the user's inbox.");
       let data = {};
       try {
         data = await response.json();
@@ -1492,10 +1551,10 @@
         throw new Error(errorMessage);
       }
       const sentAt = data.sentAt || new Date().toISOString();
-      await updateAdminInboxForUser(userId, {
+      await safeFirestoreWrite("inbox email status", () => updateAdminInboxForUser(userId, {
         emailSentAt: sentAt,
         emailDeliveryError: "",
-      }, inboxEntryId);
+      }, inboxEntryId));
       return sentAt;
     }
 
@@ -1519,7 +1578,7 @@
     async function wakeMailService() {
       try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 90000);
+        const timeout = setTimeout(() => controller.abort(), 20000);
         await fetch(`${MAIL_API_BASE}/health`, { signal: controller.signal });
         clearTimeout(timeout);
       } catch (error) {
@@ -1600,7 +1659,7 @@ Pazar Fiyatı Admin`;
       const payload = { to: email, subject, text, html };
       const inboxEntryId = getInboxEntryIdForRequest(request);
       const sentAt = await deliverEmailViaServer(userId, payload, inboxEntryId);
-      await setDoc(doc(db, "mail", `account-deleted-${userId}-${Date.now()}`), {
+      await safeFirestoreWrite("account deleted mail log", () => setDoc(doc(db, "mail", `account-deleted-${userId}-${Date.now()}`), {
         to: email,
         message: { subject, text, html },
         deleteRequestId: userId,
@@ -1609,18 +1668,23 @@ Pazar Fiyatı Admin`;
         queuedBy: localStorage.getItem("user_email") || OWNER_EMAIL,
         delivery: { state: "SUCCESS" },
         emailSentAt: sentAt,
-      });
+      }));
       return sentAt;
     }
 
     async function removeUserAccount(userId, user, request) {
       const now = new Date().toISOString();
+      const address = getUserAddress(user, request);
+      const phone = String(user.phone || request?.phone || "").trim();
       await setDoc(doc(db, "deletedAccounts", userId), {
         forceLogout: true,
         deletedAt: now,
         deletedBy: localStorage.getItem("user_email") || OWNER_EMAIL,
         email: user.email || request?.email || "",
         name: user.name || request?.name || "",
+        address: "",
+        phone: "",
+        profileCleared: true,
       }, { merge: true });
       await deleteDoc(doc(db, "users", userId));
       recentlyDeletedUserIds.add(userId);
@@ -1633,6 +1697,8 @@ Pazar Fiyatı Admin`;
           reason: getDeleteRequestReason(request),
           email: request.email || user.email || "",
           name: request.name || user.name || "",
+          address: "",
+          phone: "",
           requestedAt: request.requestedAt || now,
         };
         await setDoc(doc(db, "deleteRequests", userId), preserve, { merge: true });
@@ -1645,17 +1711,69 @@ Pazar Fiyatı Admin`;
 
     window.deleteUser = async function(userId) {
       try {
+        if (!isUserRegistered(userId)) {
+          showToast(t("removed"));
+          return;
+        }
         const user = await getUserForAdmin(userId);
         const request = await getDeleteRequestForUser(userId);
         if (request && getDeleteRequestReason(request)) {
-          await ensureMailServiceReady();
+          await withTimeout(ensureMailServiceReady(), 25000, "Mail service check timed out.");
           await queueAccountDeletedEmail(userId, request);
         }
-        await removeUserAccount(userId, user, request);
+        await retryAsync(() => removeUserAccount(userId, user, request), 3, 2000);
         showToast(t("removed"));
       } catch (error) {
         console.error("Delete user failed", error);
-        showToast(`${t("saveFailed")}: ${error.message}`, true);
+        showToast(`${t("saveFailed")}: ${error.message}`);
+      }
+    };
+
+    window.deleteAllUsers = async function(button) {
+      const users = [...currentUsers];
+      if (!users.length) {
+        showToast(t("noUsers"), true);
+        return;
+      }
+      const confirmText = t("deleteAllUsersConfirm").replace("{count}", String(users.length));
+      if (!window.confirm(confirmText)) return;
+
+      const originalText = button ? button.textContent : "";
+      if (button) {
+        button.disabled = true;
+        button.textContent = t("saving");
+      }
+
+      let deleted = 0;
+      for (const user of users) {
+        try {
+          await retryAsync(() => removeUserAccount(user.id, user, null), 3, 1500);
+          deleted += 1;
+        } catch (error) {
+          console.error("Bulk delete failed for user", user.id, error);
+        }
+      }
+
+      if (button) {
+        button.disabled = false;
+        button.textContent = originalText || t("deleteAllUsers");
+      }
+      showToast(t("deleteAllUsersDone").replace("{count}", String(deleted)));
+    };
+
+    window.dismissDeleteRequest = async function(userId, inboxEntryId) {
+      const entryId = inboxEntryId || getInboxEntryIdForRequest({ id: userId });
+      try {
+        if (entryId) await deleteDoc(doc(db, "adminInbox", entryId));
+        await deleteDoc(doc(db, "deleteRequests", userId));
+        currentDeleteRequests = currentDeleteRequests.filter((entry) => entry.id !== userId);
+        currentInboxMessages = currentInboxMessages.filter((entry) => entry.id !== entryId);
+        renderDeleteRequests(currentDeleteRequests);
+        renderInbox(currentInboxMessages);
+        showToast(t("removed"));
+      } catch (error) {
+        console.error("Dismiss delete request failed", error);
+        showToast(`${t("saveFailed")}: ${error.message}`);
       }
     };
 
@@ -1679,12 +1797,22 @@ Pazar Fiyatı Admin`;
         button.textContent = t("sendingEmail");
       }
 
+      let succeeded = false;
+      let sentAt = null;
       try {
-        await ensureMailServiceReady();
-        const sentAt = await queueAccountDeletedEmail(userId, request);
+        await withTimeout(ensureMailServiceReady(), 30000, "Mail service check timed out.");
+        sentAt = await queueAccountDeletedEmail(userId, request);
+      } catch (error) {
+        console.error("Mark delete request done failed", error);
+        await safeFirestoreWrite("email delivery error", () => updateAdminInboxForUser(userId, { emailDeliveryError: error.message }, entryId));
+        showToast(`${t("emailQueueFailed")}: ${error.message}`);
+        return;
+      }
+
+      try {
         if (isUserRegistered(userId)) {
           const user = await getUserForAdmin(userId);
-          await removeUserAccount(userId, user, request);
+          await retryAsync(() => removeUserAccount(userId, user, request), 3, 2000);
         }
 
         const now = new Date().toISOString();
@@ -1696,19 +1824,29 @@ Pazar Fiyatı Admin`;
           emailDeliveryError: "",
           message: request.message || getDeleteRequestReason(request),
           reason: getDeleteRequestReason(request),
+          address: "",
+          phone: "",
         };
-        await syncAdminInboxEntry(entryId, { userId, ...doneUpdate }, null, request);
-        await setDoc(doc(db, "deleteRequests", userId), {
-          ...doneUpdate,
-          doneMarkedBy: localStorage.getItem("user_email") || OWNER_EMAIL,
-        }, { merge: true });
+        const statusSaved = await safeFirestoreWrite("mark delete request done", async () => {
+          await syncAdminInboxEntry(entryId, { userId, ...doneUpdate }, null, request);
+          await setDoc(doc(db, "deleteRequests", userId), {
+            ...doneUpdate,
+            doneMarkedBy: localStorage.getItem("user_email") || OWNER_EMAIL,
+          }, { merge: true });
+        });
         refreshDeleteRequestViews(userId, doneUpdate, entryId);
-        showToast(`${t("updated")} - ${t("inboxEmailSent")}`);
+        if (statusSaved) {
+          showToast(`${t("updated")} - ${t("inboxEmailSent")}`);
+        } else {
+          showToast(`${t("inboxEmailSent")}. ${t("saveFailed")}: status update will retry on refresh.`, true);
+        }
+        succeeded = true;
       } catch (error) {
-        console.error("Mark delete request done failed", error);
-        await updateAdminInboxForUser(userId, { emailDeliveryError: error.message }, entryId);
-        showToast(`${t("emailQueueFailed")}: ${error.message}`, true);
-        if (button) {
+        console.error("Post-email cleanup failed after email was sent", error);
+        showToast(`${t("inboxEmailSent")}. ${t("saveFailed")}: ${error.message}`, true);
+        succeeded = true;
+      } finally {
+        if (button && !succeeded) {
           button.disabled = false;
           button.textContent = originalText || t("markRequestDone");
         }
@@ -1728,6 +1866,8 @@ Pazar Fiyatı Admin`;
         const inboxId = button.dataset.inboxId || "";
         try {
           if (action === "delete-user") await window.deleteUser(userId);
+          else if (action === "delete-all-users") await window.deleteAllUsers(button);
+          else if (action === "dismiss-delete-request") await window.dismissDeleteRequest(userId, inboxId);
           else if (action === "mark-done") await window.markDeleteRequestDone(userId, button, inboxId);
           else if (action === "delete-inbox") await window.deleteInboxMessage(inboxId);
           else if (action === "save-user") await window.saveUser(userId);

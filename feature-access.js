@@ -72,6 +72,33 @@
     return (LOCK_COPY[lang] && LOCK_COPY[lang][key]) || LOCK_COPY.tr[key] || key;
   }
 
+  function isAndroidApp() {
+    try {
+      return !!(window.AndroidApp && window.AndroidApp.isAndroidApp && window.AndroidApp.isAndroidApp());
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function navigateToAppPage(path) {
+    const target = String(path || "index.html").replace(/^\//, "");
+    if (isAndroidApp()) {
+      try {
+        if (window.AndroidApp.navigateToPage) {
+          window.AndroidApp.navigateToPage(target);
+          return;
+        }
+        if (target === "index.html" && window.AndroidApp.reloadApp) {
+          window.AndroidApp.reloadApp();
+          return;
+        }
+      } catch (error) {
+        console.warn("Android navigation failed", error);
+      }
+    }
+    window.location.href = target;
+  }
+
   function normalizeGmail(email) {
     const value = String(email || "").trim().toLowerCase();
     const [local, domain] = value.split("@");
@@ -168,7 +195,7 @@
         <div class="feature-page-lock__badge">${t("lockedBadge")}</div>
         <h1>${t("pageLockTitle")}</h1>
         <p>${t("pageLockBody")}</p>
-        <a href="index.html">${t("pageLockBack")}</a>
+        <a href="index.html" data-app-nav="index.html">${t("pageLockBack")}</a>
       </div>
     `;
     document.body.prepend(overlay);
@@ -435,6 +462,8 @@
     isAdminUser,
     canUseFeatures,
     areFeaturesUnlockedForAll,
+    isAndroidApp,
+    navigateToAppPage,
     showLockedModal,
     hideLockedModal,
     showPageLock,
@@ -454,4 +483,11 @@
   getDeviceId();
   startDeletedAccountWatcher();
   startBlockedDeviceWatcher();
+
+  document.addEventListener("click", (event) => {
+    const link = event.target.closest("[data-app-nav]");
+    if (!link) return;
+    event.preventDefault();
+    navigateToAppPage(link.getAttribute("data-app-nav") || "index.html");
+  });
 })();

@@ -35,6 +35,7 @@
         android:layout_height="wrap_content"
         android:layout_gravity="center_horizontal"
         android:visibility="gone"
+        ads:adSize="BANNER"
         ads:adUnitId="@string/admob_banner_ad_unit_id" />
 
 </LinearLayout>

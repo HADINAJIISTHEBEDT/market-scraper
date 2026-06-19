@@ -10,9 +10,12 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.app.Dialog
 import android.net.Uri
+import android.webkit.CookieManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Message
 import android.util.DisplayMetrics
 import android.webkit.GeolocationPermissions
 import android.webkit.JavascriptInterface
@@ -28,6 +31,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import com.google.android.gms.ads.AdRequest
@@ -41,6 +45,10 @@ import java.util.concurrent.Executors
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private var uploadMessage: ValueCallback<Array<Uri>>? = null
+    private var pendingWebPermissionRequest: PermissionRequest? = null
+    private var pendingGeoOrigin: String? = null
+    private var pendingGeoCallback: GeolocationPermissions.Callback? = null
+    private var authPopupDialog: Dialog? = null
     private val filePickerLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val uris = if (result.resultCode == Activity.RESULT_OK && result.data != null) {
             result.data?.data?.let { arrayOf(it) }
@@ -80,6 +88,44 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+    private val locationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+            val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+            pendingGeoCallback?.invoke(pendingGeoOrigin, granted, false)
+            pendingGeoCallback = null
+            pendingGeoOrigin = null
+            if (!::binding.isInitialized) return@registerForActivityResult
+            binding.webView.post {
+                binding.webView.evaluateJavascript(
+                    "window.dispatchEvent(new CustomEvent('android-location-permission', { detail: { granted: ${if (granted) "true" else "false"} } }));",
+                    null
+                )
+            }
+        }
+    private val cameraMicPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+            val cameraOk = !permissions.containsKey(Manifest.permission.CAMERA) ||
+                permissions[Manifest.permission.CAMERA] == true
+            val audioOk = !permissions.containsKey(Manifest.permission.RECORD_AUDIO) ||
+                permissions[Manifest.permission.RECORD_AUDIO] == true
+            pendingWebPermissionRequest?.let { request ->
+                pendingWebPermissionRequest = null
+                if (cameraOk && audioOk) {
+                    request.grant(request.resources)
+                } else {
+                    request.deny()
+                }
+            }
+            if (!::binding.isInitialized) return@registerForActivityResult
+            binding.webView.post {
+                binding.webView.evaluateJavascript(
+                    "window.dispatchEvent(new CustomEvent('android-camera-permission', { detail: { granted: ${if (cameraOk) "true" else "false"}, audioGranted: ${if (audioOk) "true" else "false"} } }));",
+                    null
+                )
+            }
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -101,6 +147,7 @@ class MainActivity : AppCompatActivity() {
 
         configureAds()
         checkForAppUpdate()
+        handleAuthDeepLink(intent)
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -113,8 +160,20 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
-    @SuppressLint("SetJavaScriptEnabled")
-    private fun configureWebView(webView: WebView) {
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleAuthDeepLink(intent)
+    }
+
+    private fun handleAuthDeepLink(intent: Intent?) {
+        val data = intent?.data ?: return
+        if (data.scheme != "https" || data.host != APP_HOST) return
+        if (!::binding.isInitialized) return
+        binding.webView.loadUrl(data.toString())
+    }
+
+    private fun applyWebViewDefaults(webView: WebView) {
         webView.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
@@ -123,16 +182,116 @@ class MainActivity : AppCompatActivity() {
             mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
             mediaPlaybackRequiresUserGesture = false
             javaScriptCanOpenWindowsAutomatically = true
-            setSupportMultipleWindows(false)
+            setSupportMultipleWindows(true)
             allowFileAccess = true
             allowContentAccess = true
             useWideViewPort = true
             loadWithOverviewMode = true
             setGeolocationEnabled(true)
         }
+        webView.settings.userAgentString =
+            "Mozilla/5.0 (Linux; Android ${Build.VERSION.RELEASE}; Mobile) " +
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.230 Mobile Safari/537.36"
+        CookieManager.getInstance().setAcceptCookie(true)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
+        }
+    }
 
-        webView.addJavascriptInterface(AndroidBridge(), "AndroidApp")
-        webView.webChromeClient = object : WebChromeClient() {
+    private fun isGoogleAuthUrl(url: String): Boolean {
+        val host = Uri.parse(url).host?.lowercase() ?: return false
+        if (host == "accounts.google.com") return true
+        return host.endsWith(".google.com") &&
+            (url.contains("oauth", ignoreCase = true) || url.contains("signin", ignoreCase = true))
+    }
+
+    private fun isAuthFlowPage(url: String?): Boolean {
+        val value = url?.lowercase() ?: return false
+        return value.contains("login.html") ||
+            value.contains("auth-bridge.html") ||
+            value.contains("/__/auth/") ||
+            value.contains("firebaseapp.com/__/auth") ||
+            value.contains(".web.app/__/auth")
+    }
+
+    private fun isAppAuthReturnUrl(url: String): Boolean {
+        val uri = Uri.parse(url)
+        val host = uri.host?.lowercase() ?: return false
+        return host == APP_HOST ||
+            host.endsWith(".firebaseapp.com") ||
+            uri.path?.contains("__/auth/") == true
+    }
+
+    private fun openAuthInCustomTab(url: String) {
+        try {
+            CustomTabsIntent.Builder().build().launchUrl(this, Uri.parse(url))
+        } catch (_: Exception) {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        }
+    }
+
+    private fun dismissAuthPopup() {
+        authPopupDialog?.dismiss()
+        authPopupDialog = null
+    }
+
+    private fun createWebViewClient(mainWebView: WebView, closePopup: (() -> Unit)? = null): WebViewClient {
+        return object : WebViewClient() {
+            override fun shouldOverrideUrlLoading(
+                view: WebView?,
+                request: WebResourceRequest?
+            ): Boolean {
+                val url = request?.url?.toString() ?: return false
+                if (isGoogleAuthUrl(url)) {
+                    if (view == mainWebView && !isAuthFlowPage(mainWebView.url)) {
+                        openAuthInCustomTab(url)
+                        return true
+                    }
+                    return false
+                }
+                if (view != mainWebView && isAppAuthReturnUrl(url)) {
+                    mainWebView.loadUrl(url)
+                    closePopup?.invoke()
+                    return true
+                }
+                return false
+            }
+
+            override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                if (view == mainWebView) {
+                    binding.swipeRefresh.isRefreshing = true
+                }
+            }
+
+            override fun onPageFinished(view: WebView?, url: String?) {
+                if (view == mainWebView) {
+                    binding.swipeRefresh.isRefreshing = false
+                }
+            }
+
+            override fun onReceivedError(
+                view: WebView?,
+                request: WebResourceRequest?,
+                error: android.webkit.WebResourceError?
+            ) {
+                super.onReceivedError(view, request, error)
+                if (view != mainWebView) return
+                if (request?.isForMainFrame == true) {
+                    binding.swipeRefresh.isRefreshing = false
+                    view?.loadDataWithBaseURL(
+                        null,
+                        OFFLINE_HTML,
+                        "text/html",
+                        "utf-8",
+                        null
+                    )
+                }
+            }
+        }
+    }
+
+    private fun createWebChromeClient(mainWebView: WebView, closePopup: (() -> Unit)? = null): WebChromeClient {
+        return object : WebChromeClient() {
             override fun onShowFileChooser(
                 webView: WebView?,
                 filePathCallback: ValueCallback<Array<Uri>>?,
@@ -151,51 +310,82 @@ class MainActivity : AppCompatActivity() {
                 origin: String?,
                 callback: GeolocationPermissions.Callback?
             ) {
-                callback?.invoke(origin, true, false)
+                if (hasLocationPermission()) {
+                    callback?.invoke(origin, true, false)
+                    return
+                }
+                pendingGeoOrigin = origin
+                pendingGeoCallback = callback
+                locationPermissionLauncher.launch(
+                    arrayOf(
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.ACCESS_COARSE_LOCATION
+                    )
+                )
             }
 
             override fun onPermissionRequest(request: PermissionRequest?) {
-                request?.grant(request.resources)
+                if (request == null) return
+                val needed = mutableListOf<String>()
+                if (request.resources.contains(PermissionRequest.RESOURCE_VIDEO_CAPTURE) && !hasCameraPermission()) {
+                    needed.add(Manifest.permission.CAMERA)
+                }
+                if (request.resources.contains(PermissionRequest.RESOURCE_AUDIO_CAPTURE) && !hasRecordAudioPermission()) {
+                    needed.add(Manifest.permission.RECORD_AUDIO)
+                }
+                if (needed.isEmpty()) {
+                    request.grant(request.resources)
+                    return
+                }
+                pendingWebPermissionRequest = request
+                cameraMicPermissionLauncher.launch(needed.distinct().toTypedArray())
             }
 
             override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                if (newProgress == 100) {
+                if (view == mainWebView && newProgress == 100) {
                     binding.swipeRefresh.isRefreshing = false
                 }
             }
-        }
-        webView.webViewClient = object : WebViewClient() {
-            override fun shouldOverrideUrlLoading(
+
+            override fun onCreateWindow(
                 view: WebView?,
-                request: WebResourceRequest?
-            ): Boolean = false
-
-            override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
-                binding.swipeRefresh.isRefreshing = true
-            }
-
-            override fun onPageFinished(view: WebView?, url: String?) {
-                binding.swipeRefresh.isRefreshing = false
-            }
-
-            override fun onReceivedError(
-                view: WebView?,
-                request: WebResourceRequest?,
-                error: android.webkit.WebResourceError?
-            ) {
-                super.onReceivedError(view, request, error)
-                if (request?.isForMainFrame == true) {
-                    binding.swipeRefresh.isRefreshing = false
-                    view?.loadDataWithBaseURL(
-                        null,
-                        OFFLINE_HTML,
-                        "text/html",
-                        "utf-8",
-                        null
-                    )
+                isDialog: Boolean,
+                isUserGesture: Boolean,
+                resultMsg: Message?
+            ): Boolean {
+                val transport = resultMsg?.obj as? WebView.WebViewTransport ?: return false
+                val dialog = Dialog(this@MainActivity)
+                val popupWebView = WebView(this@MainActivity)
+                applyWebViewDefaults(popupWebView)
+                val dismissPopup: () -> Unit = {
+                    dismissAuthPopup()
+                    closePopup?.invoke()
                 }
+                popupWebView.webChromeClient = createWebChromeClient(mainWebView, dismissPopup)
+                popupWebView.webViewClient = createWebViewClient(mainWebView, dismissPopup)
+                dialog.setContentView(popupWebView)
+                dialog.setOnDismissListener { authPopupDialog = null }
+                dialog.show()
+                authPopupDialog = dialog
+                transport.webView = popupWebView
+                resultMsg.sendToTarget()
+                return true
+            }
+
+            override fun onCloseWindow(window: WebView?) {
+                dismissAuthPopup()
+                closePopup?.invoke()
             }
         }
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun configureWebView(webView: WebView) {
+        applyWebViewDefaults(webView)
+
+        webView.addJavascriptInterface(AndroidBridge(), "AndroidApp")
+        webView.webChromeClient = createWebChromeClient(webView)
+        webView.webViewClient = createWebViewClient(webView)
     }
 
     private fun configureRefresh() {
@@ -251,6 +441,7 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val APP_URL = "https://market-scraper-0k36.onrender.com/"
+        private const val APP_HOST = "market-scraper-0k36.onrender.com"
         private const val NOTIFICATION_CHANNEL_ID = "market_scraper_alerts"
         private const val UPDATE_CHANNEL_ID = "market_scraper_updates"
         private const val VERSION_CHECK_URL = "https://raw.githubusercontent.com/HADINAJIISTHEBEDT/market-scraper/main/android-app/app/build.gradle"
@@ -287,6 +478,19 @@ class MainActivity : AppCompatActivity() {
         }
 
         @JavascriptInterface
+        fun navigateToPage(path: String?) {
+            runOnUiThread {
+                val cleanPath = (path ?: "index.html").trim().removePrefix("/")
+                val url = if (cleanPath.startsWith("http://") || cleanPath.startsWith("https://")) {
+                    cleanPath
+                } else {
+                    APP_URL + cleanPath
+                }
+                binding.webView.loadUrl(url)
+            }
+        }
+
+        @JavascriptInterface
         fun isNotificationPermissionGranted(): Boolean = hasNotificationPermission()
 
         @JavascriptInterface
@@ -302,9 +506,26 @@ class MainActivity : AppCompatActivity() {
 
         @JavascriptInterface
         fun requestStoragePermission() {
-            runOnUiThread {
-                requestStoragePermissionInternal()
-            }
+            runOnUiThread { requestStoragePermissionInternal() }
+        }
+
+        @JavascriptInterface
+        fun isLocationPermissionGranted(): Boolean = hasLocationPermission()
+
+        @JavascriptInterface
+        fun requestLocationPermission() {
+            runOnUiThread { requestLocationPermissionInternal() }
+        }
+
+        @JavascriptInterface
+        fun isCameraPermissionGranted(): Boolean = hasCameraPermission()
+
+        @JavascriptInterface
+        fun isMicrophonePermissionGranted(): Boolean = hasRecordAudioPermission()
+
+        @JavascriptInterface
+        fun requestCameraAndMicrophonePermissions() {
+            runOnUiThread { requestCameraMicPermissionInternal() }
         }
 
         @JavascriptInterface
@@ -448,6 +669,49 @@ class MainActivity : AppCompatActivity() {
             this,
             Manifest.permission.WRITE_EXTERNAL_STORAGE
         ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun hasLocationPermission(): Boolean {
+        return ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun hasCameraPermission(): Boolean {
+        return ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun hasRecordAudioPermission(): Boolean {
+        return ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun requestLocationPermissionInternal() {
+        if (hasLocationPermission()) return
+        locationPermissionLauncher.launch(
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            )
+        )
+    }
+
+    private fun requestCameraMicPermissionInternal() {
+        val needed = mutableListOf<String>()
+        if (!hasCameraPermission()) needed.add(Manifest.permission.CAMERA)
+        if (!hasRecordAudioPermission()) needed.add(Manifest.permission.RECORD_AUDIO)
+        if (needed.isEmpty()) return
+        cameraMicPermissionLauncher.launch(needed.toTypedArray())
     }
 
     private fun requestStoragePermissionInternal() {
