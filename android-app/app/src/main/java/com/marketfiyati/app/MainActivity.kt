@@ -166,8 +166,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun handleAuthDeepLink(intent: Intent?) {
         val data = intent?.data ?: return
-        if (data.scheme != "https" || data.host != APP_HOST) return
         if (!::binding.isInitialized) return
+        val host = data.host?.lowercase() ?: return
+        if (data.scheme != "https" || host != APP_HOST) return
         binding.webView.loadUrl(data.toString())
     }
 

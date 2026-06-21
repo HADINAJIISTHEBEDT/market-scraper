@@ -779,7 +779,8 @@
       return mergedProfile;
     }
 
-    async function routeSignedInUser(user) {
+    async function routeSignedInUser(user, options = {}) {
+      const autoNavigateHome = options.autoNavigateHome === true;
       setStatus("statusChecking");
       try {
         if (!user.email || !isGmailAddress(user.email)) {
@@ -815,6 +816,13 @@
         }
         if (isOwnerEmail(user.email)) {
           showOwnerPassword();
+          return;
+        }
+        if (autoNavigateHome && isAndroidApp()) {
+          sessionStorage.setItem("login_auth_handled", user.uid);
+          sessionStorage.setItem("profile_prompt", "1");
+          navigateToAppPage("index.html");
+          return;
         }
       } catch (error) {
         console.error("Login routing failed", error);
@@ -875,7 +883,7 @@
         email,
         displayName: params.get("auth_name") || "",
         photoURL: params.get("auth_photo") || "",
-      });
+      }, { autoNavigateHome: true });
       return true;
     }
 
