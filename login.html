@@ -442,8 +442,8 @@
     }
     const firebaseConfig = window.FIREBASE_CONFIG;
     const AUTH_BRIDGE_CANDIDATES = [
-      "https://st-business-86a9b.web.app/auth-bridge.html",
       "https://st-business-86a9b.firebaseapp.com/auth-bridge.html",
+      "https://st-business-86a9b.web.app/auth-bridge.html",
       "https://market-scraper-0k36.onrender.com/auth-bridge.html",
     ];
     const isFilePage = location.protocol === "file:";
@@ -864,6 +864,21 @@
       window.location.href = "admin.html";
     }
 
+    function handleAndroidAuthReturn() {
+      const params = new URLSearchParams(window.location.search);
+      const uid = params.get("auth_uid");
+      const email = params.get("auth_email");
+      if (!uid || !email) return false;
+      history.replaceState({}, "", "login.html");
+      void routeSignedInUser({
+        uid,
+        email,
+        displayName: params.get("auth_name") || "",
+        photoURL: params.get("auth_photo") || "",
+      });
+      return true;
+    }
+
     async function continueWithGoogle() {
       setStatus("statusStarting");
       if (isFilePage) {
@@ -880,6 +895,14 @@
 
       if (isAndroidApp()) {
         try {
+          const bridge = await resolveAuthBridgeUrl();
+          const separator = bridge.url.includes("?") ? "&" : "?";
+          const authUrl = bridge.url + separator + "return=android";
+          if (window.AndroidApp?.openExternalAuth) {
+            window.AndroidApp.openExternalAuth(authUrl);
+            setRawStatus(t("statusStarting"));
+            return;
+          }
           await setPersistence(auth, browserLocalPersistence);
           navigateToAppPage("auth-bridge.html?from=app");
           return;
@@ -968,7 +991,9 @@
       setStatus("statusSuccess");
       showOwnerPassword();
     }
-    handleExistingSession();
+    if (!handleAndroidAuthReturn()) {
+      handleExistingSession();
+    }
     window.FeatureAccess?.initLockedFooterLinks?.();
   </script>
 </body>

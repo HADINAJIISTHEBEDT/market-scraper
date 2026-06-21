@@ -9,7 +9,6 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
 import android.app.Dialog
 import android.net.Uri
 import android.webkit.CookieManager
@@ -134,7 +133,6 @@ class MainActivity : AppCompatActivity() {
         createNotificationChannel()
         createUpdateChannel()
         configureWebView(binding.webView)
-        configureRefresh()
         binding.privacyPolicyLink.setOnClickListener {
             binding.webView.loadUrl(getString(R.string.privacy_policy_url))
         }
@@ -198,6 +196,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun isAuthBridgeUrl(url: String): Boolean {
+        return url.contains("auth-bridge.html", ignoreCase = true)
+    }
+
+    private fun isFirebaseAuthHandlerUrl(url: String): Boolean {
+        return url.contains("/__/auth/", ignoreCase = true)
+    }
+
     private fun isGoogleAuthUrl(url: String): Boolean {
         val host = Uri.parse(url).host?.lowercase() ?: return false
         if (host == "accounts.google.com") return true
@@ -242,12 +248,17 @@ class MainActivity : AppCompatActivity() {
                 request: WebResourceRequest?
             ): Boolean {
                 val url = request?.url?.toString() ?: return false
+                if (isAuthBridgeUrl(url)) {
+                    openAuthInCustomTab(HOSTED_AUTH_BRIDGE)
+                    return true
+                }
+                if (isFirebaseAuthHandlerUrl(url)) {
+                    openAuthInCustomTab(url)
+                    return true
+                }
                 if (isGoogleAuthUrl(url)) {
-                    if (view == mainWebView && !isAuthFlowPage(mainWebView.url)) {
-                        openAuthInCustomTab(url)
-                        return true
-                    }
-                    return false
+                    openAuthInCustomTab(url)
+                    return true
                 }
                 if (view != mainWebView && isAppAuthReturnUrl(url)) {
                     mainWebView.loadUrl(url)
@@ -255,18 +266,6 @@ class MainActivity : AppCompatActivity() {
                     return true
                 }
                 return false
-            }
-
-            override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
-                if (view == mainWebView) {
-                    binding.swipeRefresh.isRefreshing = true
-                }
-            }
-
-            override fun onPageFinished(view: WebView?, url: String?) {
-                if (view == mainWebView) {
-                    binding.swipeRefresh.isRefreshing = false
-                }
             }
 
             override fun onReceivedError(
@@ -277,7 +276,6 @@ class MainActivity : AppCompatActivity() {
                 super.onReceivedError(view, request, error)
                 if (view != mainWebView) return
                 if (request?.isForMainFrame == true) {
-                    binding.swipeRefresh.isRefreshing = false
                     view?.loadDataWithBaseURL(
                         null,
                         OFFLINE_HTML,
@@ -341,12 +339,6 @@ class MainActivity : AppCompatActivity() {
                 cameraMicPermissionLauncher.launch(needed.distinct().toTypedArray())
             }
 
-            override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                if (view == mainWebView && newProgress == 100) {
-                    binding.swipeRefresh.isRefreshing = false
-                }
-            }
-
             override fun onCreateWindow(
                 view: WebView?,
                 isDialog: Boolean,
@@ -386,12 +378,6 @@ class MainActivity : AppCompatActivity() {
         webView.addJavascriptInterface(AndroidBridge(), "AndroidApp")
         webView.webChromeClient = createWebChromeClient(webView)
         webView.webViewClient = createWebViewClient(webView)
-    }
-
-    private fun configureRefresh() {
-        binding.swipeRefresh.setOnRefreshListener {
-            binding.webView.reload()
-        }
     }
 
     private fun configureAds() {
@@ -442,6 +428,8 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val APP_URL = "https://market-scraper-0k36.onrender.com/"
         private const val APP_HOST = "market-scraper-0k36.onrender.com"
+        private const val HOSTED_AUTH_BRIDGE =
+            "https://st-business-86a9b.firebaseapp.com/auth-bridge.html?return=android"
         private const val NOTIFICATION_CHANNEL_ID = "market_scraper_alerts"
         private const val UPDATE_CHANNEL_ID = "market_scraper_updates"
         private const val VERSION_CHECK_URL = "https://raw.githubusercontent.com/HADINAJIISTHEBEDT/market-scraper/main/android-app/app/build.gradle"
@@ -475,6 +463,14 @@ class MainActivity : AppCompatActivity() {
         @JavascriptInterface
         fun reloadApp() {
             runOnUiThread { binding.webView.loadUrl(APP_URL) }
+        }
+
+        @JavascriptInterface
+        fun openExternalAuth(url: String?) {
+            runOnUiThread {
+                val target = url?.trim()?.takeIf { it.isNotBlank() } ?: HOSTED_AUTH_BRIDGE
+                openAuthInCustomTab(target)
+            }
         }
 
         @JavascriptInterface
