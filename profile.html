@@ -143,7 +143,7 @@
 
     <section class="panel">
       <h1 id="title">Profil bilgileri</h1>
-      <p id="subtitle" class="subtitle">Ad ve teslimat adresi zorunludur. Telefon ve Google Maps konumu istege baglidir.</p>
+      <p id="subtitle" class="subtitle">Ad ve teslimat adresi zorunludur. Telefon istege baglidir.</p>
       <form id="profileForm" class="profile-form">
         <label>
           <span id="nameLabel">Ad</span>
@@ -161,14 +161,6 @@
           <span id="addressLabel">Adres</span>
           <textarea id="addressInput" name="address" required></textarea>
         </label>
-        <label>
-          <span id="mapLinkLabel">Google Maps baglantisi (istege bagli)</span>
-          <input id="mapLinkInput" name="mapLink" type="url" placeholder="https://maps.google.com/..." />
-        </label>
-        <div class="actions" style="margin-top:-6px;">
-          <button id="openMapsBtn" class="secondary-btn" type="button">Google Maps'te konumumu ekle</button>
-          <button id="useLocationBtn" class="secondary-btn" type="button">Bu konumu kaydet</button>
-        </div>
         <div class="actions">
           <button id="saveButton" class="primary-btn" type="submit">Kaydet ve devam et</button>
           <button id="logoutButton" class="secondary-btn" type="button">Cikis yap</button>
@@ -199,14 +191,11 @@
     const I18N = {
       tr: {
         title: "Profil bilgileri",
-        subtitle: "Ad ve teslimat adresi zorunludur. Telefon ve Google Maps konumu istege baglidir.",
+        subtitle: "Ad ve teslimat adresi zorunludur. Telefon istege baglidir.",
         nameLabel: "Ad",
         emailLabel: "E-posta",
         phoneLabel: "Telefon numarasi (istege bagli)",
         addressLabel: "Adres",
-        mapLinkLabel: "Google Maps baglantisi (istege bagli)",
-        openMapsBtn: "Google Maps'te konumumu ekle",
-        useLocationBtn: "Bu konumu kaydet",
         saveButton: "Kaydet ve devam et",
         logoutButton: "Cikis yap",
         backLink: "Uygulamaya don",
@@ -222,14 +211,11 @@
       },
       en: {
         title: "Profile details",
-        subtitle: "Name and delivery address are required. Phone and Google Maps location are optional.",
+        subtitle: "Name and delivery address are required. Phone is optional.",
         nameLabel: "Name",
         emailLabel: "Email",
         phoneLabel: "Phone number (optional)",
         addressLabel: "Address",
-        mapLinkLabel: "Google Maps link (optional)",
-        openMapsBtn: "Add my location on Google Maps",
-        useLocationBtn: "Save this location",
         saveButton: "Save and continue",
         logoutButton: "Logout",
         backLink: "Back to app",
@@ -250,8 +236,6 @@
         emailLabel: "البريد الإلكتروني",
         phoneLabel: "رقم الهاتف (اختياري)",
         addressLabel: "العنوان",
-        mapLinkLabel: "رابط Google Maps (اختياري)",
-        openMapsBtn: "ابحث عن العنوان على Google Maps",
         saveButton: "احفظ وتابع",
         logoutButton: "تسجيل الخروج",
         backLink: "العودة إلى التطبيق",
@@ -293,10 +277,6 @@
       document.getElementById("emailLabel").textContent = t("emailLabel");
       document.getElementById("phoneLabel").textContent = t("phoneLabel");
       document.getElementById("addressLabel").textContent = t("addressLabel");
-      document.getElementById("mapLinkLabel").textContent = t("mapLinkLabel");
-      document.getElementById("openMapsBtn").textContent = t("openMapsBtn");
-      const useLocationBtn = document.getElementById("useLocationBtn");
-      if (useLocationBtn) useLocationBtn.textContent = t("useLocationBtn");
       document.getElementById("saveButton").textContent = t("saveButton");
       document.getElementById("logoutButton").textContent = t("logoutButton");
       document.getElementById("backLink").innerHTML = "&larr; " + t("backLink");
@@ -310,11 +290,15 @@
       try {
         const snap = await getDoc(doc(db, "users", user.uid));
         const data = snap.exists() ? snap.data() : {};
-        document.getElementById("nameInput").value = data.name || user.displayName || "";
-        document.getElementById("emailInput").value = user.email || data.email || "";
+        document.getElementById("nameInput").value = data.name || user.displayName || localStorage.getItem("user_name") || "";
+        document.getElementById("emailInput").value = user.email || data.email || localStorage.getItem("user_email") || "";
         document.getElementById("phoneInput").value = data.phone || localStorage.getItem("user_phone") || "";
         document.getElementById("addressInput").value = data.address || localStorage.getItem("user_address") || "";
-        document.getElementById("mapLinkInput").value = data.mapLink || localStorage.getItem("user_map_link") || "";
+        localStorage.setItem("user_name", document.getElementById("nameInput").value);
+        localStorage.setItem("user_email", document.getElementById("emailInput").value);
+        localStorage.setItem("user_phone", document.getElementById("phoneInput").value);
+        localStorage.setItem("user_address", document.getElementById("addressInput").value);
+        if (data.role) localStorage.setItem("user_role", data.role);
         setStatus("", false, true);
       } catch (error) {
         console.error("Profile load failed", error);
@@ -333,7 +317,6 @@
       const email = document.getElementById("emailInput").value.trim();
       const phone = document.getElementById("phoneInput").value.trim();
       const address = document.getElementById("addressInput").value.trim();
-      const mapLink = document.getElementById("mapLinkInput").value.trim();
 
       setStatus("statusSaving");
       try {
@@ -342,7 +325,6 @@
           email,
           phone,
           address,
-          mapLink,
           photoURL: currentUser.photoURL || "",
           lastProfileUpdateAt: new Date().toISOString()
         }, { merge: true });
@@ -351,11 +333,15 @@
         localStorage.setItem("user_email", email);
         localStorage.setItem("user_phone", phone);
         localStorage.setItem("user_address", address);
-        localStorage.setItem("user_map_link", mapLink);
+        if (email) localStorage.setItem("last_google_email", email);
         if (currentUser.photoURL) localStorage.setItem("user_photo", currentUser.photoURL);
         setStatus("statusSaved");
         setTimeout(() => {
-          window.location.href = "index.html";
+          if (window.FeatureAccess?.isAndroidApp?.()) {
+            window.FeatureAccess.navigateToAppPage("index.html");
+          } else {
+            window.location.href = "index.html";
+          }
         }, 700);
       } catch (error) {
         console.error("Profile save failed", error);
@@ -364,7 +350,11 @@
     }
 
     async function logout() {
-      await signOut(auth);
+      try {
+        await signOut(auth);
+      } catch (error) {
+        console.warn("Firebase sign-out skipped", error);
+      }
       localStorage.removeItem("user_name");
       localStorage.removeItem("user_uid");
       localStorage.removeItem("user_email");
@@ -374,9 +364,14 @@
       localStorage.removeItem("user_role");
       localStorage.removeItem("owner_access");
       localStorage.removeItem("owner_email");
+      sessionStorage.removeItem("android_auto_signin_tried");
       setStatus("logoutDone");
       setTimeout(() => {
-        window.location.href = "login.html";
+        if (window.FeatureAccess?.isAndroidApp?.()) {
+          window.FeatureAccess.navigateToAppPage("login.html");
+        } else {
+          window.location.href = "login.html";
+        }
       }, 400);
     }
 
@@ -387,52 +382,36 @@
     });
 
     document.getElementById("profileForm").addEventListener("submit", saveProfile);
-    document.getElementById("openMapsBtn").addEventListener("click", () => {
-      const setMapFromCoords = (lat, lng) => {
-        const shareUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
-        document.getElementById("mapLinkInput").value = shareUrl;
-        window.open(shareUrl, "_blank", "noopener");
-      };
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => setMapFromCoords(pos.coords.latitude, pos.coords.longitude),
-          () => {
-            const query = document.getElementById("addressInput").value.trim() || document.getElementById("nameInput").value.trim();
-            window.open("https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(query || "Turkey"), "_blank", "noopener");
-          },
-          { enableHighAccuracy: true, timeout: 12000 }
-        );
-        return;
-      }
-      const query = document.getElementById("addressInput").value.trim() || document.getElementById("nameInput").value.trim();
-      window.open("https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(query || "Turkey"), "_blank", "noopener");
-    });
-    document.getElementById("useLocationBtn").addEventListener("click", () => {
-      if (!navigator.geolocation) return;
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          document.getElementById("mapLinkInput").value = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
-        },
-        () => {},
-        { enableHighAccuracy: true, timeout: 12000 }
-      );
-    });
     document.getElementById("logoutButton").addEventListener("click", logout);
 
     applyLanguage();
     await setPersistence(auth, browserLocalPersistence);
     onAuthStateChanged(auth, async (user) => {
-      currentUser = user;
-      if (!user) {
-        setStatus("errorLoginRequired", true);
-        setTimeout(() => {
-          window.location.href = "login.html";
-        }, 700);
+      if (user) {
+        currentUser = user;
+        await loadProfile(user);
         return;
       }
-      await loadProfile(user);
+      const uid = localStorage.getItem("user_uid");
+      const email = localStorage.getItem("user_email");
+      if (uid && email) {
+        currentUser = {
+          uid,
+          email,
+          displayName: localStorage.getItem("user_name") || "",
+          photoURL: localStorage.getItem("user_photo") || "",
+        };
+        await loadProfile(currentUser);
+        return;
+      }
+      setStatus("errorLoginRequired", true);
+      setTimeout(() => {
+        if (window.FeatureAccess?.isAndroidApp?.()) {
+          window.FeatureAccess.navigateToAppPage("login.html");
+        } else {
+          window.location.href = "login.html";
+        }
+      }, 700);
     });
     window.FeatureAccess?.initLockedFooterLinks?.();
     }

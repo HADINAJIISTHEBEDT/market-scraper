@@ -766,6 +766,7 @@ window.doLogout = function() {
   localStorage.removeItem("user_role");
   localStorage.removeItem("owner_access");
   localStorage.removeItem("owner_email");
+  sessionStorage.removeItem("android_auto_signin_tried");
   updateNavbar();
 };
 
@@ -969,7 +970,15 @@ async function refreshPrices() {
 }
 
 window.addEventListener("DOMContentLoaded", () => {
-  updateNavbar();
+  void (async () => {
+    if (window.FeatureAccess?.applyAndroidAuthReturnAndSync) {
+      const handled = await window.FeatureAccess.applyAndroidAuthReturnAndSync();
+      if (handled && window.FeatureAccess?.isAndroidApp?.()) {
+        sessionStorage.setItem("profile_prompt", "1");
+      }
+    }
+    updateNavbar();
+  })();
   updateCartCount();
   if (window.AppSettings?.get) {
     applyRemoteSettings(window.AppSettings.get());

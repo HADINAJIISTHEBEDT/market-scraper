@@ -148,12 +148,10 @@
       if (returnMode === "android") {
         statusEl.textContent = "Signed in. Returning to the app...";
         const returnUrl = buildAndroidReturnUrl(user);
+        const homeUrl = APP_HOME + "?" + new URL(returnUrl).searchParams.toString();
         sessionStorage.removeItem("auth_bridge_redirect_started");
-        showOpenAppActions(returnUrl, "Open Pazar Fiyati app");
-        window.location.href = returnUrl;
-        setTimeout(() => {
-          window.location.href = appIntentUrl(returnUrl);
-        }, 800);
+        showOpenAppActions(homeUrl, "Open Pazar Fiyati app");
+        window.location.href = appIntentUrl(homeUrl);
         return;
       }
       if (window.opener && !window.opener.closed) {
@@ -170,7 +168,12 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({ prompt: "select_account" });
+    const loginHint = new URLSearchParams(window.location.search).get("login_hint") || "";
+    if (loginHint) {
+      provider.setCustomParameters({ login_hint: loginHint, prompt: "none" });
+    } else {
+      provider.setCustomParameters({ prompt: "select_account" });
+    }
 
     async function startAndroidRedirectSignIn() {
       await setPersistence(auth, browserLocalPersistence);
@@ -237,6 +240,16 @@
         finishSignedInUser(result.user);
       } catch (error) {
         const code = String(error?.code || "");
+        if (loginHint && (code === "auth/popup-closed-by-user" || code === "auth/user-cancelled" || code === "auth/account-exists-with-different-credential")) {
+          provider.setCustomParameters({ login_hint: loginHint, prompt: "select_account" });
+          try {
+            const retry = await signInWithPopup(auth, provider);
+            finishSignedInUser(retry.user);
+            return;
+          } catch (retryError) {
+            console.error("Auth bridge popup retry failed", retryError);
+          }
+        }
         if (code === "auth/popup-blocked" || code === "auth/cancelled-popup-request") {
           await startAndroidRedirectSignIn();
           return;

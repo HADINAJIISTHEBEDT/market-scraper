@@ -310,6 +310,54 @@
     ].forEach((key) => localStorage.removeItem(key));
   }
 
+  async function applyAndroidAuthReturnAndSync() {
+    const params = new URLSearchParams(window.location.search);
+    const uid = params.get("auth_uid");
+    const email = params.get("auth_email");
+    if (!uid || !email) return false;
+
+    localStorage.setItem("user_uid", uid);
+    localStorage.setItem("user_email", email);
+    localStorage.setItem("user_name", params.get("auth_name") || email);
+    localStorage.setItem("last_google_email", email);
+    const photo = params.get("auth_photo");
+    if (photo) {
+      localStorage.setItem("user_photo", photo);
+    }
+
+    try {
+      const [{ getApps, initializeApp }, { getFirestore, doc, getDoc }] = await Promise.all([
+        import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"),
+        import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js"),
+      ]);
+      const config = window.FIREBASE_CONFIG || {
+        apiKey: "AIzaSyA4ZmYg5sTs4gU1Nm25s7of6oqJ4xGpR28",
+        authDomain: "st-business-86a9b.firebaseapp.com",
+        projectId: "st-business-86a9b",
+        storageBucket: "st-business-86a9b.firebasestorage.app",
+        messagingSenderId: "472603409840",
+        appId: "1:472603409840:web:30127c81e74c3b3c4e2a75",
+      };
+      const app = getApps()[0] || initializeApp(config);
+      const db = getFirestore(app);
+      const snap = await getDoc(doc(db, "users", uid));
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.name) localStorage.setItem("user_name", data.name);
+        if (data.phone) localStorage.setItem("user_phone", data.phone);
+        if (data.address) localStorage.setItem("user_address", data.address);
+        if (data.role) localStorage.setItem("user_role", data.role);
+      }
+    } catch (error) {
+      console.warn("[FeatureAccess] Profile sync from auth return failed:", error);
+    }
+
+    const cleanPath = window.location.pathname.split("/").pop() || "index.html";
+    history.replaceState({}, "", cleanPath.includes(".html") ? cleanPath : "index.html");
+    sessionStorage.setItem("profile_prompt", "1");
+    return true;
+  }
+
   function showBlockedAccountNotice() {
     const message = sessionStorage.getItem("blocked_account_notice");
     if (!message) return;
@@ -473,6 +521,7 @@
     initLockedFooterLinks,
     initLoginNotice,
     clearLocalUser,
+    applyAndroidAuthReturnAndSync,
     showBlockedAccountNotice,
     startDeletedAccountWatcher,
     updateDeleteAccountLink,

@@ -737,11 +737,38 @@
       localStorage.setItem("user_phone", profile.phone || "");
       localStorage.setItem("user_address", profile.address || "");
       localStorage.setItem("user_role", profile.role || "user");
+      if (user.email) {
+        localStorage.setItem("last_google_email", user.email);
+      }
       if (user.photoURL) {
         localStorage.setItem("user_photo", user.photoURL);
       } else {
         localStorage.removeItem("user_photo");
       }
+    }
+
+    function buildAuthBridgeUrl(bridgeUrl) {
+      const separator = bridgeUrl.includes("?") ? "&" : "?";
+      const lastEmail = localStorage.getItem("last_google_email") || "";
+      let authUrl = bridgeUrl + separator + "return=android";
+      if (lastEmail) {
+        authUrl += "&login_hint=" + encodeURIComponent(lastEmail);
+      }
+      return authUrl;
+    }
+
+    function openInAndroidApp(pagePath) {
+      const page = String(pagePath || "index.html").replace(/^\//, "");
+      if (isAndroidApp()) {
+        navigateToAppPage(page);
+        return;
+      }
+      const appUrl = "https://market-scraper-0k36.onrender.com/" + page;
+      const withoutScheme = appUrl.replace(/^https:\/\//, "");
+      const intentUrl = "intent://" + withoutScheme +
+        "#Intent;scheme=https;package=com.marketfiyati.app;S.browser_fallback_url=" +
+        encodeURIComponent(appUrl) + ";end";
+      window.location.href = intentUrl;
     }
 
     async function syncUserRecord(user) {
@@ -904,8 +931,7 @@
       if (isAndroidApp()) {
         try {
           const bridge = await resolveAuthBridgeUrl();
-          const separator = bridge.url.includes("?") ? "&" : "?";
-          const authUrl = bridge.url + separator + "return=android";
+          const authUrl = buildAuthBridgeUrl(bridge.url);
           if (window.AndroidApp?.openExternalAuth) {
             window.AndroidApp.openExternalAuth(authUrl);
             setRawStatus(t("statusStarting"));
@@ -984,7 +1010,7 @@
     document.getElementById("googleSignInBtn").addEventListener("click", continueWithGoogle);
     document.getElementById("goHomeBtn").addEventListener("click", () => {
       sessionStorage.setItem("profile_prompt", "1");
-      navigateToAppPage("index.html");
+      openInAndroidApp("index.html");
     });
     document.getElementById("ownerPasswordBtn").addEventListener("click", unlockOwnerPage);
     document.getElementById("ownerPasswordInput").addEventListener("keydown", (event) => {
@@ -1001,6 +1027,14 @@
     }
     if (!handleAndroidAuthReturn()) {
       handleExistingSession();
+      if (isAndroidApp() && localStorage.getItem("last_google_email") && !localStorage.getItem("user_uid")) {
+        if (!sessionStorage.getItem("android_auto_signin_tried")) {
+          sessionStorage.setItem("android_auto_signin_tried", "1");
+          continueWithGoogle();
+        }
+      }
+    } else {
+      sessionStorage.removeItem("android_auto_signin_tried");
     }
     window.FeatureAccess?.initLockedFooterLinks?.();
   </script>
