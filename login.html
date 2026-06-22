@@ -700,13 +700,17 @@
       document.getElementById("accountSectionLabel").textContent = t("accountSectionLabel");
       document.getElementById("buttonTitle").textContent = t("buttonTitle");
       document.getElementById("buttonSubtitle").textContent = t("buttonSubtitle");
-      document.getElementById("policyText").innerHTML = t("policyText");
+      document.getElementById("policyText").innerHTML = t("policyText").replace(
+        /href="privacy-policy\.html"/g,
+        'href="' + privacyPolicyHref() + '"'
+      );
       document.getElementById("backLink").innerHTML = "&larr; " + t("backLink");
       document.getElementById("subtitle").innerHTML = `${t("subtitlePrefix")}<strong id="brandName">${t("brandName")}</strong>`;
       document.getElementById("goHomeBtn").textContent = t("goHomeBtn");
       document.getElementById("ownerPasswordLabel").textContent = t("ownerPasswordLabel");
       document.getElementById("ownerPasswordBtn").textContent = t("ownerPasswordBtn");
       document.getElementById("privacyLink").textContent = t("privacyPolicy");
+      document.getElementById("privacyLink").href = privacyPolicyHref();
       document.getElementById("deleteAccountLink").textContent = t("deleteAccount");
       document.title = t("topLabel");
     }
@@ -737,9 +741,6 @@
       localStorage.setItem("user_phone", profile.phone || "");
       localStorage.setItem("user_address", profile.address || "");
       localStorage.setItem("user_role", profile.role || "user");
-      if (user.email) {
-        localStorage.setItem("last_google_email", user.email);
-      }
       if (user.photoURL) {
         localStorage.setItem("user_photo", user.photoURL);
       } else {
@@ -749,26 +750,35 @@
 
     function buildAuthBridgeUrl(bridgeUrl) {
       const separator = bridgeUrl.includes("?") ? "&" : "?";
-      const lastEmail = localStorage.getItem("last_google_email") || "";
-      let authUrl = bridgeUrl + separator + "return=android";
-      if (lastEmail) {
-        authUrl += "&login_hint=" + encodeURIComponent(lastEmail);
-      }
-      return authUrl;
+      return bridgeUrl + separator + "return=android";
     }
 
-    function openInAndroidApp(pagePath) {
-      const page = String(pagePath || "index.html").replace(/^\//, "");
-      if (isAndroidApp()) {
-        navigateToAppPage(page);
+    function goToHomePage() {
+      sessionStorage.setItem("profile_prompt", "1");
+      const uid = localStorage.getItem("user_uid");
+      if (uid) {
+        sessionStorage.setItem("login_auth_handled", uid);
+      }
+
+      if (window.FeatureAccess?.isAndroidApp?.()) {
+        window.FeatureAccess.navigateToAppPage("index.html");
         return;
       }
-      const appUrl = "https://market-scraper-0k36.onrender.com/" + page;
+      if (window.AndroidApp?.navigateToPage) {
+        window.AndroidApp.navigateToPage("index.html");
+        return;
+      }
+
+      const appUrl = "https://market-scraper-0k36.onrender.com/index.html";
       const withoutScheme = appUrl.replace(/^https:\/\//, "");
-      const intentUrl = "intent://" + withoutScheme +
+      window.location.href =
+        "intent://" + withoutScheme +
         "#Intent;scheme=https;package=com.marketfiyati.app;S.browser_fallback_url=" +
         encodeURIComponent(appUrl) + ";end";
-      window.location.href = intentUrl;
+    }
+
+    function privacyPolicyHref() {
+      return "privacy-policy.html?lang=" + encodeURIComponent(currentLang || "tr");
     }
 
     async function syncUserRecord(user) {
@@ -806,8 +816,7 @@
       return mergedProfile;
     }
 
-    async function routeSignedInUser(user, options = {}) {
-      const autoNavigateHome = options.autoNavigateHome === true;
+    async function routeSignedInUser(user) {
       setStatus("statusChecking");
       try {
         if (!user.email || !isGmailAddress(user.email)) {
@@ -843,12 +852,6 @@
         }
         if (isOwnerEmail(user.email)) {
           showOwnerPassword();
-          return;
-        }
-        if (autoNavigateHome && isAndroidApp()) {
-          sessionStorage.setItem("login_auth_handled", user.uid);
-          sessionStorage.setItem("profile_prompt", "1");
-          navigateToAppPage("index.html");
           return;
         }
       } catch (error) {
@@ -910,7 +913,7 @@
         email,
         displayName: params.get("auth_name") || "",
         photoURL: params.get("auth_photo") || "",
-      }, { autoNavigateHome: true });
+      });
       return true;
     }
 
@@ -1008,10 +1011,7 @@
     });
 
     document.getElementById("googleSignInBtn").addEventListener("click", continueWithGoogle);
-    document.getElementById("goHomeBtn").addEventListener("click", () => {
-      sessionStorage.setItem("profile_prompt", "1");
-      openInAndroidApp("index.html");
-    });
+    document.getElementById("goHomeBtn").addEventListener("click", goToHomePage);
     document.getElementById("ownerPasswordBtn").addEventListener("click", unlockOwnerPage);
     document.getElementById("ownerPasswordInput").addEventListener("keydown", (event) => {
       if (event.key === "Enter") unlockOwnerPage();
@@ -1027,14 +1027,6 @@
     }
     if (!handleAndroidAuthReturn()) {
       handleExistingSession();
-      if (isAndroidApp() && localStorage.getItem("last_google_email") && !localStorage.getItem("user_uid")) {
-        if (!sessionStorage.getItem("android_auto_signin_tried")) {
-          sessionStorage.setItem("android_auto_signin_tried", "1");
-          continueWithGoogle();
-        }
-      }
-    } else {
-      sessionStorage.removeItem("android_auto_signin_tried");
     }
     window.FeatureAccess?.initLockedFooterLinks?.();
   </script>

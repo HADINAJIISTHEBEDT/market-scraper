@@ -281,6 +281,7 @@
       document.getElementById("logoutButton").textContent = t("logoutButton");
       document.getElementById("backLink").innerHTML = "&larr; " + t("backLink");
       document.getElementById("privacyLink").textContent = t("privacyPolicy");
+      document.getElementById("privacyLink").href = window.FeatureAccess?.privacyPolicyHref?.() || "privacy-policy.html";
       document.getElementById("deleteAccountLink").textContent = t("deleteAccount");
       document.title = t("title");
     }
@@ -333,7 +334,6 @@
         localStorage.setItem("user_email", email);
         localStorage.setItem("user_phone", phone);
         localStorage.setItem("user_address", address);
-        if (email) localStorage.setItem("last_google_email", email);
         if (currentUser.photoURL) localStorage.setItem("user_photo", currentUser.photoURL);
         setStatus("statusSaved");
         setTimeout(() => {
@@ -364,7 +364,6 @@
       localStorage.removeItem("user_role");
       localStorage.removeItem("owner_access");
       localStorage.removeItem("owner_email");
-      sessionStorage.removeItem("android_auto_signin_tried");
       setStatus("logoutDone");
       setTimeout(() => {
         if (window.FeatureAccess?.isAndroidApp?.()) {

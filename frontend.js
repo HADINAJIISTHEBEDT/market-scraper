@@ -424,7 +424,10 @@ function applyLanguage() {
   if (contactComponentLabel) contactComponentLabel.textContent = t("contactComponent");
   if (contactSubmit) contactSubmit.textContent = t("contactSubmit");
   if (contactClose) contactClose.textContent = t("contactClose");
-  if (privacyLink) privacyLink.textContent = t("privacyPolicy");
+  if (privacyLink) {
+    privacyLink.textContent = t("privacyPolicy");
+    privacyLink.href = window.FeatureAccess?.privacyPolicyHref?.() || "privacy-policy.html";
+  }
   if (deleteAccountLink) deleteAccountLink.textContent = t("deleteAccount");
   if (navBrand) navBrand.textContent = t("navBrand");
   if (navCartBtn) navCartBtn.innerHTML = `${escapeHtml(t("navCart"))} (<span id="cartCount">${escapeHtml(document.getElementById("cartCount")?.textContent || "0")}</span>)`;
@@ -766,7 +769,6 @@ window.doLogout = function() {
   localStorage.removeItem("user_role");
   localStorage.removeItem("owner_access");
   localStorage.removeItem("owner_email");
-  sessionStorage.removeItem("android_auto_signin_tried");
   updateNavbar();
 };
 

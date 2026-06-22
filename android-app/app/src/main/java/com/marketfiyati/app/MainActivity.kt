@@ -134,7 +134,14 @@ class MainActivity : AppCompatActivity() {
         createUpdateChannel()
         configureWebView(binding.webView)
         binding.privacyPolicyLink.setOnClickListener {
-            binding.webView.loadUrl(getString(R.string.privacy_policy_url))
+            binding.webView.evaluateJavascript(
+                "(function(){ return localStorage.getItem('app_lang') || 'tr'; })();"
+            ) { lang ->
+                val cleanLang = lang?.trim()?.removeSurrounding("\"")?.ifBlank { "tr" } ?: "tr"
+                binding.webView.loadUrl(
+                    getString(R.string.privacy_policy_url) + "?lang=" + cleanLang
+                )
+            }
         }
 
         if (savedInstanceState == null) {

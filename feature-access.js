@@ -80,6 +80,11 @@
     }
   }
 
+  function privacyPolicyHref(lang) {
+    const value = lang || currentLang();
+    return "privacy-policy.html?lang=" + encodeURIComponent(value);
+  }
+
   function navigateToAppPage(path) {
     const target = String(path || "index.html").replace(/^\//, "");
     if (isAndroidApp()) {
@@ -319,7 +324,6 @@
     localStorage.setItem("user_uid", uid);
     localStorage.setItem("user_email", email);
     localStorage.setItem("user_name", params.get("auth_name") || email);
-    localStorage.setItem("last_google_email", email);
     const photo = params.get("auth_photo");
     if (photo) {
       localStorage.setItem("user_photo", photo);
@@ -512,6 +516,7 @@
     areFeaturesUnlockedForAll,
     isAndroidApp,
     navigateToAppPage,
+    privacyPolicyHref,
     showLockedModal,
     hideLockedModal,
     showPageLock,
