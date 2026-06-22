@@ -171,7 +171,7 @@
     document.body.appendChild(incoming);
 
     modal.querySelectorAll("[data-in-app-call-close]").forEach(function (el) {
-      el.addEventListener("click", close);
+      el.addEventListener("click", function () { close(false); });
     });
     document.getElementById("inAppIncomingAccept").addEventListener("click", acceptIncoming);
     document.getElementById("inAppIncomingDecline").addEventListener("click", declineIncoming);
@@ -180,7 +180,7 @@
     var endBtn = document.getElementById("inAppEndCallBtn");
     if (endBtn) {
       endBtn.title = callT("close");
-      endBtn.addEventListener("click", close);
+      endBtn.addEventListener("click", function () { close(false); });
     }
   }
 
@@ -261,9 +261,18 @@
 
   function bindLocalPreview(stream) {
     var localVideo = document.getElementById("inAppLocalVideo");
+    var videoStage = document.getElementById("inAppCallVideoStage");
+    if (videoStage) videoStage.hidden = false;
     if (localVideo && stream) {
       localVideo.srcObject = stream;
       localVideo.hidden = false;
+      localVideo.muted = true;
+      var playPromise = localVideo.play();
+      if (playPromise && playPromise.catch) {
+        playPromise.catch(function (error) {
+          console.warn("Local video preview play failed", error);
+        });
+      }
     }
   }
 
@@ -310,13 +319,22 @@
     if (el) el.textContent = text || "";
   }
 
-  function showCallModal(title) {
+  function showCallModal(title, mode) {
     ensureUi();
     var modal = document.getElementById("inAppCallModal");
     var titleEl = document.getElementById("inAppCallTitle");
     if (titleEl) titleEl.textContent = title || callT("voice");
     if (modal) modal.hidden = false;
     document.body.style.overflow = "hidden";
+    var videoStage = document.getElementById("inAppCallVideoStage");
+    var voiceStage = document.getElementById("inAppCallVoiceStage");
+    if (mode === "video") {
+      if (videoStage) videoStage.hidden = false;
+      if (voiceStage) voiceStage.hidden = true;
+    } else {
+      if (videoStage) videoStage.hidden = true;
+      if (voiceStage) voiceStage.hidden = false;
+    }
   }
 
   function hideIncoming() {
@@ -368,9 +386,17 @@
   function bindRemoteStream(stream, mode) {
     var remoteVideo = document.getElementById("inAppRemoteVideo");
     var remoteAudio = document.getElementById("inAppRemoteAudio");
+    var videoStage = document.getElementById("inAppCallVideoStage");
     if (mode === "video" && remoteVideo) {
+      if (videoStage) videoStage.hidden = false;
       remoteVideo.srcObject = stream;
       remoteVideo.hidden = false;
+      var playPromise = remoteVideo.play();
+      if (playPromise && playPromise.catch) {
+        playPromise.catch(function (error) {
+          console.warn("Remote video play failed", error);
+        });
+      }
     }
     if (remoteAudio) {
       remoteAudio.srcObject = stream;
@@ -443,6 +469,15 @@
     return firebase.storage();
   }
 
+  function withTimeout(promise, ms) {
+    return Promise.race([
+      promise,
+      new Promise(function (_, reject) {
+        setTimeout(function () { reject(new Error("timeout")); }, ms);
+      }),
+    ]);
+  }
+
   async function uploadCallRecording(orderId, blob, mime) {
     var storage = getStorageBucket();
     if (!storage || !blob) return "";
@@ -458,7 +493,16 @@
       iceServers: [{ urls: "stun:stun.l.google.com:19302" }, { urls: "stun:stun1.l.google.com:19302" }],
     });
     pc.ontrack = function (event) {
-      bindRemoteStream(event.streams[0], mode);
+      var stream = event.streams && event.streams[0];
+      if (!stream && event.track) {
+        if (!pc._remoteMediaStream) pc._remoteMediaStream = new MediaStream();
+        var hasTrack = pc._remoteMediaStream.getTracks().some(function (track) {
+          return track.id === event.track.id;
+        });
+        if (!hasTrack) pc._remoteMediaStream.addTrack(event.track);
+        stream = pc._remoteMediaStream;
+      }
+      if (stream) bindRemoteStream(stream, mode);
       setCallStatus(callT("connected"));
       stopRing();
     };
@@ -535,10 +579,17 @@
       var recording = await stopCallRecording();
       if (recording && recording.blob) {
         recordingMimeType = recording.mime || "";
-        recordingUrl = await uploadCallRecording(call.orderId, recording.blob, recording.mime);
+        try {
+          recordingUrl = await withTimeout(
+            uploadCallRecording(call.orderId, recording.blob, recording.mime),
+            8000
+          );
+        } catch (uploadError) {
+          console.warn("Call recording upload skipped", uploadError);
+        }
       }
     } catch (error) {
-      console.warn("Call recording upload failed", error);
+      console.warn("Call recording stop failed", error);
     }
     try {
       await saveCallHistory(call.orderId, {
@@ -591,11 +642,10 @@
       historySaved: false,
     };
     watchCandidates(orderId, pc);
-    showCallModal(mode === "video" ? callT("video") : callT("voice"));
+    showCallModal(mode === "video" ? callT("video") : callT("voice"), mode);
     updateCallLayout(mode, remoteMeta);
     if (mode === "video") bindLocalPreview(stream);
     setCallStatus(isCaller ? callT("calling") : callT("connected"));
-    startCallRecording(activeCall);
     return pc;
   }
 
@@ -610,7 +660,10 @@
       var ref = callRef(orderId);
       if (!ref || !data.offer) return;
       await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
-      var answer = await pc.createAnswer();
+      var answer = await pc.createAnswer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: (data.mode || "voice") === "video",
+      });
       await pc.setLocalDescription(answer);
       await ref.set({
         status: "active",
@@ -621,7 +674,7 @@
       }, { merge: true });
     } catch (error) {
       console.error("Accept call failed", error);
-      close();
+      close(false);
     }
   }
 
@@ -666,11 +719,29 @@
             await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
           }
         }
+        if (activeCall) {
+          updateCallLayout(activeCall.mode, activeCall.meta);
+          if (activeCall.mode === "video" && activeCall.localStream) {
+            bindLocalPreview(activeCall.localStream);
+          }
+        }
         stopRing();
         setCallStatus(callT("connected"));
         outgoingOrderId = "";
       } catch (error) {
         console.error("Caller connect failed", error);
+      }
+      return;
+    }
+
+    if (status === "active" && callerId !== localId && activeCall && activeCall.orderId === orderId && data.answer && !activeCall.remoteDescriptionSet) {
+      try {
+        await activeCall.pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+        activeCall.remoteDescriptionSet = true;
+        stopRing();
+        setCallStatus(callT("connected"));
+      } catch (error) {
+        console.error("Callee connect failed", error);
       }
       return;
     }
@@ -681,7 +752,6 @@
       stopRing();
       pendingIncoming = null;
       if (activeCall && activeCall.orderId === orderId) {
-        await persistCallHistoryIfNeeded(status === "declined" ? "declined" : "remote-ended");
         close(true);
       } else {
         var modal = document.getElementById("inAppCallModal");
@@ -752,7 +822,10 @@
       }).catch(function () {});
 
       var pc = await beginCall(orderId, callMode, true, callMeta);
-      var offer = await pc.createOffer();
+      var offer = await pc.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: callMode === "video",
+      });
       await pc.setLocalDescription(offer);
       await ref.set({
         status: "ringing",
@@ -772,29 +845,32 @@
       playRingPattern();
     } catch (error) {
       console.error("Call start failed", error);
-      close();
+      setCallStatus(String(error.message || "Call failed"));
+      close(false);
       return Promise.reject(error);
     }
     return Promise.resolve();
   }
 
   function close(fromRemote) {
+    var remoteEnd = fromRemote === true;
     var endedOrderId = activeCall && activeCall.orderId;
+    var endedOutcome = remoteEnd ? "remote-ended" : "ended";
     stopRing();
     outgoingOrderId = "";
     hideIncoming();
     pendingIncoming = null;
     var finalize = async function () {
       if (activeCall) {
-        await persistCallHistoryIfNeeded(fromRemote ? "remote-ended" : "ended");
+        await persistCallHistoryIfNeeded(endedOutcome);
       }
-      if (endedOrderId && !fromRemote) {
+      if (endedOrderId && !remoteEnd) {
         unwatchCandidates(endedOrderId);
         var ref = callRef(endedOrderId);
         if (ref) {
           ref.set({ status: "ended", updatedAt: new Date().toISOString() }, { merge: true }).catch(function () {});
         }
-      } else if (endedOrderId && fromRemote) {
+      } else if (endedOrderId && remoteEnd) {
         unwatchCandidates(endedOrderId);
         setCallStatus(callT("ended"));
       }

@@ -3,6 +3,7 @@
 
   const OL = window.OrderLifecycle || {};
   const ORDER_STATUSES = OL.ORDER_STATUSES || ["waiting", "on-the-way", "arrived"];
+  const DRIVER_STATUSES = ["preparing", "on-the-way", "arrived"];
   const normalizeOrderStatus = OL.normalizeOrderStatus || function (s) { return s || "waiting"; };
   const orderNumberDisplay = OL.orderNumberDisplay || function () { return ""; };
   const orderMatchesMarket = OL.orderMatchesMarket || function () { return true; };
@@ -28,6 +29,12 @@
   };
   const groupItemsByCategory = OL.groupItemsByCategory || function (items) {
     return [{ category: "General", entries: (items || []).map(function (item, index) { return { item: item, index: index }; }) }];
+  };
+  const computeOrderTotal = OL.computeOrderTotal || function (items) {
+    return (Array.isArray(items) ? items : []).reduce(function (sum, item) {
+      if (item && item.available === false) return sum;
+      return sum + (Number(item.price) || 0) * (Number(item.qty) || 1);
+    }, 0);
   };
   const getMarketLabel = window.MarketsConfig?.getMarketLabel || function (k) { return k || "Unknown"; };
   const normalizeMarketKey = window.MarketsConfig?.normalizeMarketKey || function (value) {
@@ -74,6 +81,7 @@
       cardExpiry: "Son kullanma",
       available: "Mevcut",
       unavailable: "Yok",
+      total: "Toplam",
       waiting: "Siparis inceleniyor",
       awaitingPayment: "Odeme bekleniyor",
       preparing: "Hazirlaniyor",
@@ -148,6 +156,7 @@
       cardExpiry: "Expiry",
       available: "Available",
       unavailable: "Unavailable",
+      total: "Total",
       waiting: "Waiting / reviewing",
       awaitingPayment: "Awaiting payment",
       preparing: "Preparing",
@@ -222,6 +231,7 @@
       cardExpiry: "تاريخ الانتهاء",
       available: "متوفر",
       unavailable: "غير متوفر",
+      total: "المجموع",
       waiting: "قيد المراجعة",
       awaitingPayment: "في انتظار الدفع",
       preparing: "قيد التحضير",
@@ -351,6 +361,13 @@
       );
     }
     return "<strong>" + escapeHtml(t("payment")) + "</strong> " + escapeHtml(t("payCash"));
+  }
+
+  function driverStatusOptions(currentStatus) {
+    var normalized = normalizeOrderStatus(currentStatus);
+    var options = DRIVER_STATUSES.slice();
+    if (normalized && options.indexOf(normalized) === -1) options.unshift(normalized);
+    return options;
   }
 
   function isActiveOrder(order) {
@@ -595,7 +612,7 @@
     driverName = "";
     driverPhone = "";
     if (window.PortalAccess && window.PortalAccess.clearPortal) window.PortalAccess.clearPortal();
-    if (window.InAppCall) window.InAppCall.close();
+    if (window.InAppCall) window.InAppCall.close(false);
     updateDriverGate();
     renderOrders(allMarketOrders);
   }
@@ -739,7 +756,7 @@
     const items = Array.isArray(order.items) ? order.items : [];
     const itemsHtml = renderItemsHtml(items);
 
-    const statusOptions = ORDER_STATUSES.map(function (status) {
+    const statusOptions = driverStatusOptions(order.status).map(function (status) {
       const selected = normalizeOrderStatus(order.status) === status ? " selected" : "";
       return '<option value="' + status + '"' + selected + ">" + escapeHtml(statusLabel(status)) + "</option>";
     }).join("");
@@ -754,7 +771,9 @@
       escapeHtml(formatDate(order.createdAt));
 
     document.getElementById("activeOrderPayment").innerHTML = paymentHtml(order);
-    document.getElementById("activeOrderItems").innerHTML = itemsHtml;
+    document.getElementById("activeOrderItems").innerHTML = itemsHtml +
+      '<div style="font-weight:700;margin-top:10px;color:#1e293b;">' +
+      escapeHtml(t("total")) + ": " + formatPrice(computeOrderTotal(items)) + "</div>";
     document.getElementById("driverStatusSelect").innerHTML = statusOptions;
     renderLocationBox(order);
     driverDisplayName = (order.driver && order.driver.name) || t("driver");
@@ -954,7 +973,7 @@
         userEmail: order.userEmail || "",
       });
     }).then(function () {
-      if (window.InAppCall) window.InAppCall.close();
+      if (window.InAppCall) window.InAppCall.close(false);
       stopTracking(false);
       activeOrderId = "";
       clearDriverChatListener();
