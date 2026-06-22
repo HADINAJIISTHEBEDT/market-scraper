@@ -113,9 +113,17 @@
       color: var(--text-muted);
     }
 
-    .hero p strong {
+    .hero p strong,
+    .brand-ltr {
       color: var(--accent);
       font-weight: 500;
+      direction: ltr;
+      unicode-bidi: isolate;
+      display: inline-block;
+    }
+
+    html[dir="rtl"] .hero p {
+      text-align: right;
     }
 
     .auth-panel {
@@ -705,7 +713,8 @@
         'href="' + privacyPolicyHref() + '"'
       );
       document.getElementById("backLink").innerHTML = "&larr; " + t("backLink");
-      document.getElementById("subtitle").innerHTML = `${t("subtitlePrefix")}<strong id="brandName">${t("brandName")}</strong>`;
+      document.getElementById("subtitle").innerHTML =
+        `${t("subtitlePrefix")}<strong id="brandName" class="brand-ltr" dir="ltr">Pazar Fiyatı</strong>`;
       document.getElementById("goHomeBtn").textContent = t("goHomeBtn");
       document.getElementById("ownerPasswordLabel").textContent = t("ownerPasswordLabel");
       document.getElementById("ownerPasswordBtn").textContent = t("ownerPasswordBtn");
@@ -753,6 +762,17 @@
       return bridgeUrl + separator + "return=android";
     }
 
+    function clearLoginSuccessUI() {
+      document.getElementById("successAction")?.classList.remove("visible");
+      const box = document.getElementById("authStatus");
+      if (box) {
+        box.textContent = "";
+        box.className = "status-box";
+      }
+      document.getElementById("ownerPasswordBox")?.classList.remove("visible");
+      sessionStorage.removeItem("login_auth_handled");
+    }
+
     function goToHomePage() {
       sessionStorage.setItem("profile_prompt", "1");
       const uid = localStorage.getItem("user_uid");
@@ -760,21 +780,19 @@
         sessionStorage.setItem("login_auth_handled", uid);
       }
 
-      if (window.FeatureAccess?.isAndroidApp?.()) {
+      if (window.AndroidApp?.navigateToPage) {
+        try {
+          window.AndroidApp.navigateToPage("index.html");
+          return;
+        } catch (error) {
+          console.warn("Android navigate failed", error);
+        }
+      }
+      if (window.FeatureAccess?.isAndroidApp?.() && window.FeatureAccess?.navigateToAppPage) {
         window.FeatureAccess.navigateToAppPage("index.html");
         return;
       }
-      if (window.AndroidApp?.navigateToPage) {
-        window.AndroidApp.navigateToPage("index.html");
-        return;
-      }
-
-      const appUrl = "https://market-scraper-0k36.onrender.com/index.html";
-      const withoutScheme = appUrl.replace(/^https:\/\//, "");
-      window.location.href =
-        "intent://" + withoutScheme +
-        "#Intent;scheme=https;package=com.marketfiyati.app;S.browser_fallback_url=" +
-        encodeURIComponent(appUrl) + ";end";
+      window.location.replace("index.html");
     }
 
     function privacyPolicyHref() {
@@ -974,6 +992,19 @@
     async function handleExistingSession() {
       if (isFilePage) return;
       await setPersistence(auth, browserLocalPersistence);
+
+      const localUid = localStorage.getItem("user_uid");
+      const localEmail = localStorage.getItem("user_email");
+      if (!localUid || !localEmail) {
+        clearLoginSuccessUI();
+        try {
+          await signOut(auth);
+        } catch (error) {
+          console.warn("Sign out skipped", error);
+        }
+        return;
+      }
+
       if (!isAndroidApp()) {
         try {
           const result = await getRedirectResult(auth);
@@ -994,6 +1025,7 @@
 
       onAuthStateChanged(auth, async (user) => {
         if (!user) return;
+        if (user.uid !== localUid) return;
         const handledUid = sessionStorage.getItem("login_auth_handled");
         if (handledUid === user.uid) {
           await routeSignedInUser(user);
@@ -1021,10 +1053,6 @@
     window.FeatureAccess?.showBlockedAccountNotice?.();
     await window.AppSettings.ready();
     window.FeatureAccess?.initLoginNotice?.();
-    if (isOwnerEmail(localStorage.getItem("user_email"))) {
-      setStatus("statusSuccess");
-      showOwnerPassword();
-    }
     if (!handleAndroidAuthReturn()) {
       handleExistingSession();
     }

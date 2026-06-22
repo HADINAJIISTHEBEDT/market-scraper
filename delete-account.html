@@ -207,8 +207,17 @@
             requestedAt,
             lang: userLang,
             inboxEntryId: inboxRef.id,
+            adminOnly: true,
           }, { merge: true });
+          document.getElementById("requestDeleteBtn").disabled = true;
           setStatus(t("sent"));
+          setTimeout(() => {
+            if (window.FeatureAccess?.navigateToAppPage) {
+              window.FeatureAccess.navigateToAppPage("index.html");
+            } else {
+              window.location.href = "index.html";
+            }
+          }, 1800);
         } catch (error) {
           setStatus(`${t("failed")}: ${error.message}`, true);
         }

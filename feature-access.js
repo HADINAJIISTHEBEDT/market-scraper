@@ -527,6 +527,7 @@
     initLoginNotice,
     clearLocalUser,
     applyAndroidAuthReturnAndSync,
+    signOutFirebaseAuth,
     showBlockedAccountNotice,
     startDeletedAccountWatcher,
     updateDeleteAccountLink,

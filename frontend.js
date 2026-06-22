@@ -457,6 +457,10 @@ function applyLanguage() {
       span.textContent = t(featuredKeys[index]);
     }
   });
+
+  if (window.AppSettings?.get) {
+    renderHomepageTiles(window.AppSettings.get().homepageTiles);
+  }
 }
 
 function showResultsView() {
@@ -637,12 +641,30 @@ window.addToCart = function(item) {
   }
 };
 
+const TILE_LABEL_KEYS = {
+  "Fresh vegetables": "featuredFreshVegetables",
+  "Bread and bakery": "featuredBreadAndBakery",
+  "Daily groceries": "featuredDailyGroceries",
+  "Fruit": "featuredFruit",
+  "Rice and grains": "featuredRiceAndGrains",
+  "Desserts": "featuredDesserts",
+  "Potatoes": "featuredPotatoes",
+  "Dairy": "featuredDairy",
+  "Vegetables": "featuredVegetables",
+  "Bananas": "featuredBananas",
+};
+
+function translateTileLabel(label) {
+  const key = TILE_LABEL_KEYS[String(label || "").trim()];
+  return key ? t(key) : String(label || "");
+}
+
 function renderHomepageTiles(tiles) {
   const strip = document.getElementById("adStrip");
   if (!strip || !Array.isArray(tiles) || !tiles.length) return;
   strip.innerHTML = tiles.map((tile) => `
     <div class="ad-tile" style="background-image:url('${escapeHtml(tile.imageUrl)}')">
-      <span>${escapeHtml(tile.label)}</span>
+      <span>${escapeHtml(translateTileLabel(tile.label))}</span>
     </div>
   `).join("");
 }
@@ -769,6 +791,11 @@ window.doLogout = function() {
   localStorage.removeItem("user_role");
   localStorage.removeItem("owner_access");
   localStorage.removeItem("owner_email");
+  sessionStorage.removeItem("login_auth_handled");
+  sessionStorage.removeItem("android_auto_signin_tried");
+  if (window.FeatureAccess?.signOutFirebaseAuth) {
+    void window.FeatureAccess.signOutFirebaseAuth();
+  }
   updateNavbar();
 };
 

@@ -213,8 +213,8 @@
       <div class="actions-row" style="margin-bottom:14px;">
         <button class="btn-danger" type="button" data-admin-action="delete-all-users" id="deleteAllUsersBtn">Delete all users</button>
       </div>
-      <h3 id="deleteRequestsTitle">Delete requests</h3>
-      <div id="deleteRequestsList"></div>
+      <h3 id="deleteRequestsTitle" hidden>Delete requests</h3>
+      <div id="deleteRequestsList" hidden></div>
       <div id="usersList"></div>
     </section>
 
@@ -860,7 +860,7 @@
     function renderDeleteRequests(requests) {
       currentDeleteRequests = requests;
       const root = document.getElementById("deleteRequestsList");
-      if (!root) return;
+      if (!root || root.hidden) return;
       const pending = requests.filter((request) => isActiveDeleteRequest(request));
       if (!pending.length) {
         root.innerHTML = `<p class="empty-msg">${escapeHtml(t("noDeleteRequests"))}</p>`;
@@ -1634,9 +1634,9 @@ Pazar Fiyatı Admin`;
           html: `<p>Hello ${escapeHtml(name)},</p><p>Your Pazar Fiyati account and personal data have been deleted after your account deletion request.</p><p>If you did not request this, please contact <a href="mailto:${OWNER_EMAIL}">${OWNER_EMAIL}</a>.</p><p>Pazar Fiyati Admin</p>`,
         },
         ar: {
-          subject: "تم حذف حسابك في Pazar Fiyati",
+          subject: "تم حذف حسابك في <span dir=\"ltr\" class=\"brand-ltr\">Pazar Fiyati</span>",
           text: `مرحباً ${name},\n\nتم حذف حسابك وبياناتك الشخصية في Pazar Fiyati بناءً على طلب حذف الحساب.\n\nإذا لم تطلب ذلك، يرجى التواصل مع ${OWNER_EMAIL}.\n\nإدارة Pazar Fiyati`,
-          html: `<p>مرحباً ${escapeHtml(name)},</p><p>تم حذف حسابك وبياناتك الشخصية في Pazar Fiyati بناءً على طلب حذف الحساب.</p><p>إذا لم تطلب ذلك، يرجى التواصل مع <a href="mailto:${OWNER_EMAIL}">${OWNER_EMAIL}</a>.</p><p>إدارة Pazar Fiyati</p>`,
+          html: `<p>مرحباً ${escapeHtml(name)},</p><p>تم حذف حسابك وبياناتك الشخصية في <span dir="ltr" class="brand-ltr">Pazar Fiyati</span> بناءً على طلب حذف الحساب.</p><p>إذا لم تطلب ذلك، يرجى التواصل مع <a href="mailto:${OWNER_EMAIL}">${OWNER_EMAIL}</a>.</p><p>إدارة <span dir="ltr" class="brand-ltr">Pazar Fiyati</span></p>`,
         },
       };
       return templates[lang] || templates.tr;

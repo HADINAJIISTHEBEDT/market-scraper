@@ -9,21 +9,38 @@
     body { max-width: 700px; margin: 0 auto; padding: 24px; }
     h1 { margin-bottom: 20px; }
     .cart-item {
-      display: flex; align-items: center; gap: 14px;
+      display: grid;
+      grid-template-columns: 60px minmax(0, 1fr) auto auto auto;
+      align-items: center;
+      gap: 12px;
       border: 1px solid #e5e7eb; border-radius: 10px;
       padding: 12px; margin-bottom: 10px; background: #fff;
     }
-    .cart-item img { width: 60px; height: 60px; object-fit: cover; border-radius: 6px; }
-    .cart-item-info { flex: 1; }
-    .cart-item-name { font-weight: 600; font-size: 15px; }
-    .cart-item-market { display: none; }
-    .cart-item-price { color: #065f46; font-weight: 600; }
-    .qty-controls { display: flex; align-items: center; gap: 8px; }
-    .qty-btn {
-      width: 30px; height: 30px; border: 1px solid #cbd5e1;
-      border-radius: 6px; background: #f1f5f9; cursor: pointer; font-size: 18px;
+    html[dir="rtl"] .cart-item {
+      grid-template-columns: auto auto auto minmax(0, 1fr) 60px;
     }
-    .qty-num { font-weight: 700; min-width: 24px; text-align: center; }
+    .cart-item img { width: 60px; height: 60px; object-fit: cover; border-radius: 6px; }
+    html[dir="rtl"] .cart-item img { order: 5; }
+    .cart-item-info { min-width: 0; }
+    .cart-item-name { font-weight: 600; font-size: 15px; line-height: 1.35; }
+    .cart-item-market { display: none; }
+    .cart-item-price { color: #065f46; font-weight: 600; white-space: nowrap; }
+    .qty-controls {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      direction: ltr;
+      unicode-bidi: isolate;
+      flex-shrink: 0;
+    }
+    .qty-btn {
+      width: 32px; height: 32px; border: 1px solid #cbd5e1;
+      border-radius: 8px; background: #f8fafc; cursor: pointer;
+      font-size: 18px; line-height: 1; padding: 0;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .qty-num { font-weight: 700; min-width: 28px; text-align: center; }
     .remove-btn {
       background: none; border: none; color: #b91c1c;
       cursor: pointer; font-size: 20px; padding: 4px;
