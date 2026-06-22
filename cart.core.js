@@ -24,19 +24,28 @@
       pageTitle: "Sepetim", backLink: "Aramaya don", ordersLink: "Siparislerim", emptyCart: "Sepetiniz bos.",
       searchProducts: "Urun ara", each: "adet", remove: "Kaldir", total: "Toplam", placeOrder: "Siparis ver",
       orderPlaced: "Siparisiniz alindi!", trackOrder: "Siparisinizi takip edin", viewOrders: "Siparislerim",
-      orderNumber: "Siparis no", error: "Hata", unknown: "Bilinmiyor"
+      orderNumber: "Siparis no", error: "Hata", unknown: "Bilinmiyor",
+      paymentTitle: "Odeme yontemi", paymentHint: "Odeme, market urunleri onayladiktan sonra tamamlanir.",
+      payCash: "Kapida nakit", payCard: "Kapida kart", cardName: "Kart uzerindeki isim",
+      cardLast4: "Son 4 hane", cardExpiry: "AA/YY", paymentRequired: "Odeme yontemi secin"
     },
     en: {
       pageTitle: "My Cart", backLink: "Back to Search", ordersLink: "My Orders", emptyCart: "Your cart is empty.",
       searchProducts: "Search for products", each: "each", remove: "Remove", total: "Total", placeOrder: "Place Order",
       orderPlaced: "Your order was placed!", trackOrder: "Track your order", viewOrders: "My Orders",
-      orderNumber: "Order no", error: "Error", unknown: "Unknown"
+      orderNumber: "Order no", error: "Error", unknown: "Unknown",
+      paymentTitle: "Payment method", paymentHint: "Payment is completed after the market confirms your items.",
+      payCash: "Cash on delivery", payCard: "Card on delivery", cardName: "Name on card",
+      cardLast4: "Last 4 digits", cardExpiry: "MM/YY", paymentRequired: "Choose a payment method"
     },
     ar: {
       pageTitle: "سلتي", backLink: "العودة إلى البحث", ordersLink: "طلباتي", emptyCart: "سلتك فارغة.",
       searchProducts: "ابحث عن المنتجات", each: "للقطعة", remove: "إزالة", total: "المجموع", placeOrder: "إرسال الطلب",
       orderPlaced: "تم استلام طلبك!", trackOrder: "تتبع طلبك", viewOrders: "طلباتي",
-      orderNumber: "رقم الطلب", error: "خطأ", unknown: "غير معروف"
+      orderNumber: "رقم الطلب", error: "خطأ", unknown: "غير معروف",
+      paymentTitle: "طريقة الدفع", paymentHint: "يتم الدفع بعد أن يؤكد السوق المنتجات.",
+      payCash: "نقداً عند التسليم", payCard: "بطاقة عند التسليم", cardName: "الاسم على البطاقة",
+      cardLast4: "آخر 4 أرقام", cardExpiry: "شهر/سنة", paymentRequired: "اختر طريقة الدفع"
     }
   };
 
@@ -78,6 +87,49 @@
     return Number(price).toFixed(2).replace(".", ",") + " TL";
   }
 
+  function getSelectedPaymentMethod() {
+    const selected = document.querySelector('input[name="cartPaymentMethod"]:checked');
+    return selected ? selected.value : "";
+  }
+
+  function paymentSectionHtml() {
+    const saved = localStorage.getItem("cart_payment_method") || "cash";
+    const cashSelected = saved !== "card" ? " selected" : "";
+    const cardSelected = saved === "card" ? " selected" : "";
+    return (
+      '<div class="payment-box">' +
+      "<h2>" + escapeHtml(t("paymentTitle")) + "</h2>" +
+      '<p class="pay-hint">' + escapeHtml(t("paymentHint")) + "</p>" +
+      '<div class="pay-method-grid">' +
+      '<label class="pay-method-option' + cashSelected + '" data-pay-option="cash">' +
+      '<input type="radio" name="cartPaymentMethod" value="cash"' + (saved !== "card" ? " checked" : "") + ">" +
+      '<span class="pay-method-icon">💵</span><span>' + escapeHtml(t("payCash")) + "</span></label>" +
+      '<label class="pay-method-option' + cardSelected + '" data-pay-option="card">' +
+      '<input type="radio" name="cartPaymentMethod" value="card"' + (saved === "card" ? " checked" : "") + ">" +
+      '<span class="pay-method-icon">💳</span><span>' + escapeHtml(t("payCard")) + "</span></label>" +
+      "</div>" +
+      '<div id="cartCardFields" class="pay-card-fields' + (saved === "card" ? " visible" : "") + '">' +
+      '<input class="pay-field" id="cartCardName" placeholder="' + escapeHtml(t("cardName")) + '" />' +
+      '<input class="pay-field" id="cartCardLast4" placeholder="' + escapeHtml(t("cardLast4")) + '" maxlength="4" inputmode="numeric" />' +
+      '<input class="pay-field" id="cartCardExpiry" placeholder="' + escapeHtml(t("cardExpiry")) + '" />' +
+      "</div></div>"
+    );
+  }
+
+  function bindPaymentMethodUi() {
+    document.querySelectorAll("[data-pay-option]").forEach(function (label) {
+      label.addEventListener("click", function () {
+        const value = label.getAttribute("data-pay-option") || "cash";
+        localStorage.setItem("cart_payment_method", value);
+        document.querySelectorAll(".pay-method-option").forEach(function (el) {
+          el.classList.toggle("selected", el.getAttribute("data-pay-option") === value);
+        });
+        const cardFields = document.getElementById("cartCardFields");
+        if (cardFields) cardFields.classList.toggle("visible", value === "card");
+      });
+    });
+  }
+
   function renderCart() {
     const cart = getCart();
     const root = document.getElementById("cartList");
@@ -100,8 +152,10 @@
         '<button class="remove-btn" onclick="removeItem(' + idx + ')" title="' + escapeHtml(t("remove")) + '">X</button></div>';
     });
     html += '<div class="cart-summary"><div class="cart-total">' + escapeHtml(t("total")) + ": " + formatPrice(total) +
-      '</div><button class="btn-order" onclick="placeOrder()">' + escapeHtml(t("placeOrder")) + "</button></div>";
+      "</div>" + paymentSectionHtml() +
+      '<button class="btn-order" onclick="placeOrder()">' + escapeHtml(t("placeOrder")) + "</button></div>";
     root.innerHTML = html;
+    bindPaymentMethodUi();
   }
 
   window.changeQty = function (idx, delta) {
@@ -125,6 +179,11 @@
     }
     const cart = getCart();
     if (!cart.length) return;
+    const paymentMethod = getSelectedPaymentMethod();
+    if (!paymentMethod) {
+      document.getElementById("orderMsg").innerHTML = '<span style="color:#b91c1c">' + escapeHtml(t("paymentRequired")) + "</span>";
+      return;
+    }
     const total = cart.reduce(function (sum, item) { return sum + (item.price || 0) * (item.qty || 1); }, 0);
     const btn = document.querySelector(".btn-order");
     if (btn) btn.disabled = true;
@@ -157,6 +216,13 @@
         totalPrice: total,
         status: "waiting",
         paymentStatus: "pending",
+        preferredPaymentMethod: paymentMethod,
+        paymentSummary: paymentMethod === "card" ? {
+          type: "card",
+          cardholderName: document.getElementById("cartCardName")?.value.trim() || "",
+          last4: document.getElementById("cartCardLast4")?.value.trim() || "",
+          expiry: document.getElementById("cartCardExpiry")?.value.trim() || "",
+        } : { type: "cash" },
         createdAt: new Date().toISOString()
       }).then(function () {
         return orderNumber;

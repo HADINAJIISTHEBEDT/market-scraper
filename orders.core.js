@@ -385,22 +385,29 @@
     if (!isAwaitingPayment(order) || isOrderPaid(order)) return "";
     const deadline = order.paymentDeadline ? new Date(order.paymentDeadline).getTime() : Date.now() + PAYMENT_TIMEOUT_MS;
     const mins = Math.max(0, Math.ceil((deadline - Date.now()) / 60000));
+    const preferred = String(order.preferredPaymentMethod || order.paymentSummary?.type || "cash").toLowerCase();
+    const cashSelected = preferred !== "card" ? " selected" : "";
+    const cardSelected = preferred === "card" ? " selected" : "";
+    const summary = order.paymentSummary || {};
     return (
-      '<div class="payment-box" style="margin-top:12px;padding:12px;border:1px solid #fcd34d;border-radius:12px;background:#fffbeb;">' +
-      "<strong>" + escapeHtml(t("payNowTitle")) + "</strong><br>" +
-      escapeHtml(t("payNowHelp")) + "<br>" +
-      escapeHtml(t("payTimeLeft")) + ": " + mins + " min<br>" +
-      '<label><input type="radio" name="pay-' + escapeHtml(order.id) + '" value="cash" checked> ' +
-      escapeHtml(t("payCash")) + "</label><br>" +
-      '<label><input type="radio" name="pay-' + escapeHtml(order.id) + '" value="card"> ' +
-      escapeHtml(t("payCard")) + "</label>" +
-      '<div id="card-fields-' + escapeHtml(order.id) + '" style="display:none;margin-top:8px;">' +
-      '<input class="chat-input" id="pay-name-' + escapeHtml(order.id) + '" placeholder="' + escapeHtml(t("cardName")) + '" style="width:100%;margin-bottom:6px;" />' +
-      '<input class="chat-input" id="pay-last4-' + escapeHtml(order.id) + '" placeholder="' + escapeHtml(t("cardLast4")) + '" maxlength="4" style="width:100%;margin-bottom:6px;" />' +
-      '<input class="chat-input" id="pay-expiry-' + escapeHtml(order.id) + '" placeholder="' + escapeHtml(t("cardExpiry")) + '" style="width:100%;" />' +
+      '<div class="payment-panel">' +
+      "<h3>" + escapeHtml(t("payNowTitle")) + "</h3>" +
+      '<p class="pay-hint">' + escapeHtml(t("payNowHelp")) + " " + escapeHtml(t("payTimeLeft")) + ": " + mins + " min</p>" +
+      '<div class="pay-method-grid">' +
+      '<label class="pay-method-option' + cashSelected + '" data-pay-option="cash" data-order-id="' + escapeHtml(order.id) + '">' +
+      '<input type="radio" name="pay-' + escapeHtml(order.id) + '" value="cash"' + (preferred !== "card" ? " checked" : "") + ">" +
+      '<span>💵</span><span>' + escapeHtml(t("payCash")) + "</span></label>" +
+      '<label class="pay-method-option' + cardSelected + '" data-pay-option="card" data-order-id="' + escapeHtml(order.id) + '">' +
+      '<input type="radio" name="pay-' + escapeHtml(order.id) + '" value="card"' + (preferred === "card" ? " checked" : "") + ">" +
+      '<span>💳</span><span>' + escapeHtml(t("payCard")) + "</span></label>" +
       "</div>" +
-      '<button class="btn-send" type="button" data-order-action="pay-order" data-order-id="' +
-      escapeHtml(order.id) + '" style="margin-top:10px;">' + escapeHtml(t("payNow")) + "</button>" +
+      '<div id="card-fields-' + escapeHtml(order.id) + '" class="pay-card-fields' + (preferred === "card" ? " visible" : "") + '">' +
+      '<input class="pay-field" id="pay-name-' + escapeHtml(order.id) + '" placeholder="' + escapeHtml(t("cardName")) + '" value="' + escapeHtml(summary.cardholderName || "") + '" />' +
+      '<input class="pay-field" id="pay-last4-' + escapeHtml(order.id) + '" placeholder="' + escapeHtml(t("cardLast4")) + '" maxlength="4" inputmode="numeric" value="' + escapeHtml(summary.last4 || "") + '" />' +
+      '<input class="pay-field" id="pay-expiry-' + escapeHtml(order.id) + '" placeholder="' + escapeHtml(t("cardExpiry")) + '" value="' + escapeHtml(summary.expiry || "") + '" />' +
+      "</div>" +
+      '<button class="btn-pay" type="button" data-order-action="pay-order" data-order-id="' +
+      escapeHtml(order.id) + '">' + escapeHtml(t("payNow")) + "</button>" +
       "</div>"
     );
   }
@@ -583,6 +590,7 @@
     const payload = {
       paymentMethod: method,
       paidAt: now,
+      paymentStatus: "paid",
       status: "preparing",
       updatedAt: now,
     };
@@ -702,16 +710,19 @@
     root.innerHTML = html;
 
     activeOrders.forEach(function (order) {
-      const cardRadio = document.querySelector('input[name="pay-' + order.id + '"][value="card"]');
-      const cashRadio = document.querySelector('input[name="pay-' + order.id + '"][value="cash"]');
-      const cardFields = document.getElementById("card-fields-" + order.id);
-      function syncCardFields() {
-        if (!cardFields || !cardRadio) return;
-        cardFields.style.display = cardRadio.checked ? "block" : "none";
-      }
-      if (cardRadio) cardRadio.addEventListener("change", syncCardFields);
-      if (cashRadio) cashRadio.addEventListener("change", syncCardFields);
-      syncCardFields();
+      document.querySelectorAll('[data-pay-option][data-order-id="' + order.id + '"]').forEach(function (label) {
+        label.addEventListener("click", function () {
+          const value = label.getAttribute("data-pay-option") || "cash";
+          const orderId = label.getAttribute("data-order-id") || "";
+          document.querySelectorAll('[data-pay-option][data-order-id="' + orderId + '"]').forEach(function (el) {
+            el.classList.toggle("selected", el.getAttribute("data-pay-option") === value);
+          });
+          const radio = document.querySelector('input[name="pay-' + orderId + '"][value="' + value + '"]');
+          if (radio) radio.checked = true;
+          const cardFields = document.getElementById("card-fields-" + orderId);
+          if (cardFields) cardFields.classList.toggle("visible", value === "card");
+        });
+      });
     });
 
     clearChatListeners(activeIds);

@@ -64,6 +64,27 @@
     return ORDER_STATUSES.indexOf(normalizeOrderStatus(status));
   }
 
+  function getSelectableStatuses(currentStatus) {
+    var normalized = normalizeOrderStatus(currentStatus);
+    if (isOrderClosed(currentStatus)) return ["closed"];
+    var idx = ORDER_STATUSES.indexOf(normalized);
+    if (idx < 0) return [normalized];
+    var options = [ORDER_STATUSES[idx]];
+    if (idx + 1 < ORDER_STATUSES.length) options.push(ORDER_STATUSES[idx + 1]);
+    return options;
+  }
+
+  function canAdvanceToStatus(currentStatus, targetStatus) {
+    var current = normalizeOrderStatus(currentStatus);
+    var target = normalizeOrderStatus(targetStatus);
+    if (current === target) return true;
+    if (isOrderClosed(currentStatus)) return false;
+    var curIdx = ORDER_STATUSES.indexOf(current);
+    var tgtIdx = ORDER_STATUSES.indexOf(target);
+    if (curIdx < 0 || tgtIdx < 0) return false;
+    return tgtIdx === curIdx + 1;
+  }
+
   function allocateOrderNumber(db) {
     return db.runTransaction(function (transaction) {
       var ref = db.collection("counters").doc("orders");
@@ -298,6 +319,8 @@
       startedAt: String(entry.startedAt || now),
       endedAt: String(entry.endedAt || now),
       createdAt: now,
+      recordingUrl: String(entry.recordingUrl || ""),
+      recordingMime: String(entry.recordingMime || ""),
     });
   }
 
@@ -374,6 +397,8 @@
     formatOrderNumber: formatOrderNumber,
     orderNumberDisplay: orderNumberDisplay,
     statusIndex: statusIndex,
+    getSelectableStatuses: getSelectableStatuses,
+    canAdvanceToStatus: canAdvanceToStatus,
     allocateOrderNumber: allocateOrderNumber,
     normalizeMarketKey: normalizeMarketKey,
     orderMatchesMarket: orderMatchesMarket,

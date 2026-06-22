@@ -12,6 +12,9 @@
   var activeCall = null;
   var useFrontCamera = true;
   var speakerEnabled = true;
+  var mediaRecorder = null;
+  var recordedChunks = [];
+  var recordingMime = "audio/webm";
 
   var CALL_I18N = {
     tr: {
@@ -373,6 +376,81 @@
       remoteAudio.srcObject = stream;
       remoteAudio.muted = !speakerEnabled;
     }
+    if (activeCall) {
+      activeCall.remoteStream = stream;
+      if (!activeCall.recordingActive) startCallRecording(activeCall);
+    }
+  }
+
+  function buildRecordingStream(call) {
+    if (!call || !call.localStream) return null;
+    var combined = new MediaStream();
+    call.localStream.getAudioTracks().forEach(function (track) { combined.addTrack(track); });
+    if (call.mode === "video") {
+      call.localStream.getVideoTracks().forEach(function (track) { combined.addTrack(track); });
+      if (call.remoteStream) {
+        call.remoteStream.getAudioTracks().forEach(function (track) { combined.addTrack(track); });
+      }
+    }
+    return combined;
+  }
+
+  function startCallRecording(call) {
+    if (!call || call.recordingActive || !window.MediaRecorder) return;
+    try {
+      var stream = buildRecordingStream(call);
+      if (!stream || !stream.getTracks().length) return;
+      recordedChunks = [];
+      recordingMime = call.mode === "video" ? "video/webm" : "audio/webm";
+      if (!MediaRecorder.isTypeSupported(recordingMime)) {
+        recordingMime = call.mode === "video" ? "video/webm;codecs=vp8,opus" : "audio/webm;codecs=opus";
+      }
+      if (!MediaRecorder.isTypeSupported(recordingMime)) recordingMime = "";
+      mediaRecorder = recordingMime
+        ? new MediaRecorder(stream, { mimeType: recordingMime })
+        : new MediaRecorder(stream);
+      mediaRecorder.ondataavailable = function (event) {
+        if (event.data && event.data.size) recordedChunks.push(event.data);
+      };
+      mediaRecorder.start(1000);
+      call.recordingActive = true;
+    } catch (error) {
+      console.warn("Call recording unavailable", error);
+    }
+  }
+
+  function stopCallRecording() {
+    return new Promise(function (resolve) {
+      if (!mediaRecorder || mediaRecorder.state === "inactive") {
+        mediaRecorder = null;
+        return resolve(null);
+      }
+      mediaRecorder.onstop = function () {
+        var mime = recordingMime || mediaRecorder.mimeType || "application/octet-stream";
+        var blob = recordedChunks.length ? new Blob(recordedChunks, { type: mime }) : null;
+        recordedChunks = [];
+        mediaRecorder = null;
+        resolve(blob ? { blob: blob, mime: mime } : null);
+      };
+      try { mediaRecorder.stop(); } catch (error) { resolve(null); }
+    });
+  }
+
+  function getStorageBucket() {
+    if (typeof firebase === "undefined" || !window.FIREBASE_CONFIG) return null;
+    if (!firebase.apps.length) firebase.initializeApp(window.FIREBASE_CONFIG);
+    if (!firebase.storage) return null;
+    return firebase.storage();
+  }
+
+  async function uploadCallRecording(orderId, blob, mime) {
+    var storage = getStorageBucket();
+    if (!storage || !blob) return "";
+    var ext = mime.indexOf("video") >= 0 ? "webm" : "webm";
+    var path = "callRecordings/" + String(orderId || "unknown") + "/" + Date.now() + "." + ext;
+    var ref = storage.ref().child(path);
+    await ref.put(blob, { contentType: mime || "application/octet-stream" });
+    return ref.getDownloadURL();
   }
 
   function createPeerConnection(orderId, mode, isCaller) {
@@ -451,6 +529,17 @@
     activeCall.historySaved = true;
     var call = activeCall;
     var meta = call.meta || {};
+    var recordingUrl = "";
+    var recordingMimeType = "";
+    try {
+      var recording = await stopCallRecording();
+      if (recording && recording.blob) {
+        recordingMimeType = recording.mime || "";
+        recordingUrl = await uploadCallRecording(call.orderId, recording.blob, recording.mime);
+      }
+    } catch (error) {
+      console.warn("Call recording upload failed", error);
+    }
     try {
       await saveCallHistory(call.orderId, {
         orderNumber: meta.orderNumber || "",
@@ -463,6 +552,8 @@
         mode: call.mode || "voice",
         startedAt: call.startedAt || new Date().toISOString(),
         outcome: outcome || "completed",
+        recordingUrl: recordingUrl,
+        recordingMime: recordingMimeType,
       });
     } catch (error) {
       console.error("Call history save failed", error);
@@ -504,6 +595,7 @@
     updateCallLayout(mode, remoteMeta);
     if (mode === "video") bindLocalPreview(stream);
     setCallStatus(isCaller ? callT("calling") : callT("connected"));
+    startCallRecording(activeCall);
     return pc;
   }
 
@@ -688,30 +780,30 @@
 
   function close(fromRemote) {
     var endedOrderId = activeCall && activeCall.orderId;
-    var endedMeta = activeCall && activeCall.meta;
-    var startedAt = activeCall && activeCall.startedAt;
-    var endedMode = activeCall && activeCall.mode;
     stopRing();
     outgoingOrderId = "";
     hideIncoming();
     pendingIncoming = null;
-    if (activeCall) {
-      persistCallHistoryIfNeeded(fromRemote ? "remote-ended" : "ended");
-    }
-    if (endedOrderId && !fromRemote) {
-      unwatchCandidates(endedOrderId);
-      var ref = callRef(endedOrderId);
-      if (ref) {
-        ref.set({ status: "ended", updatedAt: new Date().toISOString() }, { merge: true }).catch(function () {});
+    var finalize = async function () {
+      if (activeCall) {
+        await persistCallHistoryIfNeeded(fromRemote ? "remote-ended" : "ended");
       }
-    } else if (endedOrderId && fromRemote) {
-      unwatchCandidates(endedOrderId);
-      setCallStatus(callT("ended"));
-    }
-    cleanupPeer();
-    var modal = document.getElementById("inAppCallModal");
-    if (modal) modal.hidden = true;
-    document.body.style.overflow = "";
+      if (endedOrderId && !fromRemote) {
+        unwatchCandidates(endedOrderId);
+        var ref = callRef(endedOrderId);
+        if (ref) {
+          ref.set({ status: "ended", updatedAt: new Date().toISOString() }, { merge: true }).catch(function () {});
+        }
+      } else if (endedOrderId && fromRemote) {
+        unwatchCandidates(endedOrderId);
+        setCallStatus(callT("ended"));
+      }
+      cleanupPeer();
+      var modal = document.getElementById("inAppCallModal");
+      if (modal) modal.hidden = true;
+      document.body.style.overflow = "";
+    };
+    void finalize();
   }
 
   window.InAppCall = {

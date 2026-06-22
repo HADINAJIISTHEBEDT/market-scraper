@@ -41,6 +41,7 @@
       trackDriver: "Surucuyu takip et",
       savedDrivers: "Kayitli suruculer",
       assignAfterPayment: "Surucu yalnizca odeme sonrasi atanabilir",
+      statusMustAdvanceStep: "Durum sirayla guncellenmeli (bir adim ileri).",
       deleteDriver: "Surucuyu sil",
       selectDriver: "Surucu sec",
       chatTitle: "Canli sohbet",
@@ -102,6 +103,7 @@
       trackDriver: "Track driver",
       savedDrivers: "Saved drivers",
       assignAfterPayment: "Assign driver only after customer payment",
+      statusMustAdvanceStep: "Update status one step at a time.",
       deleteDriver: "Delete driver",
       selectDriver: "Select driver",
       chatTitle: "Live chat",
@@ -175,7 +177,8 @@
       waitingStatus: "قيد المراجعة",
       awaitingPaymentStatus: "في انتظار الدفع",
       preparingStatus: "قيد التحضير",
-      assignAfterPayment: "Surucu yalnizca odeme sonrasi atanabilir",
+      assignAfterPayment: "يمكن تعيين السائق فقط بعد الدفع",
+      statusMustAdvanceStep: "يجب تحديث الحالة خطوة واحدة في كل مرة.",
       onTheWayStatus: "في الطريق",
       arrivedStatus: "تم التسليم",
       inboxTitle: "صندوق الوارد",
@@ -208,6 +211,12 @@
   const isOrderClosed = OL.isOrderClosed || function () { return false; };
   const allItemsAvailable = OL.allItemsAvailable || function () { return false; };
   const isOrderPaid = OL.isOrderPaid || function () { return false; };
+  const getSelectableStatuses = OL.getSelectableStatuses || function (status) {
+    return [normalizeOrderStatus(status)];
+  };
+  const canAdvanceToStatus = OL.canAdvanceToStatus || function (current, target) {
+    return normalizeOrderStatus(current) === normalizeOrderStatus(target);
+  };
   const PAYMENT_TIMEOUT_MS = OL.PAYMENT_TIMEOUT_MS || 20 * 60 * 1000;
   const isOrderCommunicationActive = OL.isOrderCommunicationActive || function () { return true; };
   const orderChatCollection = OL.orderChatCollection || function (db, id) {
@@ -705,7 +714,7 @@
       const currentStatus = normalizeOrderStatus(order.status);
       const orderNo = orderNumberDisplay(order);
       const closed = isOrderClosed(order.status);
-      const statusOptions = STATUSES.map((status) =>
+      const statusOptions = getSelectableStatuses(currentStatus).map((status) =>
         `<option value="${status}" ${currentStatus === status ? "selected" : ""}>${escapeHtml(statusLabel(status))}</option>`
       ).join("");
       const driver = order.driver || {};
@@ -755,8 +764,6 @@
     }).join("");
 
     clearChatListeners(new Set());
-    renderMarketHistory(filtered);
-    renderMarketCallHistory();
   }
 
   async function toggleItemAvailability(orderId, itemIndex, makeAvailable) {
@@ -794,6 +801,11 @@
     const select = document.getElementById(`status-${orderId}`);
     if (!select || select.disabled) return;
     const status = normalizeOrderStatus(select.value);
+    if (!canAdvanceToStatus(order.status, status)) {
+      showToast(t("statusMustAdvanceStep"));
+      select.value = normalizeOrderStatus(order.status);
+      return;
+    }
     if (!STATUSES.includes(status)) return;
     if (status === "preparing" && !isOrderPaid(order)) {
       showToast(t("assignAfterPayment"));
@@ -948,7 +960,6 @@
     if (header) header.style.borderLeftColor = MARKET_COLOR;
     const badge = document.getElementById("marketBadge");
     if (badge) badge.style.background = MARKET_COLOR;
-    ensureHistorySections();
     bindMarketActions();
     applyLanguage();
     document.getElementById("langSelect").addEventListener("change", (event) => {
@@ -956,11 +967,8 @@
       localStorage.setItem("app_lang", currentLang);
       applyLanguage();
       renderOrders(currentOrders);
-      renderMarketInbox(currentInboxEntries);
     });
-    startMarketInboxListener();
     loadMarketDrivers();
-    startCallHistoryListener();
     startOrdersListener();
   }
 

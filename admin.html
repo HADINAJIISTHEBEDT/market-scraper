@@ -204,6 +204,9 @@
       <h2 id="adminHistoryTitle" style="font-size:20px;margin:24px 0 12px;">Order history</h2>
       <div id="adminHistoryList"></div>
       <h2 id="adminCallHistoryTitle" style="font-size:20px;margin:24px 0 12px;">Call history</h2>
+      <div class="actions-row" style="margin-bottom:12px;">
+        <button class="btn-danger" type="button" data-admin-action="delete-all-call-history" id="deleteAllCallHistoryBtn">Delete all call history</button>
+      </div>
       <div id="adminCallHistoryList"></div>
     </section>
 
@@ -279,7 +282,7 @@
       throw new Error("Missing global config");
     }
 
-    const { ORDER_STATUSES, normalizeOrderStatus, orderNumberDisplay, isOrderClosed, normalizePhone, hasAssignedDriver, computeOrderTotal, resolveChatSenderDisplayName, chatRoleClass } = window.OrderLifecycle;
+    const { ORDER_STATUSES, normalizeOrderStatus, orderNumberDisplay, isOrderClosed, normalizePhone, hasAssignedDriver, computeOrderTotal, resolveChatSenderDisplayName, chatRoleClass, getSelectableStatuses, canAdvanceToStatus, isOrderPaid } = window.OrderLifecycle;
     const { MARKETS, orderMatchesMarket, getMarketLabel } = window.MarketsConfig;
 
     const firebaseConfig = window.FIREBASE_CONFIG;
@@ -300,6 +303,11 @@
         waiting: "Siparis inceleniyor", awaitingPayment: "Odeme bekleniyor", preparing: "Hazirlaniyor", onTheWay: "Yolda", arrived: "Teslim edildi", orderClosed: "Siparis kapatildi", orderNumber: "Siparis no", unknown: "Bilinmiyor",
         driver: "Surucu", reassignDriver: "Surucu ata", chatHistory: "Sohbet gecmisi", sendChat: "Mesaj gonder", chatPlaceholder: "Musteriye yanit yazin...", savedDrivers: "Kayitli suruculer", addDriver: "Surucu ekle", driverName: "Surucu adi", driverPhone: "Surucu telefonu",
         updateStatus: "Durumu guncelle", delete: "Sil", saveUser: "Kullaniciyi kaydet", updated: "Guncellendi",
+        statusMustAdvanceStep: "Durum sirayla guncellenmeli (bir adim ileri).",
+        confirmDeleteUser: "Bu kullaniciyi silmek istediginize emin misiniz?",
+        deleteCallHistory: "Aramayi sil", deleteAllCallHistory: "Tum arama gecmisini sil",
+        deleteAllCallHistoryConfirm: "Tum arama gecmisi silinsin mi?",
+        playRecording: "Kaydi dinle",
         saved: "Kaydedildi", removed: "Silindi", id: "ID", role: "Rol", name: "Ad", phone: "Telefon", address: "Adres", email: "E-posta",
         deleteRequestsTitle: "Hesap silme istekleri", noDeleteRequests: "Henuz silme istegi yok.", requestedAt: "Istek tarihi", markRequestDone: "Tamamlandi olarak isaretle",
         inboxTitle: "Gelen kutusu", inboxHelp: "Silme istegi mesajlari burada saklanir. Tek tek silebilirsiniz.", noInboxMessages: "Henuz mesaj yok.", message: "Mesaj", deleteMessage: "Mesaji sil", deleteReason: "Silme nedeni",
@@ -334,6 +342,11 @@
         waiting: "Waiting / reviewing", awaitingPayment: "Awaiting payment", preparing: "Preparing", onTheWay: "On the way", arrived: "Arrived", orderClosed: "Order closed", orderNumber: "Order no", unknown: "Unknown",
         driver: "Driver", reassignDriver: "Assign driver", chatHistory: "Chat history", sendChat: "Send message", chatPlaceholder: "Reply to customer...", savedDrivers: "Saved drivers", addDriver: "Add driver", driverName: "Driver name", driverPhone: "Driver phone",
         updateStatus: "Update status", delete: "Delete", saveUser: "Save user", updated: "Updated",
+        statusMustAdvanceStep: "Update status one step at a time.",
+        confirmDeleteUser: "Are you sure you want to delete this user?",
+        deleteCallHistory: "Delete call", deleteAllCallHistory: "Delete all call history",
+        deleteAllCallHistoryConfirm: "Delete all call history entries?",
+        playRecording: "Play recording",
         saved: "Saved", removed: "Removed", id: "ID", role: "Role", name: "Name", phone: "Phone", address: "Address", email: "Email",
         deleteRequestsTitle: "Account delete requests", noDeleteRequests: "No delete requests yet.", requestedAt: "Requested at", markRequestDone: "Mark request done",
         inboxTitle: "Inbox", inboxHelp: "Delete request messages are saved here. You can delete individual messages.", noInboxMessages: "No messages yet.", message: "Message", deleteMessage: "Delete message", deleteReason: "Deletion reason",
@@ -368,6 +381,11 @@
         waiting: "قيد المراجعة", awaitingPayment: "في انتظار الدفع", preparing: "قيد التحضير", onTheWay: "في الطريق", arrived: "تم التسليم", orderClosed: "تم إغلاق الطلب", orderNumber: "رقم الطلب", unknown: "غير معروف",
         driver: "السائق", reassignDriver: "تعيين السائق", chatHistory: "سجل الدردشة", sendChat: "إرسال رسالة", chatPlaceholder: "الرد على العميل...", savedDrivers: "السائقون المحفوظون", addDriver: "إضافة سائق", driverName: "اسم السائق", driverPhone: "هاتف السائق",
         updateStatus: "تحديث الحالة", delete: "حذف", saveUser: "حفظ المستخدم", updated: "تم التحديث",
+        statusMustAdvanceStep: "يجب تحديث الحالة خطوة واحدة في كل مرة.",
+        confirmDeleteUser: "هل أنت متأكد من حذف هذا المستخدم؟",
+        deleteCallHistory: "حذف المكالمة", deleteAllCallHistory: "حذف كل سجل المكالمات",
+        deleteAllCallHistoryConfirm: "حذف كل سجل المكالمات؟",
+        playRecording: "تشغيل التسجيل",
         saved: "تم الحفظ", removed: "تم الحذف", id: "المعرف", role: "الدور", name: "الاسم", phone: "الهاتف", address: "العنوان", email: "البريد الإلكتروني",
         deleteRequestsTitle: "طلبات حذف الحساب", noDeleteRequests: "لا توجد طلبات حذف بعد.", requestedAt: "تاريخ الطلب", markRequestDone: "وضع علامة مكتمل",
         inboxTitle: "صندوق الوارد", inboxHelp: "يتم حفظ رسائل طلبات الحذف هنا. يمكنك حذف الرسائل يدوياً.", noInboxMessages: "لا توجد رسائل بعد.", message: "الرسالة", deleteMessage: "حذف الرسالة", deleteReason: "سبب الحذف",
@@ -844,14 +862,10 @@
     }
 
     function renderDeleteRequestActions(userId, status, inboxEntryId, request) {
-      const registered = isUserRegistered(userId);
       const canMarkDone = (status === "pending" || status === "user-deleted") && status !== "done";
       const inboxId = inboxEntryId || getInboxEntryIdForRequest(request || { id: userId });
-      const deleteAction = registered ? "delete-user" : "dismiss-delete-request";
-      const deleteLabel = registered ? t("delete") : t("removeRequest");
       return `
         <div class="actions-row">
-          <button class="btn-danger" type="button" data-admin-action="${deleteAction}" data-user-id="${escapeHtml(userId)}" data-inbox-id="${escapeHtml(inboxId)}">${escapeHtml(deleteLabel)}</button>
           <button class="btn-secondary" type="button" data-admin-action="mark-done" data-user-id="${escapeHtml(userId)}" data-inbox-id="${escapeHtml(inboxId)}" ${canMarkDone ? "" : "disabled"}>${escapeHtml(t("markRequestDone"))}</button>
         </div>
       `;
@@ -1262,6 +1276,8 @@
 
     function renderAdminCallHistory() {
       const root = document.getElementById("adminCallHistoryList");
+      const deleteAllBtn = document.getElementById("deleteAllCallHistoryBtn");
+      if (deleteAllBtn) deleteAllBtn.textContent = t("deleteAllCallHistory");
       if (!root) return;
       const rows = adminCallHistoryEntries.slice(0, 40);
       if (!rows.length) {
@@ -1272,13 +1288,22 @@
         const modeLabel = entry.mode === "video" ? t("videoCall") : t("voiceCall");
         const outcomeKey = entry.outcome === "declined" ? "callDeclined"
           : entry.outcome === "remote-ended" ? "callRemoteEnded" : "callCompleted";
+        const recordingHtml = entry.recordingUrl
+          ? `<div class="card-meta"><a href="${escapeHtml(entry.recordingUrl)}" target="_blank" rel="noopener">${escapeHtml(t("playRecording"))}</a></div>`
+          : "";
         return `
         <div class="card">
-          <div class="card-title">${escapeHtml(getMarketLabel(entry.marketId || entry.marketName))} · #${escapeHtml(String(entry.orderNumber || entry.orderId || ""))}</div>
-          <div class="card-meta">${escapeHtml(t("driver"))}: ${escapeHtml(entry.driverName || t("unknown"))}</div>
-          <div class="card-meta">${escapeHtml(t("callWith"))}: ${escapeHtml(entry.callerName || t("unknown"))} (${escapeHtml(entry.callerRole || "")})</div>
-          <div class="card-meta">${escapeHtml(t("callMode"))}: ${escapeHtml(modeLabel)} · ${escapeHtml(t("callOutcome"))}: ${escapeHtml(t(outcomeKey))}</div>
-          <div class="card-meta">${escapeHtml(formatDate(entry.startedAt || entry.createdAt))}${entry.endedAt ? " → " + escapeHtml(formatDate(entry.endedAt)) : ""}</div>
+          <div class="card-header">
+            <div>
+              <div class="card-title">${escapeHtml(getMarketLabel(entry.marketId || entry.marketName))} · #${escapeHtml(String(entry.orderNumber || entry.orderId || ""))}</div>
+              <div class="card-meta">${escapeHtml(t("driver"))}: ${escapeHtml(entry.driverName || t("unknown"))}</div>
+              <div class="card-meta">${escapeHtml(t("callWith"))}: ${escapeHtml(entry.callerName || t("unknown"))} (${escapeHtml(entry.callerRole || "")})</div>
+              <div class="card-meta">${escapeHtml(t("callMode"))}: ${escapeHtml(modeLabel)} · ${escapeHtml(t("callOutcome"))}: ${escapeHtml(t(outcomeKey))}</div>
+              <div class="card-meta">${escapeHtml(formatDate(entry.startedAt || entry.createdAt))}${entry.endedAt ? " → " + escapeHtml(formatDate(entry.endedAt)) : ""}</div>
+              ${recordingHtml}
+            </div>
+            <button class="btn-danger" type="button" data-admin-action="delete-call-history" data-call-id="${escapeHtml(entry.id)}">${escapeHtml(t("deleteCallHistory"))}</button>
+          </div>
         </div>
       `;
       }).join("");
@@ -1310,8 +1335,8 @@
         const orderNo = orderNumberDisplay(order);
         const currentStatus = normalizeOrderStatus(order.status);
         const closed = isOrderClosed(order.status);
-        const statusOptions = [...STATUSES, ...(closed ? ["closed"] : [])].map((status) =>
-          `<option value="${status}" ${(closed ? status === "closed" : currentStatus === status) ? "selected" : ""}>${escapeHtml(statusLabel(status))}</option>`
+        const statusOptions = getSelectableStatuses(currentStatus).map((status) =>
+          `<option value="${status}" ${currentStatus === status ? "selected" : ""}>${escapeHtml(statusLabel(status))}</option>`
         ).join("");
         const driver = order.driver || {};
         return `
@@ -1350,8 +1375,21 @@
     }
 
     window.updateStatus = async function(orderId) {
+      const order = currentOrders.find((entry) => entry.id === orderId);
       const select = document.getElementById(`sel-${orderId}`);
-      await updateDoc(doc(db, "orders", orderId), { status: select.value, updatedAt: new Date().toISOString() });
+      if (!order || !select) return;
+      const nextStatus = normalizeOrderStatus(select.value);
+      if (!canAdvanceToStatus(order.status, nextStatus)) {
+        showToast(t("statusMustAdvanceStep"), true);
+        select.value = normalizeOrderStatus(order.status);
+        return;
+      }
+      if (nextStatus === "preparing" && !isOrderPaid(order)) {
+        showToast(t("awaitingPayment"), true);
+        select.value = normalizeOrderStatus(order.status);
+        return;
+      }
+      await updateDoc(doc(db, "orders", orderId), { status: nextStatus, updatedAt: new Date().toISOString() });
       showToast(t("updated"));
     };
 
@@ -1715,18 +1753,58 @@ Pazar Fiyatı Admin`;
           showToast(t("removed"));
           return;
         }
+        if (!window.confirm(t("confirmDeleteUser"))) return;
         const user = await getUserForAdmin(userId);
         const request = await getDeleteRequestForUser(userId);
         if (request && getDeleteRequestReason(request)) {
-          await withTimeout(ensureMailServiceReady(), 25000, "Mail service check timed out.");
-          await queueAccountDeletedEmail(userId, request);
+          try {
+            await withTimeout(ensureMailServiceReady(), 25000, "Mail service check timed out.");
+            await queueAccountDeletedEmail(userId, request);
+          } catch (mailError) {
+            console.warn("Delete email skipped", mailError);
+          }
         }
         await retryAsync(() => removeUserAccount(userId, user, request), 3, 2000);
         showToast(t("removed"));
       } catch (error) {
         console.error("Delete user failed", error);
-        showToast(`${t("saveFailed")}: ${error.message}`);
+        showToast(`${t("saveFailed")}: ${error.message}`, true);
       }
+    };
+
+    window.deleteCallHistoryEntry = async function(callId) {
+      if (!callId) return;
+      await deleteDoc(doc(db, "orderCallHistory", callId));
+      adminCallHistoryEntries = adminCallHistoryEntries.filter((entry) => entry.id !== callId);
+      renderAdminCallHistory();
+      showToast(t("removed"));
+    };
+
+    window.deleteAllCallHistory = async function(button) {
+      if (!adminCallHistoryEntries.length) {
+        showToast(t("noHistory"), true);
+        return;
+      }
+      if (!window.confirm(t("deleteAllCallHistoryConfirm"))) return;
+      const originalText = button ? button.textContent : "";
+      if (button) {
+        button.disabled = true;
+        button.textContent = t("saving");
+      }
+      for (const entry of [...adminCallHistoryEntries]) {
+        try {
+          await deleteDoc(doc(db, "orderCallHistory", entry.id));
+        } catch (error) {
+          console.error("Call history delete failed", entry.id, error);
+        }
+      }
+      adminCallHistoryEntries = [];
+      renderAdminCallHistory();
+      if (button) {
+        button.disabled = false;
+        button.textContent = originalText || t("deleteAllCallHistory");
+      }
+      showToast(t("removed"));
     };
 
     window.deleteAllUsers = async function(button) {
@@ -1870,6 +1948,8 @@ Pazar Fiyatı Admin`;
           else if (action === "dismiss-delete-request") await window.dismissDeleteRequest(userId, inboxId);
           else if (action === "mark-done") await window.markDeleteRequestDone(userId, button, inboxId);
           else if (action === "delete-inbox") await window.deleteInboxMessage(inboxId);
+          else if (action === "delete-call-history") await window.deleteCallHistoryEntry(button.dataset.callId || "");
+          else if (action === "delete-all-call-history") await window.deleteAllCallHistory(button);
           else if (action === "save-user") await window.saveUser(userId);
           else if (action === "block-user") await window.setUserBlocked(userId, true);
           else if (action === "unblock-user") await window.setUserBlocked(userId, false);

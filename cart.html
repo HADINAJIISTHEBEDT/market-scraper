@@ -50,10 +50,29 @@
       padding-top: 16px; text-align: right;
     }
     .payment-box {
-      margin-top: 18px; padding: 14px; border: 1px solid #e5e7eb;
+      margin-top: 18px; padding: 16px; border: 1px solid #e5e7eb;
       border-radius: 12px; background: #fff; text-align: left;
     }
-    .payment-box h2 { margin: 0 0 10px; font-size: 18px; }
+    .payment-box h2 { margin: 0 0 12px; font-size: 17px; font-weight: 700; color: #1e293b; }
+    .pay-method-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;
+    }
+    .pay-method-option {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 6px; padding: 14px 10px; border: 2px solid #e2e8f0; border-radius: 12px;
+      background: #f8fafc; cursor: pointer; transition: border-color .15s, background .15s;
+      font-weight: 600; font-size: 14px; color: #334155; text-align: center;
+    }
+    .pay-method-option input { position: absolute; opacity: 0; pointer-events: none; }
+    .pay-method-option.selected { border-color: #16a34a; background: #f0fdf4; color: #166534; }
+    .pay-method-icon { font-size: 22px; line-height: 1; }
+    .pay-card-fields { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px solid #e5e7eb; }
+    .pay-card-fields.visible { display: grid; gap: 8px; }
+    .pay-field {
+      width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px;
+      font: inherit; box-sizing: border-box;
+    }
+    .pay-hint { font-size: 13px; color: #64748b; margin: 0 0 10px; line-height: 1.4; }
     .cart-total { font-size: 22px; font-weight: 700; color: #1e293b; }
     .btn-order {
       margin-top: 14px; padding: 14px 32px;
