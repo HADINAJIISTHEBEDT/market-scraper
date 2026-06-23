@@ -514,6 +514,7 @@
     const orderNo = orderNumberDisplay(order);
     document.getElementById("activeOrderMeta").innerHTML =
       (orderNo ? "<strong>" + escapeHtml(t("orderNumber")) + ":</strong> " + escapeHtml(orderNo) + "<br>" : "") +
+      "<strong>" + escapeHtml(t("total")) + ":</strong> " + formatPrice(computeOrderTotal(items)) + "<br>" +
       escapeHtml(t("customer")) + ": " + escapeHtml(order.userName || t("unknown")) + "<br>" +
       escapeHtml(t("phone")) + ": " + escapeHtml(order.userPhone || t("unknown")) + "<br>" +
       escapeHtml(t("address")) + ": " + escapeHtml(order.userAddress || t("unknown")) + "<br>" +
@@ -521,9 +522,7 @@
       escapeHtml(formatDate(order.createdAt));
 
     document.getElementById("activeOrderPayment").innerHTML = paymentHtml(order);
-    document.getElementById("activeOrderItems").innerHTML = itemsHtml +
-      '<div style="font-weight:700;margin-top:10px;color:#1e293b;">' +
-      escapeHtml(t("total")) + ": " + formatPrice(computeOrderTotal(items)) + "</div>";
+    document.getElementById("activeOrderItems").innerHTML = itemsHtml;
     document.getElementById("driverStatusSelect").innerHTML = statusOptions;
     renderLocationBox(order);
     driverDisplayName = (order.driver && order.driver.name) || t("driver");
@@ -558,12 +557,14 @@
 
     root.innerHTML = active.map(function (order) {
       const orderNo = orderNumberDisplay(order);
+      const items = Array.isArray(order.items) ? order.items : [];
       return (
         '<div class="card">' +
         '<div class="card-title">' + escapeHtml(order.userName || t("unknown")) +
         (orderNo ? " · " + escapeHtml(orderNo) : "") + "</div>" +
         '<div class="card-meta">' + escapeHtml(getMarketLabel(order.marketId || order.marketName)) +
         " · " + escapeHtml(statusLabel(order.status)) +
+        " · " + escapeHtml(formatPrice(computeOrderTotal(items))) +
         " · " + escapeHtml(formatDate(order.createdAt)) + "</div>" +
         '<div class="actions-row">' +
         '<button class="btn-primary" type="button" data-driver-action="select-order" data-order-id="' +
