@@ -3,7 +3,13 @@
 
   const OL = window.OrderLifecycle || {};
   const ORDER_STATUSES = OL.ORDER_STATUSES || ["waiting", "on-the-way", "arrived"];
-  const DRIVER_STATUSES = ["preparing", "on-the-way", "arrived"];
+  const DRIVER_STATUSES = OL.DRIVER_STATUSES || ["preparing", "on-the-way", "arrived"];
+  const getDriverStatusOptions = OL.getDriverStatusOptions || function (currentStatus) {
+    var normalized = normalizeOrderStatus(currentStatus);
+    var options = DRIVER_STATUSES.slice();
+    if (normalized && options.indexOf(normalized) === -1) options.unshift(normalized);
+    return options;
+  };
   const normalizeOrderStatus = OL.normalizeOrderStatus || function (s) { return s || "waiting"; };
   const orderNumberDisplay = OL.orderNumberDisplay || function () { return ""; };
   const orderMatchesMarket = OL.orderMatchesMarket || function () { return true; };
@@ -233,6 +239,9 @@
   let currentOrders = [];
   let allMarketOrders = [];
   let activeOrderId = "";
+  let pendingStatusUpdate = null;
+  let statusUpdateBusy = false;
+  let suppressStatusChange = false;
   let geoWatchId = null;
   let chatUnsub = null;
   let driverDisplayName = "";
@@ -264,10 +273,55 @@
   }
 
   function driverStatusOptions(currentStatus) {
-    var normalized = normalizeOrderStatus(currentStatus);
-    var options = DRIVER_STATUSES.slice();
-    if (normalized && options.indexOf(normalized) === -1) options.unshift(normalized);
-    return options;
+    return getDriverStatusOptions(currentStatus);
+  }
+
+  function patchLocalOrderStatus(orderId, payload) {
+    function patchList(list) {
+      const order = list.find(function (entry) { return entry.id === orderId; });
+      if (!order) return;
+      order.status = payload.status;
+      order.updatedAt = payload.updatedAt;
+      if (payload.arrivedAt) order.arrivedAt = payload.arrivedAt;
+    }
+    patchList(allMarketOrders);
+    patchList(currentOrders);
+  }
+
+  function applyPendingStatusToOrders() {
+    if (!pendingStatusUpdate || Date.now() - pendingStatusUpdate.at > 10000) return;
+    const order = allMarketOrders.find(function (entry) { return entry.id === pendingStatusUpdate.orderId; });
+    if (!order) return;
+    order.status = pendingStatusUpdate.status;
+    order.updatedAt = new Date().toISOString();
+    if (normalizeOrderStatus(pendingStatusUpdate.status) === "arrived") {
+      order.arrivedAt = order.arrivedAt || new Date().toISOString();
+    }
+  }
+
+  function renderDriverStatusSelect(order) {
+    const select = document.getElementById("driverStatusSelect");
+    if (!select) return;
+    const options = driverStatusOptions(order.status);
+    const normalizedCurrent = normalizeOrderStatus(order.status);
+    let selectedValue = normalizedCurrent;
+    if (
+      pendingStatusUpdate &&
+      pendingStatusUpdate.orderId === order.id &&
+      Date.now() - pendingStatusUpdate.at < 10000
+    ) {
+      selectedValue = normalizeOrderStatus(pendingStatusUpdate.status);
+    } else if (select.value) {
+      const normalizedSelect = normalizeOrderStatus(select.value);
+      if (options.indexOf(normalizedSelect) >= 0) selectedValue = normalizedSelect;
+    }
+    select.innerHTML = options.map(function (status) {
+      const selected = normalizeOrderStatus(status) === selectedValue ? " selected" : "";
+      return '<option value="' + status + '"' + selected + ">" + escapeHtml(statusLabel(status)) + "</option>";
+    }).join("");
+    suppressStatusChange = true;
+    select.value = selectedValue;
+    suppressStatusChange = false;
   }
 
   function paymentHtml(order) {
@@ -506,11 +560,6 @@
     const items = Array.isArray(order.items) ? order.items : [];
     const itemsHtml = renderItemsHtml(items);
 
-    const statusOptions = driverStatusOptions(order.status).map(function (status) {
-      const selected = normalizeOrderStatus(order.status) === status ? " selected" : "";
-      return '<option value="' + status + '"' + selected + ">" + escapeHtml(statusLabel(status)) + "</option>";
-    }).join("");
-
     const orderNo = orderNumberDisplay(order);
     document.getElementById("activeOrderMeta").innerHTML =
       (orderNo ? "<strong>" + escapeHtml(t("orderNumber")) + ":</strong> " + escapeHtml(orderNo) + "<br>" : "") +
@@ -523,7 +572,7 @@
 
     document.getElementById("activeOrderPayment").innerHTML = paymentHtml(order);
     document.getElementById("activeOrderItems").innerHTML = itemsHtml;
-    document.getElementById("driverStatusSelect").innerHTML = statusOptions;
+    renderDriverStatusSelect(order);
     renderLocationBox(order);
     driverDisplayName = (order.driver && order.driver.name) || t("driver");
     const closeBtn = document.getElementById("closeOrderBtn");
@@ -629,23 +678,39 @@
   }
 
   function updateDriverStatus() {
-    if (!activeOrderId) return;
+    if (!activeOrderId || statusUpdateBusy || suppressStatusChange) return;
     const select = document.getElementById("driverStatusSelect");
-    const status = select ? select.value : "waiting";
+    const status = select ? select.value : "";
+    if (!status) return;
+    const order = currentOrders.find(function (entry) { return entry.id === activeOrderId; }) ||
+      allMarketOrders.find(function (entry) { return entry.id === activeOrderId; });
+    if (!order) return;
+    if (normalizeOrderStatus(order.status) === normalizeOrderStatus(status)) return;
+
     const payload = { status: status, updatedAt: new Date().toISOString() };
-    if (status === "arrived") payload.arrivedAt = new Date().toISOString();
+    if (normalizeOrderStatus(status) === "arrived") payload.arrivedAt = payload.updatedAt;
+
+    statusUpdateBusy = true;
+    pendingStatusUpdate = { orderId: activeOrderId, status: status, at: Date.now() };
+    patchLocalOrderStatus(activeOrderId, payload);
+    renderOrders(allMarketOrders);
+
     db.collection("orders").doc(activeOrderId).update(payload).then(function () {
-      if (status === "arrived") {
+      pendingStatusUpdate = null;
+      statusUpdateBusy = false;
+      if (normalizeOrderStatus(status) === "arrived") {
         stopTracking();
         const closeBtn = document.getElementById("closeOrderBtn");
         if (closeBtn) closeBtn.hidden = false;
       }
-      renderOrders(allMarketOrders);
       renderActiveOrderDetails();
-      alert(t("updated"));
     }).catch(function (error) {
       console.error("Status update failed", error);
+      pendingStatusUpdate = null;
+      statusUpdateBusy = false;
       alert(error.message || t("unknown"));
+      renderOrders(allMarketOrders);
+      renderActiveOrderDetails();
     });
   }
 
@@ -691,6 +756,7 @@
   document.getElementById("startTrackingBtn").addEventListener("click", startTracking);
   document.getElementById("stopTrackingBtn").addEventListener("click", stopTracking);
   document.getElementById("updateStatusBtn").addEventListener("click", updateDriverStatus);
+  document.getElementById("driverStatusSelect").addEventListener("change", updateDriverStatus);
   document.getElementById("closeOrderBtn").addEventListener("click", closeOrder);
   document.getElementById("driverChatSend").addEventListener("click", sendDriverChatMessage);
   document.getElementById("driverChatInput").addEventListener("keydown", function (event) {
@@ -738,6 +804,7 @@
       allMarketOrders = snapshot.docs.map(function (entry) {
         return { id: entry.id, ...entry.data() };
       });
+      applyPendingStatusToOrders();
       renderOrders(allMarketOrders);
       if (activeOrderId) renderActiveOrderDetails();
     }, function (error) {

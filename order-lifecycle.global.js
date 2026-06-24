@@ -85,6 +85,22 @@
     return tgtIdx === curIdx + 1;
   }
 
+  const DRIVER_STATUSES = ["preparing", "on-the-way", "arrived"];
+
+  function getDriverStatusOptions(currentStatus) {
+    var normalized = normalizeOrderStatus(currentStatus);
+    var options = DRIVER_STATUSES.slice();
+    if (normalized && options.indexOf(normalized) === -1) options.unshift(normalized);
+    return options;
+  }
+
+  function canDriverSetStatus(currentStatus, targetStatus) {
+    if (isOrderClosed(currentStatus)) return false;
+    var target = normalizeOrderStatus(targetStatus);
+    if (DRIVER_STATUSES.indexOf(target) >= 0) return true;
+    return normalizeOrderStatus(currentStatus) === target;
+  }
+
   function allocateOrderNumber(db) {
     return db.runTransaction(function (transaction) {
       var ref = db.collection("counters").doc("orders");
@@ -399,6 +415,9 @@
     statusIndex: statusIndex,
     getSelectableStatuses: getSelectableStatuses,
     canAdvanceToStatus: canAdvanceToStatus,
+    DRIVER_STATUSES: DRIVER_STATUSES,
+    getDriverStatusOptions: getDriverStatusOptions,
+    canDriverSetStatus: canDriverSetStatus,
     allocateOrderNumber: allocateOrderNumber,
     normalizeMarketKey: normalizeMarketKey,
     orderMatchesMarket: orderMatchesMarket,
