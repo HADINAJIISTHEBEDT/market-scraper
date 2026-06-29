@@ -264,6 +264,7 @@ class MainActivity : AppCompatActivity() {
         val dialog = Dialog(this, android.R.style.Theme_DeviceDefault_Light_NoActionBar)
         val popupWebView = WebView(this)
         applyWebViewDefaults(popupWebView)
+        popupWebView.addJavascriptInterface(AndroidBridge(), "AndroidApp")
         val mainWebView = binding.webView
         val dismissPopup: () -> Unit = { dismissAuthPopup() }
 
@@ -558,6 +559,16 @@ class MainActivity : AppCompatActivity() {
         @JavascriptInterface
         fun clearAuthSession() {
             runOnUiThread { clearWebAuthStorage() }
+        }
+
+        @JavascriptInterface
+        fun completeAuthReturn(url: String?) {
+            runOnUiThread {
+                val target = url?.trim()?.takeIf { it.isNotBlank() } ?: return@runOnUiThread
+                if (!isAppLoginReturnUrl(target)) return@runOnUiThread
+                binding.webView.loadUrl(target)
+                dismissAuthPopup()
+            }
         }
 
         @JavascriptInterface

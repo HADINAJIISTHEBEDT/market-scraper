@@ -74,12 +74,21 @@
       return new URLSearchParams(window.location.search).get("from") === "app";
     }
 
+    function isInAppAuthWebView() {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("webview") === "1" || params.get("from") === "app";
+    }
+
     function isRecoverableRedirectError(error) {
       const code = String(error?.code || "");
       const message = String(error?.message || "");
       return code === "auth/no-auth-event" ||
         message.includes("missing initial state") ||
         message.includes("sessionStorage is inaccessible");
+    }
+
+    function redirectSignInInProgress() {
+      return sessionStorage.getItem("auth_bridge_redirect_started") === "1";
     }
 
     function appIntentUrl(pageUrl) {
@@ -114,6 +123,19 @@
       }
     }
 
+    function returnToAndroidApp(returnUrl) {
+      sessionStorage.removeItem("auth_bridge_redirect_started");
+      try {
+        if (window.AndroidApp && window.AndroidApp.completeAuthReturn) {
+          window.AndroidApp.completeAuthReturn(returnUrl);
+          return;
+        }
+      } catch (error) {
+        console.warn("Android completeAuthReturn failed", error);
+      }
+      window.location.replace(returnUrl);
+    }
+
     function finish(message, isError, pageAfterSuccess) {
       statusEl.textContent = message;
       if (isError) {
@@ -146,12 +168,9 @@
         return;
       }
       const returnMode = new URLSearchParams(window.location.search).get("return");
-      if (returnMode === "android") {
+      if (returnMode === "android" || isInAppAuthWebView() || isEmbeddedAndroidApp()) {
         statusEl.textContent = "Signed in. Returning to the app...";
-        const returnUrl = buildAndroidReturnUrl(user);
-        sessionStorage.removeItem("auth_bridge_redirect_started");
-        showOpenAppActions(returnUrl, "Open Pazar Fiyati app");
-        window.location.href = appIntentUrl(returnUrl);
+        returnToAndroidApp(buildAndroidReturnUrl(user));
         return;
       }
       if (window.opener && !window.opener.closed) {
@@ -170,17 +189,7 @@
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });
 
-    function wantsFreshAccountPicker() {
-      const params = new URLSearchParams(window.location.search);
-      return params.get("fresh") === "1" || params.get("select_account") === "1";
-    }
-
-    function redirectSignInInProgress() {
-      return sessionStorage.getItem("auth_bridge_redirect_started") === "1";
-    }
-
     async function clearCachedAuthSession() {
-      sessionStorage.removeItem("auth_bridge_redirect_started");
       try {
         if (auth.currentUser) {
           await signOut(auth);
@@ -190,84 +199,62 @@
       }
     }
 
-    function isInAppAuthWebView() {
-      const params = new URLSearchParams(window.location.search);
-      return params.get("webview") === "1" || params.get("from") === "app";
-    }
-
-    async function prepareSignInSession() {
-      await setPersistence(auth, browserLocalPersistence);
-      if (wantsFreshAccountPicker()) {
-        await clearCachedAuthSession();
-        return;
-      }
-      if (redirectSignInInProgress()) {
-        return;
-      }
-      if (isAndroidCustomTabReturn() || isEmbeddedAndroidApp() || isInAppAuthWebView()) {
-        await clearCachedAuthSession();
-      }
-    }
-
-    async function startAndroidRedirectSignIn() {
-      await prepareSignInSession();
+    async function completePendingRedirect() {
       try {
         const result = await getRedirectResult(auth);
         if (result?.user) {
           finishSignedInUser(result.user);
-          return;
+          return true;
         }
       } catch (error) {
         if (!isRecoverableRedirectError(error)) {
           console.error("Auth bridge redirect result failed", error);
           finish(error.message || "Google sign-in failed.", true);
-          return;
+          return true;
         }
-        console.warn("Redirect result unavailable, starting fresh sign-in", error);
+        console.warn("Redirect result unavailable", error);
       }
+
       if (redirectSignInInProgress()) {
+        if (auth.currentUser) {
+          finishSignedInUser(auth.currentUser);
+          return true;
+        }
         statusEl.textContent = "Completing sign-in...";
-        const timeout = setTimeout(() => {
-          finish("Sign-in timed out. Tap Open Pazar Fiyati app below.", true);
-        }, 20000);
-        onAuthStateChanged(auth, (user) => {
-          if (!user) return;
-          clearTimeout(timeout);
-          finishSignedInUser(user);
+        return await new Promise((resolve) => {
+          const timeout = setTimeout(() => {
+            finish("Sign-in timed out. Close and try again.", true);
+            resolve(true);
+          }, 20000);
+          const unsub = onAuthStateChanged(auth, (user) => {
+            if (!user) return;
+            clearTimeout(timeout);
+            unsub();
+            finishSignedInUser(user);
+            resolve(true);
+          });
         });
-        return;
       }
-      sessionStorage.setItem("auth_bridge_redirect_started", "1");
-      try {
-        await signInWithRedirect(auth, provider);
-      } catch (error) {
-        console.error("Auth bridge redirect failed", error);
-        finish(error.message || "Google sign-in failed.", true);
-      }
+
+      return false;
     }
 
-    async function startAndroidCustomTabSignIn() {
-      await prepareSignInSession();
-      try {
-        const result = await getRedirectResult(auth);
-        if (result?.user) {
-          finishSignedInUser(result.user);
-          return;
-        }
-      } catch (error) {
-        if (!isRecoverableRedirectError(error)) {
-          console.error("Auth bridge redirect result failed", error);
-          finish(error.message || "Google sign-in failed.", true);
-          return;
-        }
-      }
+    async function startFreshAndroidSignIn() {
+      sessionStorage.removeItem("auth_bridge_redirect_started");
+      await clearCachedAuthSession();
       try {
         const result = await signInWithPopup(auth, provider);
         finishSignedInUser(result.user);
       } catch (error) {
         const code = String(error?.code || "");
         if (code === "auth/popup-blocked" || code === "auth/cancelled-popup-request") {
-          await startAndroidRedirectSignIn();
+          sessionStorage.setItem("auth_bridge_redirect_started", "1");
+          try {
+            await signInWithRedirect(auth, provider);
+          } catch (redirectError) {
+            console.error("Auth bridge redirect failed", redirectError);
+            finish(redirectError.message || "Google sign-in failed.", true);
+          }
           return;
         }
         console.error("Auth bridge popup failed", error);
@@ -285,13 +272,21 @@
       }
     }
 
-    if (isInAppAuthWebView() || isEmbeddedAndroidApp()) {
-      startAndroidRedirectSignIn();
-    } else if (isAndroidCustomTabReturn()) {
-      startAndroidCustomTabSignIn();
-    } else {
-      startPopupSignIn();
+    async function boot() {
+      await setPersistence(auth, browserLocalPersistence);
+
+      const completed = await completePendingRedirect();
+      if (completed) return;
+
+      if (isInAppAuthWebView() || isEmbeddedAndroidApp() || isAndroidCustomTabReturn()) {
+        await startFreshAndroidSignIn();
+        return;
+      }
+
+      await startPopupSignIn();
     }
+
+    void boot();
   </script>
 </body>
 </html>

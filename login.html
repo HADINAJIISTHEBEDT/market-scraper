@@ -937,6 +937,7 @@
       const email = params.get("auth_email");
       if (!uid || !email) return false;
       history.replaceState({}, "", "login.html");
+      sessionStorage.removeItem("force_account_picker");
       void routeSignedInUser({
         uid,
         email,
