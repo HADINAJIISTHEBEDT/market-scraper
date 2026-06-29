@@ -48,6 +48,7 @@
       setPersistence,
       signInWithPopup,
       signInWithRedirect,
+      signOut,
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
     import firebaseConfig from "./firebase-config.js";
 
@@ -169,12 +170,47 @@
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });
 
-    async function startAndroidRedirectSignIn() {
+    function wantsFreshAccountPicker() {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("fresh") === "1" || params.get("select_account") === "1";
+    }
+
+    function redirectSignInInProgress() {
+      return sessionStorage.getItem("auth_bridge_redirect_started") === "1";
+    }
+
+    async function clearCachedAuthSession() {
+      sessionStorage.removeItem("auth_bridge_redirect_started");
+      try {
+        if (auth.currentUser) {
+          await signOut(auth);
+        }
+      } catch (error) {
+        console.warn("Auth bridge sign-out failed", error);
+      }
+    }
+
+    function isInAppAuthWebView() {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("webview") === "1" || params.get("from") === "app";
+    }
+
+    async function prepareSignInSession() {
       await setPersistence(auth, browserLocalPersistence);
-      if (auth.currentUser) {
-        finishSignedInUser(auth.currentUser);
+      if (wantsFreshAccountPicker()) {
+        await clearCachedAuthSession();
         return;
       }
+      if (redirectSignInInProgress()) {
+        return;
+      }
+      if (isAndroidCustomTabReturn() || isEmbeddedAndroidApp() || isInAppAuthWebView()) {
+        await clearCachedAuthSession();
+      }
+    }
+
+    async function startAndroidRedirectSignIn() {
+      await prepareSignInSession();
       try {
         const result = await getRedirectResult(auth);
         if (result?.user) {
@@ -189,7 +225,7 @@
         }
         console.warn("Redirect result unavailable, starting fresh sign-in", error);
       }
-      if (sessionStorage.getItem("auth_bridge_redirect_started") === "1") {
+      if (redirectSignInInProgress()) {
         statusEl.textContent = "Completing sign-in...";
         const timeout = setTimeout(() => {
           finish("Sign-in timed out. Tap Open Pazar Fiyati app below.", true);
@@ -211,11 +247,7 @@
     }
 
     async function startAndroidCustomTabSignIn() {
-      await setPersistence(auth, browserLocalPersistence);
-      if (auth.currentUser) {
-        finishSignedInUser(auth.currentUser);
-        return;
-      }
+      await prepareSignInSession();
       try {
         const result = await getRedirectResult(auth);
         if (result?.user) {
@@ -253,7 +285,7 @@
       }
     }
 
-    if (isEmbeddedAndroidApp()) {
+    if (isInAppAuthWebView() || isEmbeddedAndroidApp()) {
       startAndroidRedirectSignIn();
     } else if (isAndroidCustomTabReturn()) {
       startAndroidCustomTabSignIn();

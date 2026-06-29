@@ -793,6 +793,10 @@ window.doLogout = function() {
   localStorage.removeItem("owner_email");
   sessionStorage.removeItem("login_auth_handled");
   sessionStorage.removeItem("android_auto_signin_tried");
+  sessionStorage.setItem("force_account_picker", "1");
+  if (window.AndroidApp?.clearAuthSession) {
+    window.AndroidApp.clearAuthSession();
+  }
   if (window.FeatureAccess?.signOutFirebaseAuth) {
     void window.FeatureAccess.signOutFirebaseAuth();
   }

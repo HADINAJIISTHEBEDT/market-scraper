@@ -355,6 +355,9 @@
       } catch (error) {
         console.warn("Firebase sign-out skipped", error);
       }
+      if (window.AndroidApp?.clearAuthSession) {
+        window.AndroidApp.clearAuthSession();
+      }
       if (window.FeatureAccess?.signOutFirebaseAuth) {
         await window.FeatureAccess.signOutFirebaseAuth();
       }
@@ -369,6 +372,7 @@
       localStorage.removeItem("owner_email");
       sessionStorage.removeItem("login_auth_handled");
       sessionStorage.removeItem("android_auto_signin_tried");
+      sessionStorage.setItem("force_account_picker", "1");
       setStatus("logoutDone");
       setTimeout(() => {
         if (window.FeatureAccess?.isAndroidApp?.()) {

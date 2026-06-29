@@ -25,12 +25,13 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.view.ViewGroup
+import android.webkit.WebStorage
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import androidx.browser.customtabs.CustomTabsIntent
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import com.google.android.gms.ads.AdRequest
@@ -236,12 +237,80 @@ class MainActivity : AppCompatActivity() {
             uri.path?.contains("__/auth/") == true
     }
 
-    private fun openAuthInCustomTab(url: String) {
+    private fun clearWebAuthStorage() {
         try {
-            CustomTabsIntent.Builder().build().launchUrl(this, Uri.parse(url))
+            val cookieManager = CookieManager.getInstance()
+            cookieManager.removeAllCookies(null)
+            cookieManager.flush()
+            WebStorage.getInstance().deleteAllData()
         } catch (_: Exception) {
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+            // Best-effort cleanup for Google/Firebase auth cookies in WebView.
         }
+    }
+
+    private fun isAppLoginReturnUrl(url: String): Boolean {
+        val uri = Uri.parse(url)
+        val host = uri.host?.lowercase() ?: return false
+        if (host != APP_HOST) return false
+        val path = uri.path?.lowercase() ?: ""
+        if (!path.contains("login.html")) return false
+        return !uri.getQueryParameter("auth_uid").isNullOrBlank()
+    }
+
+    private fun openAuthInAppWebView(url: String) {
+        dismissAuthPopup()
+        clearWebAuthStorage()
+
+        val dialog = Dialog(this, android.R.style.Theme_DeviceDefault_Light_NoActionBar)
+        val popupWebView = WebView(this)
+        applyWebViewDefaults(popupWebView)
+        val mainWebView = binding.webView
+        val dismissPopup: () -> Unit = { dismissAuthPopup() }
+
+        popupWebView.webViewClient = object : WebViewClient() {
+            override fun shouldOverrideUrlLoading(
+                view: WebView?,
+                request: WebResourceRequest?
+            ): Boolean {
+                val loadUrl = request?.url?.toString() ?: return false
+                if (loadUrl.startsWith("intent://")) {
+                    try {
+                        val intent = Intent.parseUri(loadUrl, Intent.URI_INTENT_SCHEME)
+                        val fallback = intent.getStringExtra("browser_fallback_url")
+                        if (!fallback.isNullOrBlank()) {
+                            mainWebView.loadUrl(fallback)
+                            dismissAuthPopup()
+                            return true
+                        }
+                    } catch (_: Exception) {
+                        // Fall through and let WebView try to load the URL.
+                    }
+                }
+                if (isAppLoginReturnUrl(loadUrl)) {
+                    mainWebView.loadUrl(loadUrl)
+                    dismissAuthPopup()
+                    return true
+                }
+                return false
+            }
+        }
+        popupWebView.webChromeClient = createWebChromeClient(mainWebView, dismissPopup)
+
+        dialog.setContentView(
+            popupWebView,
+            ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        )
+        dialog.setOnDismissListener { authPopupDialog = null }
+        dialog.show()
+        authPopupDialog = dialog
+        popupWebView.loadUrl(url)
+    }
+
+    private fun openAuthInCustomTab(url: String) {
+        openAuthInAppWebView(url)
     }
 
     private fun dismissAuthPopup() {
@@ -256,16 +325,21 @@ class MainActivity : AppCompatActivity() {
                 request: WebResourceRequest?
             ): Boolean {
                 val url = request?.url?.toString() ?: return false
-                if (isAuthBridgeUrl(url)) {
-                    openAuthInCustomTab(HOSTED_AUTH_BRIDGE)
+                if (view == mainWebView && isAuthBridgeUrl(url)) {
+                    openAuthInAppWebView(url)
                     return true
                 }
-                if (isFirebaseAuthHandlerUrl(url)) {
-                    openAuthInCustomTab(url)
+                if (view == mainWebView && isFirebaseAuthHandlerUrl(url)) {
+                    openAuthInAppWebView(url)
                     return true
                 }
-                if (isGoogleAuthUrl(url)) {
-                    openAuthInCustomTab(url)
+                if (view == mainWebView && isGoogleAuthUrl(url)) {
+                    openAuthInAppWebView(url)
+                    return true
+                }
+                if (view != mainWebView && isAppLoginReturnUrl(url)) {
+                    mainWebView.loadUrl(url)
+                    closePopup?.invoke()
                     return true
                 }
                 if (view != mainWebView && isAppAuthReturnUrl(url)) {
@@ -437,7 +511,7 @@ class MainActivity : AppCompatActivity() {
         private const val APP_URL = "https://market-scraper-0k36.onrender.com/"
         private const val APP_HOST = "market-scraper-0k36.onrender.com"
         private const val HOSTED_AUTH_BRIDGE =
-            "https://st-business-86a9b.firebaseapp.com/auth-bridge.html?return=android"
+            "https://market-scraper-0k36.onrender.com/auth-bridge.html?return=android&fresh=1&select_account=1&webview=1"
         private const val NOTIFICATION_CHANNEL_ID = "market_scraper_alerts"
         private const val UPDATE_CHANNEL_ID = "market_scraper_updates"
         private const val VERSION_CHECK_URL = "https://raw.githubusercontent.com/HADINAJIISTHEBEDT/market-scraper/main/android-app/app/build.gradle"
@@ -479,6 +553,11 @@ class MainActivity : AppCompatActivity() {
                 val target = url?.trim()?.takeIf { it.isNotBlank() } ?: HOSTED_AUTH_BRIDGE
                 openAuthInCustomTab(target)
             }
+        }
+
+        @JavascriptInterface
+        fun clearAuthSession() {
+            runOnUiThread { clearWebAuthStorage() }
         }
 
         @JavascriptInterface

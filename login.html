@@ -449,11 +449,21 @@
       throw new Error("firebase-config.global.js is missing from this folder.");
     }
     const firebaseConfig = window.FIREBASE_CONFIG;
-    const AUTH_BRIDGE_CANDIDATES = [
-      "https://st-business-86a9b.firebaseapp.com/auth-bridge.html",
-      "https://st-business-86a9b.web.app/auth-bridge.html",
-      "https://market-scraper-0k36.onrender.com/auth-bridge.html",
-    ];
+    function detectAndroidApp() {
+      return window.FeatureAccess?.isAndroidApp?.() ||
+        !!(window.AndroidApp && window.AndroidApp.isAndroidApp && window.AndroidApp.isAndroidApp());
+    }
+    const AUTH_BRIDGE_CANDIDATES = detectAndroidApp()
+      ? [
+        "https://market-scraper-0k36.onrender.com/auth-bridge.html",
+        "https://st-business-86a9b.firebaseapp.com/auth-bridge.html",
+        "https://st-business-86a9b.web.app/auth-bridge.html",
+      ]
+      : [
+        "https://st-business-86a9b.firebaseapp.com/auth-bridge.html",
+        "https://st-business-86a9b.web.app/auth-bridge.html",
+        "https://market-scraper-0k36.onrender.com/auth-bridge.html",
+      ];
     const isFilePage = location.protocol === "file:";
 
     const I18N = {
@@ -759,7 +769,7 @@
 
     function buildAuthBridgeUrl(bridgeUrl) {
       const separator = bridgeUrl.includes("?") ? "&" : "?";
-      return bridgeUrl + separator + "return=android";
+      return bridgeUrl + separator + "return=android&fresh=1&select_account=1&webview=1&t=" + Date.now();
     }
 
     function clearLoginSuccessUI() {
@@ -848,6 +858,7 @@
           phone: localStorage.getItem("user_phone") || "",
           address: localStorage.getItem("user_address") || ""
         });
+        sessionStorage.removeItem("force_account_picker");
 
         let profileWarning = "";
         try {
@@ -937,6 +948,13 @@
 
     async function continueWithGoogle() {
       setStatus("statusStarting");
+      sessionStorage.removeItem("login_auth_handled");
+      sessionStorage.removeItem("android_auto_signin_tried");
+      sessionStorage.setItem("force_account_picker", "1");
+      await safeSignOut();
+      if (window.AndroidApp?.clearAuthSession) {
+        window.AndroidApp.clearAuthSession();
+      }
       if (isFilePage) {
         try {
           const bridge = await resolveAuthBridgeUrl();
@@ -992,6 +1010,15 @@
     async function handleExistingSession() {
       if (isFilePage) return;
       await setPersistence(auth, browserLocalPersistence);
+
+      if (sessionStorage.getItem("force_account_picker") === "1") {
+        clearLoginSuccessUI();
+        await safeSignOut();
+        if (window.AndroidApp?.clearAuthSession) {
+          window.AndroidApp.clearAuthSession();
+        }
+        return;
+      }
 
       const localUid = localStorage.getItem("user_uid");
       const localEmail = localStorage.getItem("user_email");

@@ -301,7 +301,10 @@
     }
   }
 
-  function clearLocalUser() {
+    function clearLocalUser() {
+    sessionStorage.setItem("force_account_picker", "1");
+    sessionStorage.removeItem("login_auth_handled");
+    sessionStorage.removeItem("android_auto_signin_tried");
     [
       "user_name",
       "user_uid",
@@ -359,6 +362,7 @@
     const cleanPath = window.location.pathname.split("/").pop() || "index.html";
     history.replaceState({}, "", cleanPath.includes(".html") ? cleanPath : "index.html");
     sessionStorage.setItem("profile_prompt", "1");
+    sessionStorage.removeItem("force_account_picker");
     return true;
   }
 
@@ -377,6 +381,9 @@
 
   async function signOutFirebaseAuth() {
     try {
+      if (window.AndroidApp?.clearAuthSession) {
+        window.AndroidApp.clearAuthSession();
+      }
       const [{ getApps, initializeApp }, { getAuth, signOut }] = await Promise.all([
         import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"),
         import("https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js"),
