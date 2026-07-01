@@ -237,14 +237,22 @@ class MainActivity : AppCompatActivity() {
             uri.path?.contains("__/auth/") == true
     }
 
-    private fun clearWebAuthStorage() {
+    private fun clearWebAuthCookies() {
         try {
             val cookieManager = CookieManager.getInstance()
             cookieManager.removeAllCookies(null)
             cookieManager.flush()
+        } catch (_: Exception) {
+            // Best-effort cookie cleanup.
+        }
+    }
+
+    private fun clearWebAuthStorage() {
+        clearWebAuthCookies()
+        try {
             WebStorage.getInstance().deleteAllData()
         } catch (_: Exception) {
-            // Best-effort cleanup for Google/Firebase auth cookies in WebView.
+            // Best-effort storage cleanup.
         }
     }
 
@@ -259,7 +267,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun openAuthInAppWebView(url: String) {
         dismissAuthPopup()
-        clearWebAuthStorage()
+        clearWebAuthCookies()
 
         val dialog = Dialog(this, android.R.style.Theme_DeviceDefault_Light_NoActionBar)
         val popupWebView = WebView(this)
@@ -327,14 +335,6 @@ class MainActivity : AppCompatActivity() {
             ): Boolean {
                 val url = request?.url?.toString() ?: return false
                 if (view == mainWebView && isAuthBridgeUrl(url)) {
-                    openAuthInAppWebView(url)
-                    return true
-                }
-                if (view == mainWebView && isFirebaseAuthHandlerUrl(url)) {
-                    openAuthInAppWebView(url)
-                    return true
-                }
-                if (view == mainWebView && isGoogleAuthUrl(url)) {
                     openAuthInAppWebView(url)
                     return true
                 }

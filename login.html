@@ -947,15 +947,63 @@
       return true;
     }
 
+    async function handleAndroidRedirectSignIn() {
+      if (!isAndroidApp() || isFilePage) return false;
+      await setPersistence(auth, browserLocalPersistence);
+
+      try {
+        const result = await getRedirectResult(auth);
+        if (result?.user) {
+          sessionStorage.removeItem("android_redirect_started");
+          sessionStorage.removeItem("force_account_picker");
+          sessionStorage.setItem("login_auth_handled", result.user.uid);
+          await routeSignedInUser(result.user);
+          return true;
+        }
+      } catch (error) {
+        if (!isRecoverableRedirectError(error)) {
+          console.error("Android redirect sign-in failed", error);
+          setRawStatus(getFriendlyError(error), true);
+          sessionStorage.removeItem("android_redirect_started");
+          return true;
+        }
+        console.warn("Android redirect result pending", error);
+      }
+
+      if (sessionStorage.getItem("android_redirect_started") !== "1") {
+        return false;
+      }
+
+      setStatus("statusChecking");
+      return await new Promise((resolve) => {
+        let settled = false;
+        const timeout = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          sessionStorage.removeItem("android_redirect_started");
+          setRawStatus(t("errorGeneric"), true);
+          resolve(true);
+        }, 45000);
+        const unsub = onAuthStateChanged(auth, async (user) => {
+          if (!user || settled) return;
+          settled = true;
+          clearTimeout(timeout);
+          unsub();
+          sessionStorage.removeItem("android_redirect_started");
+          sessionStorage.removeItem("force_account_picker");
+          sessionStorage.setItem("login_auth_handled", user.uid);
+          await routeSignedInUser(user);
+          resolve(true);
+        });
+      });
+    }
+
     async function continueWithGoogle() {
       setStatus("statusStarting");
       sessionStorage.removeItem("login_auth_handled");
       sessionStorage.removeItem("android_auto_signin_tried");
       sessionStorage.setItem("force_account_picker", "1");
       await safeSignOut();
-      if (window.AndroidApp?.clearAuthSession) {
-        window.AndroidApp.clearAuthSession();
-      }
       if (isFilePage) {
         try {
           const bridge = await resolveAuthBridgeUrl();
@@ -970,21 +1018,15 @@
 
       if (isAndroidApp()) {
         try {
-          const bridge = await resolveAuthBridgeUrl();
-          const authUrl = buildAuthBridgeUrl(bridge.url);
-          if (window.AndroidApp?.openExternalAuth) {
-            window.AndroidApp.openExternalAuth(authUrl);
-            setRawStatus(t("statusStarting"));
-            return;
-          }
           await setPersistence(auth, browserLocalPersistence);
-          navigateToAppPage("auth-bridge.html?from=app");
-          return;
+          sessionStorage.setItem("android_redirect_started", "1");
+          await signInWithRedirect(auth, provider);
         } catch (error) {
           console.error("Google sign-in failed", error);
+          sessionStorage.removeItem("android_redirect_started");
           setRawStatus(getFriendlyError(error), true);
-          return;
         }
+        return;
       }
 
       try {
@@ -1013,6 +1055,9 @@
       await setPersistence(auth, browserLocalPersistence);
 
       if (sessionStorage.getItem("force_account_picker") === "1") {
+        if (sessionStorage.getItem("android_redirect_started") === "1") {
+          return;
+        }
         clearLoginSuccessUI();
         await safeSignOut();
         if (window.AndroidApp?.clearAuthSession) {
@@ -1082,7 +1127,10 @@
     await window.AppSettings.ready();
     window.FeatureAccess?.initLoginNotice?.();
     if (!handleAndroidAuthReturn()) {
-      handleExistingSession();
+      const androidRedirectHandled = await handleAndroidRedirectSignIn();
+      if (!androidRedirectHandled) {
+        await handleExistingSession();
+      }
     }
     window.FeatureAccess?.initLockedFooterLinks?.();
   </script>
