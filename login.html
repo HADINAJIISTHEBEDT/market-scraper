@@ -995,15 +995,22 @@
 
       if (isAndroidApp()) {
         try {
-          const bridge = await resolveAuthBridgeUrl();
-          const authUrl = buildAuthBridgeUrl(bridge.url);
-          if (window.AndroidApp?.openExternalAuth) {
-            window.AndroidApp.openExternalAuth(authUrl);
-            setRawStatus(t("statusStarting"));
-            return;
+          await setPersistence(auth, browserLocalPersistence);
+          try {
+            const result = await signInWithPopup(auth, provider);
+            if (result?.user) {
+              await routeSignedInUser(result.user);
+              return;
+            }
+          } catch (popupError) {
+            const code = String(popupError?.code || "");
+            if (code === "auth/popup-blocked" || code === "auth/cancelled-popup-request") {
+              sessionStorage.setItem("android_redirect_started", "1");
+              await signInWithRedirect(auth, provider);
+              return;
+            }
+            throw popupError;
           }
-          // Fallback for unusual Android contexts without bridge.
-          navigateToAppPage("auth-bridge.html?return=android&from=app&webview=1&fresh=1&select_account=1&t=" + Date.now());
         } catch (error) {
           console.error("Google sign-in failed", error);
           setRawStatus(getFriendlyError(error), true);
