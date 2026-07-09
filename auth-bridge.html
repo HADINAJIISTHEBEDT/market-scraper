@@ -265,23 +265,13 @@
 
     async function startFreshAndroidSignIn() {
       await clearCachedAuthSession();
+      statusEl.textContent = "Opening account chooser...";
+      markRedirectStarted();
       try {
-        const result = await signInWithPopup(auth, provider);
-        finishSignedInUser(result.user);
+        await signInWithRedirect(auth, provider);
       } catch (error) {
-        const code = String(error?.code || "");
-        if (code === "auth/popup-blocked" || code === "auth/cancelled-popup-request") {
-          markRedirectStarted();
-          try {
-            await signInWithRedirect(auth, provider);
-          } catch (redirectError) {
-            clearRedirectStarted();
-            console.error("Auth bridge redirect failed", redirectError);
-            finish(redirectError.message || "Google sign-in failed.", true);
-          }
-          return;
-        }
-        console.error("Auth bridge popup failed", error);
+        clearRedirectStarted();
+        console.error("Auth bridge redirect failed", error);
         finish(error.message || "Google sign-in failed.", true);
       }
     }
