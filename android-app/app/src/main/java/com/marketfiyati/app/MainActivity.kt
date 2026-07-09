@@ -159,6 +159,7 @@ class MainActivity : AppCompatActivity() {
             override fun handleOnBackPressed() {
                 if (authPopupDialog?.isShowing == true) {
                     dismissAuthPopup()
+                    binding.webView.loadUrl(APP_URL + "login.html")
                     return
                 }
                 if (binding.webView.canGoBack()) {
@@ -507,6 +508,7 @@ class MainActivity : AppCompatActivity() {
     override fun onBackPressed() {
         if (authPopupDialog?.isShowing == true) {
             dismissAuthPopup()
+            binding.webView.loadUrl(APP_URL + "login.html")
             return
         }
         if (binding.webView.canGoBack()) {

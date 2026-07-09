@@ -128,6 +128,19 @@
       document.getElementById("closeWindowBtn").addEventListener("click", () => window.close());
     }
 
+    function showBackToLoginAction() {
+      actionsEl.hidden = false;
+      actionsEl.innerHTML =
+        '<button type="button" id="backToLoginBtn">Back to login</button>';
+      document.getElementById("backToLoginBtn").addEventListener("click", () => {
+        if (window.AndroidApp?.navigateToPage) {
+          window.AndroidApp.navigateToPage("login.html");
+          return;
+        }
+        window.location.replace("login.html");
+      });
+    }
+
     function notify(payload) {
       if (window.opener && !window.opener.closed) {
         window.opener.postMessage({ type: AUTH_MESSAGE, ...payload }, "*");
@@ -288,6 +301,10 @@
 
     async function boot() {
       await setPersistence(auth, browserLocalPersistence);
+
+      if (isInAppAuthWebView() || isEmbeddedAndroidApp() || isAndroidCustomTabReturn()) {
+        showBackToLoginAction();
+      }
 
       const completed = await completePendingRedirect();
       if (completed) return;
