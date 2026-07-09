@@ -157,8 +157,7 @@ class MainActivity : AppCompatActivity() {
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (authPopupDialog?.isShowing == true) {
-                    dismissAuthPopup()
+                if (isAuthFlowPage(binding.webView.url)) {
                     binding.webView.loadUrl(APP_URL + "login.html")
                     return
                 }
@@ -324,7 +323,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openAuthInCustomTab(url: String) {
-        openAuthInAppWebView(url)
+        dismissAuthPopup()
+        clearWebAuthCookies()
+        val target = if (url.contains("native=1")) {
+            url
+        } else {
+            val separator = if (url.contains("?")) "&" else "?"
+            url + separator + "native=1&t=" + System.currentTimeMillis()
+        }
+        binding.webView.loadUrl(target)
     }
 
     private fun dismissAuthPopup() {
@@ -340,8 +347,13 @@ class MainActivity : AppCompatActivity() {
             ): Boolean {
                 val url = request?.url?.toString() ?: return false
                 if (view == mainWebView && isAuthBridgeUrl(url)) {
-                    openAuthInAppWebView(url)
+                    if (url.contains("native=1")) return false
+                    val separator = if (url.contains("?")) "&" else "?"
+                    mainWebView.loadUrl(url + separator + "native=1&t=" + System.currentTimeMillis())
                     return true
+                }
+                if (view == mainWebView && (isFirebaseAuthHandlerUrl(url) || isGoogleAuthUrl(url))) {
+                    return false
                 }
                 if (view != mainWebView && isAppLoginReturnUrl(url)) {
                     mainWebView.loadUrl(url)
@@ -506,8 +518,7 @@ class MainActivity : AppCompatActivity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        if (authPopupDialog?.isShowing == true) {
-            dismissAuthPopup()
+        if (isAuthFlowPage(binding.webView.url)) {
             binding.webView.loadUrl(APP_URL + "login.html")
             return
         }
