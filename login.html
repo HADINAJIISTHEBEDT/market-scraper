@@ -453,17 +453,11 @@
       return window.FeatureAccess?.isAndroidApp?.() ||
         !!(window.AndroidApp && window.AndroidApp.isAndroidApp && window.AndroidApp.isAndroidApp());
     }
-    const AUTH_BRIDGE_CANDIDATES = detectAndroidApp()
-      ? [
-        "https://market-scraper-0k36.onrender.com/auth-bridge.html",
-        "https://st-business-86a9b.firebaseapp.com/auth-bridge.html",
-        "https://st-business-86a9b.web.app/auth-bridge.html",
-      ]
-      : [
-        "https://st-business-86a9b.firebaseapp.com/auth-bridge.html",
-        "https://st-business-86a9b.web.app/auth-bridge.html",
-        "https://market-scraper-0k36.onrender.com/auth-bridge.html",
-      ];
+    const AUTH_BRIDGE_CANDIDATES = [
+      "https://market-scraper-0k36.onrender.com/auth-bridge.html",
+      "https://st-business-86a9b.firebaseapp.com/auth-bridge.html",
+      "https://st-business-86a9b.web.app/auth-bridge.html",
+    ];
     const isFilePage = location.protocol === "file:";
 
     const I18N = {
