@@ -157,6 +157,10 @@ class MainActivity : AppCompatActivity() {
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
+                if (authPopupDialog?.isShowing == true) {
+                    dismissAuthPopup()
+                    return
+                }
                 if (binding.webView.canGoBack()) {
                     binding.webView.goBack()
                 } else {
@@ -272,23 +276,11 @@ class MainActivity : AppCompatActivity() {
         val dialog = Dialog(this, android.R.style.Theme_DeviceDefault_Light_NoActionBar)
         val popupWebView = WebView(this)
         applyWebViewDefaults(popupWebView)
-        // Hide the intermediate auth-bridge page; reveal once Google chooser/auth pages load.
-        popupWebView.alpha = 0f
         popupWebView.addJavascriptInterface(AndroidBridge(), "AndroidApp")
         val mainWebView = binding.webView
         val dismissPopup: () -> Unit = { dismissAuthPopup() }
 
         popupWebView.webViewClient = object : WebViewClient() {
-            override fun onPageStarted(view: WebView?, pageUrl: String?, favicon: android.graphics.Bitmap?) {
-                super.onPageStarted(view, pageUrl, favicon)
-                val value = pageUrl ?: ""
-                if (isGoogleAuthUrl(value) || isFirebaseAuthHandlerUrl(value)) {
-                    popupWebView.alpha = 1f
-                } else if (isAuthBridgeUrl(value)) {
-                    popupWebView.alpha = 0f
-                }
-            }
-
             override fun shouldOverrideUrlLoading(
                 view: WebView?,
                 request: WebResourceRequest?
@@ -513,6 +505,10 @@ class MainActivity : AppCompatActivity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
+        if (authPopupDialog?.isShowing == true) {
+            dismissAuthPopup()
+            return
+        }
         if (binding.webView.canGoBack()) {
             binding.webView.goBack()
             return
