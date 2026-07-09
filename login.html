@@ -950,9 +950,53 @@
     }
 
     async function handleAndroidRedirectSignIn() {
-      // Android login is handled by auth-bridge + auth_uid return parameters.
-      sessionStorage.removeItem("android_redirect_started");
-      return false;
+      if (!isAndroidApp() || isFilePage) return false;
+      await setPersistence(auth, browserLocalPersistence);
+
+      try {
+        const result = await getRedirectResult(auth);
+        if (result?.user) {
+          sessionStorage.removeItem("android_redirect_started");
+          sessionStorage.removeItem("force_account_picker");
+          sessionStorage.setItem("login_auth_handled", result.user.uid);
+          await routeSignedInUser(result.user);
+          return true;
+        }
+      } catch (error) {
+        if (!isRecoverableRedirectError(error)) {
+          console.error("Android redirect sign-in failed", error);
+          setRawStatus(getFriendlyError(error), true);
+          sessionStorage.removeItem("android_redirect_started");
+          return true;
+        }
+      }
+
+      if (sessionStorage.getItem("android_redirect_started") !== "1") {
+        return false;
+      }
+
+      setStatus("statusChecking");
+      return await new Promise((resolve) => {
+        let settled = false;
+        const timeout = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          sessionStorage.removeItem("android_redirect_started");
+          setRawStatus(t("errorGeneric"), true);
+          resolve(true);
+        }, 30000);
+        const unsub = onAuthStateChanged(auth, async (user) => {
+          if (!user || settled) return;
+          settled = true;
+          clearTimeout(timeout);
+          unsub();
+          sessionStorage.removeItem("android_redirect_started");
+          sessionStorage.removeItem("force_account_picker");
+          sessionStorage.setItem("login_auth_handled", user.uid);
+          await routeSignedInUser(user);
+          resolve(true);
+        });
+      });
     }
 
     async function continueWithGoogle() {
@@ -976,14 +1020,22 @@
 
       if (isAndroidApp()) {
         try {
-          const bridge = await resolveAuthBridgeUrl();
-          const authUrl = buildAuthBridgeUrl(bridge.url);
-          if (window.AndroidApp?.openExternalAuth) {
-            window.AndroidApp.openExternalAuth(authUrl);
-            setRawStatus(t("statusStarting"));
-            return;
+          await setPersistence(auth, browserLocalPersistence);
+          try {
+            const result = await signInWithPopup(auth, provider);
+            if (result?.user) {
+              await routeSignedInUser(result.user);
+              return;
+            }
+          } catch (popupError) {
+            const code = String(popupError?.code || "");
+            if (code === "auth/popup-blocked" || code === "auth/cancelled-popup-request") {
+              sessionStorage.setItem("android_redirect_started", "1");
+              await signInWithRedirect(auth, provider);
+              return;
+            }
+            throw popupError;
           }
-          navigateToAppPage("auth-bridge.html?return=android&from=app&webview=1&fresh=1&select_account=1&t=" + Date.now());
         } catch (error) {
           console.error("Google sign-in failed", error);
           setRawStatus(getFriendlyError(error), true);
