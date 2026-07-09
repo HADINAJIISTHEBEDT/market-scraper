@@ -144,7 +144,18 @@
       } catch (error) {
         console.warn("Android completeAuthReturn failed", error);
       }
-      window.location.replace(returnUrl);
+      const intentUrl = appIntentUrl(returnUrl);
+      try {
+        window.location.href = intentUrl;
+      } catch (error) {
+        console.warn("Android intent redirect failed", error);
+      }
+      // Keep a web fallback in case intent launch is blocked.
+      setTimeout(() => {
+        if (document.visibilityState === "visible") {
+          window.location.replace(returnUrl);
+        }
+      }, 1200);
     }
 
     function finish(message, isError, pageAfterSuccess) {
