@@ -950,26 +950,7 @@
     }
 
     async function handleAndroidRedirectSignIn() {
-      if (!isAndroidApp() || isFilePage) return false;
-      await setPersistence(auth, browserLocalPersistence);
-
-      try {
-        const result = await getRedirectResult(auth);
-        if (result?.user) {
-          sessionStorage.removeItem("force_account_picker");
-          sessionStorage.setItem("login_auth_handled", result.user.uid);
-          await routeSignedInUser(result.user);
-          return true;
-        }
-      } catch (error) {
-        if (!isRecoverableRedirectError(error)) {
-          console.error("Android redirect sign-in failed", error);
-          setRawStatus(getFriendlyError(error), true);
-          return true;
-        }
-        console.warn("Android redirect result unavailable", error);
-      }
-      // Clear stale redirect marker from older app versions to avoid stuck "completing sign-in" loops.
+      // Android login is handled by auth-bridge + auth_uid return parameters.
       sessionStorage.removeItem("android_redirect_started");
       return false;
     }
@@ -995,22 +976,14 @@
 
       if (isAndroidApp()) {
         try {
-          await setPersistence(auth, browserLocalPersistence);
-          try {
-            const result = await signInWithPopup(auth, provider);
-            if (result?.user) {
-              await routeSignedInUser(result.user);
-              return;
-            }
-          } catch (popupError) {
-            const code = String(popupError?.code || "");
-            if (code === "auth/popup-blocked" || code === "auth/cancelled-popup-request") {
-              sessionStorage.setItem("android_redirect_started", "1");
-              await signInWithRedirect(auth, provider);
-              return;
-            }
-            throw popupError;
+          const bridge = await resolveAuthBridgeUrl();
+          const authUrl = buildAuthBridgeUrl(bridge.url);
+          if (window.AndroidApp?.openExternalAuth) {
+            window.AndroidApp.openExternalAuth(authUrl);
+            setRawStatus(t("statusStarting"));
+            return;
           }
+          navigateToAppPage("auth-bridge.html?return=android&from=app&webview=1&fresh=1&select_account=1&t=" + Date.now());
         } catch (error) {
           console.error("Google sign-in failed", error);
           setRawStatus(getFriendlyError(error), true);

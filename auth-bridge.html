@@ -88,7 +88,18 @@
     }
 
     function redirectSignInInProgress() {
-      return sessionStorage.getItem("auth_bridge_redirect_started") === "1";
+      return sessionStorage.getItem("auth_bridge_redirect_started") === "1" ||
+        localStorage.getItem("auth_bridge_redirect_started") === "1";
+    }
+
+    function markRedirectStarted() {
+      sessionStorage.setItem("auth_bridge_redirect_started", "1");
+      localStorage.setItem("auth_bridge_redirect_started", "1");
+    }
+
+    function clearRedirectStarted() {
+      sessionStorage.removeItem("auth_bridge_redirect_started");
+      localStorage.removeItem("auth_bridge_redirect_started");
     }
 
     function appIntentUrl(pageUrl) {
@@ -124,7 +135,7 @@
     }
 
     function returnToAndroidApp(returnUrl) {
-      sessionStorage.removeItem("auth_bridge_redirect_started");
+      clearRedirectStarted();
       try {
         if (window.AndroidApp && window.AndroidApp.completeAuthReturn) {
           window.AndroidApp.completeAuthReturn(returnUrl);
@@ -167,6 +178,7 @@
         finish("No email returned from Google.", true);
         return;
       }
+      clearRedirectStarted();
       const returnMode = new URLSearchParams(window.location.search).get("return");
       if (returnMode === "android" || isInAppAuthWebView() || isEmbeddedAndroidApp()) {
         statusEl.textContent = "Signed in. Returning to the app...";
@@ -223,6 +235,7 @@
         statusEl.textContent = "Completing sign-in...";
         return await new Promise((resolve) => {
           const timeout = setTimeout(() => {
+            clearRedirectStarted();
             finish("Sign-in timed out. Close and try again.", true);
             resolve(true);
           }, 20000);
@@ -240,7 +253,6 @@
     }
 
     async function startFreshAndroidSignIn() {
-      sessionStorage.removeItem("auth_bridge_redirect_started");
       await clearCachedAuthSession();
       try {
         const result = await signInWithPopup(auth, provider);
@@ -248,10 +260,11 @@
       } catch (error) {
         const code = String(error?.code || "");
         if (code === "auth/popup-blocked" || code === "auth/cancelled-popup-request") {
-          sessionStorage.setItem("auth_bridge_redirect_started", "1");
+          markRedirectStarted();
           try {
             await signInWithRedirect(auth, provider);
           } catch (redirectError) {
+            clearRedirectStarted();
             console.error("Auth bridge redirect failed", redirectError);
             finish(redirectError.message || "Google sign-in failed.", true);
           }
