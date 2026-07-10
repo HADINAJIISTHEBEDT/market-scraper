@@ -16,6 +16,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Message
 import android.util.DisplayMetrics
+import android.util.Log
 import android.webkit.GeolocationPermissions
 import android.webkit.JavascriptInterface
 import android.webkit.PermissionRequest
@@ -34,8 +35,10 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
+import com.google.android.gms.ads.AdListener
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdSize
+import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.MobileAds
 import com.marketfiyati.app.databinding.ActivityMainBinding
 import java.net.HttpURLConnection
@@ -43,6 +46,7 @@ import java.net.URL
 import java.util.concurrent.Executors
 
 class MainActivity : AppCompatActivity() {
+    private val adTag = "AdMobBanner"
     private lateinit var binding: ActivityMainBinding
     private var uploadMessage: ValueCallback<Array<Uri>>? = null
     private var pendingWebPermissionRequest: PermissionRequest? = null
@@ -475,16 +479,48 @@ class MainActivity : AppCompatActivity() {
                 MobileAds.initialize(this) {
                     runOnUiThread {
                         try {
+                            val testBannerUnitId = "ca-app-pub-3940256099942544/6300978111"
+                            val isDebuggable =
+                                (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
+                            var fallbackTried = false
+
+                            // Debug always uses test ads. Release tries live first, then test fallback if no-fill.
+                            if (isDebuggable) {
+                                binding.bannerAdView.adUnitId = testBannerUnitId
+                            }
                             binding.bannerAdView.setAdSize(getAdaptiveBannerSize())
+                            binding.bannerAdView.adListener = object : AdListener() {
+                                override fun onAdLoaded() {
+                                    binding.bannerAdView.visibility = android.view.View.VISIBLE
+                                    Log.i(adTag, "Banner ad loaded (unit=${binding.bannerAdView.adUnitId})")
+                                }
+
+                                override fun onAdFailedToLoad(error: LoadAdError) {
+                                    Log.e(
+                                        adTag,
+                                        "Banner failed (unit=${binding.bannerAdView.adUnitId}): " +
+                                            "code=${error.code}, domain=${error.domain}, message=${error.message}"
+                                    )
+                                    if (!isDebuggable && !fallbackTried) {
+                                        fallbackTried = true
+                                        binding.bannerAdView.adUnitId = testBannerUnitId
+                                        Log.i(adTag, "Retrying banner with Google test unit")
+                                        binding.bannerAdView.loadAd(AdRequest.Builder().build())
+                                    } else {
+                                        binding.bannerAdView.visibility = android.view.View.GONE
+                                    }
+                                }
+                            }
                             binding.bannerAdView.loadAd(AdRequest.Builder().build())
-                            binding.bannerAdView.visibility = android.view.View.VISIBLE
-                        } catch (_: Exception) {
+                        } catch (error: Exception) {
                             binding.bannerAdView.visibility = android.view.View.GONE
+                            Log.e(adTag, "Banner setup exception", error)
                         }
                     }
                 }
-            } catch (_: Exception) {
+            } catch (error: Exception) {
                 binding.bannerAdView.visibility = android.view.View.GONE
+                Log.e(adTag, "MobileAds init exception", error)
             }
         }
     }
