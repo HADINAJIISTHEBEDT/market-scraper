@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  const OWNER_EMAIL = "hadi.naji145@gmail.com";
+  const OWNER_EMAIL = "pazarfiyati@gmail.com";
 
   const LOCK_COPY = {
     tr: {
