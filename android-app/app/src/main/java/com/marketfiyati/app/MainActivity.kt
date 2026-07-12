@@ -48,12 +48,16 @@ import java.util.concurrent.Executors
 
 class MainActivity : AppCompatActivity() {
     private val adTag = "AdMobBanner"
+    private val bannerRetryDelaysMs = longArrayOf(15000L, 30000L, 60000L, 120000L)
     private lateinit var binding: ActivityMainBinding
     private var uploadMessage: ValueCallback<Array<Uri>>? = null
     private var pendingWebPermissionRequest: PermissionRequest? = null
     private var pendingGeoOrigin: String? = null
     private var pendingGeoCallback: GeolocationPermissions.Callback? = null
     private var authPopupDialog: Dialog? = null
+    private var bannerRetryAttempt = 0
+    private var bannerRetryRunnable: Runnable? = null
+    private var bannerWatchdogRunnable: Runnable? = null
     private val filePickerLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val uris = if (result.resultCode == Activity.RESULT_OK && result.data != null) {
             result.data?.data?.let { arrayOf(it) }
@@ -482,7 +486,6 @@ class MainActivity : AppCompatActivity() {
                         try {
                             val isDebuggable =
                                 (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
-                            var adLoaded = false
                             var adCallbackSeen = false
 
                             val adapterStates = initStatus.adapterStatusMap.entries.joinToString { entry ->
@@ -504,33 +507,76 @@ class MainActivity : AppCompatActivity() {
                                 )
                             }
 
+                            fun clearBannerRetry() {
+                                bannerRetryRunnable?.let { binding.bannerAdView.removeCallbacks(it) }
+                                bannerRetryRunnable = null
+                            }
+
+                            fun clearBannerWatchdog() {
+                                bannerWatchdogRunnable?.let { binding.bannerAdView.removeCallbacks(it) }
+                                bannerWatchdogRunnable = null
+                            }
+
+                            fun scheduleBannerRetry(reason: String) {
+                                if (bannerRetryAttempt >= bannerRetryDelaysMs.size) {
+                                    Log.w(adTag, "Retry limit reached, stopping retries (reason=$reason)")
+                                    return
+                                }
+                                val delayMs = bannerRetryDelaysMs[bannerRetryAttempt]
+                                bannerRetryAttempt += 1
+                                clearBannerRetry()
+                                val retryRunnable = Runnable {
+                                    requestBannerLoad("retry#$bannerRetryAttempt")
+                                }
+                                bannerRetryRunnable = retryRunnable
+                                binding.bannerAdView.postDelayed(retryRunnable, delayMs)
+                                Log.i(
+                                    adTag,
+                                    "Scheduling banner retry in ${delayMs}ms (attempt=$bannerRetryAttempt, reason=$reason)"
+                                )
+                            }
+
+                            fun requestBannerLoad(trigger: String) {
+                                adCallbackSeen = false
+                                clearBannerWatchdog()
+                                Log.i(adTag, "Loading banner ad (unit=$configuredUnitId, trigger=$trigger)")
+                                binding.bannerAdView.loadAd(AdRequest.Builder().build())
+
+                                // If the SDK never responds for this request, retry with backoff.
+                                val watchdogRunnable = Runnable {
+                                    if (!adCallbackSeen) {
+                                        Log.w(adTag, "No ad callback after timeout (unit=$configuredUnitId)")
+                                        scheduleBannerRetry("no_callback")
+                                    }
+                                }
+                                bannerWatchdogRunnable = watchdogRunnable
+                                binding.bannerAdView.postDelayed(watchdogRunnable, 12000L)
+                            }
+
                             binding.bannerAdView.adListener = object : AdListener() {
                                 override fun onAdLoaded() {
                                     adCallbackSeen = true
-                                    adLoaded = true
+                                    bannerRetryAttempt = 0
+                                    clearBannerRetry()
+                                    clearBannerWatchdog()
                                     binding.bannerAdView.visibility = android.view.View.VISIBLE
                                     Log.i(adTag, "Banner ad loaded (unit=${binding.bannerAdView.adUnitId})")
                                 }
 
                                 override fun onAdFailedToLoad(error: LoadAdError) {
                                     adCallbackSeen = true
+                                    clearBannerWatchdog()
                                     Log.e(
                                         adTag,
                                         "Banner failed (unit=${binding.bannerAdView.adUnitId}): " +
                                             "code=${error.code}, domain=${error.domain}, message=${error.message}"
                                     )
                                     binding.bannerAdView.visibility = android.view.View.GONE
+                                    scheduleBannerRetry("code=${error.code}")
                                 }
                             }
-                            Log.i(adTag, "Loading banner ad (unit=$configuredUnitId)")
-                            binding.bannerAdView.loadAd(AdRequest.Builder().build())
-
-                            // Safety watchdog: if no callback arrives, log explicitly for diagnosis.
-                            binding.bannerAdView.postDelayed({
-                                if (!adLoaded && !adCallbackSeen) {
-                                    Log.w(adTag, "No ad callback after timeout for unit=$configuredUnitId")
-                                }
-                            }, 12000L)
+                            bannerRetryAttempt = 0
+                            requestBannerLoad("initial")
                         } catch (error: Exception) {
                             binding.bannerAdView.visibility = android.view.View.GONE
                             Log.e(adTag, "Banner setup exception", error)
@@ -542,6 +588,14 @@ class MainActivity : AppCompatActivity() {
                 Log.e(adTag, "MobileAds init exception", error)
             }
         }
+    }
+
+    override fun onDestroy() {
+        bannerRetryRunnable?.let { binding.bannerAdView.removeCallbacks(it) }
+        bannerWatchdogRunnable?.let { binding.bannerAdView.removeCallbacks(it) }
+        bannerRetryRunnable = null
+        bannerWatchdogRunnable = null
+        super.onDestroy()
     }
 
     private fun getAdaptiveBannerSize(): AdSize {
