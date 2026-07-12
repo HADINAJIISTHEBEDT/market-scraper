@@ -143,16 +143,6 @@ class MainActivity : AppCompatActivity() {
         createNotificationChannel()
         createUpdateChannel()
         configureWebView(binding.webView)
-        binding.privacyPolicyLink.setOnClickListener {
-            binding.webView.evaluateJavascript(
-                "(function(){ return localStorage.getItem('app_lang') || 'tr'; })();"
-            ) { lang ->
-                val cleanLang = lang?.trim()?.removeSurrounding("\"")?.ifBlank { "tr" } ?: "tr"
-                binding.webView.loadUrl(
-                    getString(R.string.privacy_policy_url) + "?lang=" + cleanLang
-                )
-            }
-        }
 
         if (savedInstanceState == null) {
             binding.webView.loadUrl(APP_URL)
@@ -478,7 +468,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun configureAds() {
-        binding.bannerAdView.visibility = android.view.View.GONE
+        binding.bannerAdView.visibility = android.view.View.VISIBLE
         binding.root.post {
             try {
                 MobileAds.initialize(this) { initStatus ->
@@ -496,7 +486,9 @@ class MainActivity : AppCompatActivity() {
                                 "MobileAds initialized. debug=$isDebuggable, adapters=[$adapterStates]"
                             )
 
-                            // Ad unit ID is configured in XML via @string/admob_banner_ad_unit_id.
+                            // Adaptive size needs measured width.
+                            binding.bannerAdView.setAdSize(getAdaptiveBannerSize())
+
                             val configuredUnitId = binding.bannerAdView.adUnitId
 
                             if (isDebuggable) {
@@ -540,6 +532,7 @@ class MainActivity : AppCompatActivity() {
                                 adCallbackSeen = false
                                 clearBannerWatchdog()
                                 Log.i(adTag, "Loading banner ad (unit=$configuredUnitId, trigger=$trigger)")
+                                binding.bannerAdView.visibility = android.view.View.VISIBLE
                                 binding.bannerAdView.loadAd(AdRequest.Builder().build())
 
                                 // If the SDK never responds for this request, retry with backoff.
@@ -571,20 +564,21 @@ class MainActivity : AppCompatActivity() {
                                         "Banner failed (unit=${binding.bannerAdView.adUnitId}): " +
                                             "code=${error.code}, domain=${error.domain}, message=${error.message}"
                                     )
-                                    binding.bannerAdView.visibility = android.view.View.GONE
+                                    // Keep the reserved banner slot visible while retries continue.
+                                    binding.bannerAdView.visibility = android.view.View.VISIBLE
                                     scheduleBannerRetry("code=${error.code}")
                                 }
                             }
                             bannerRetryAttempt = 0
                             requestBannerLoad("initial")
                         } catch (error: Exception) {
-                            binding.bannerAdView.visibility = android.view.View.GONE
+                            binding.bannerAdView.visibility = android.view.View.VISIBLE
                             Log.e(adTag, "Banner setup exception", error)
                         }
                     }
                 }
             } catch (error: Exception) {
-                binding.bannerAdView.visibility = android.view.View.GONE
+                binding.bannerAdView.visibility = android.view.View.VISIBLE
                 Log.e(adTag, "MobileAds init exception", error)
             }
         }
@@ -595,6 +589,7 @@ class MainActivity : AppCompatActivity() {
         bannerWatchdogRunnable?.let { binding.bannerAdView.removeCallbacks(it) }
         bannerRetryRunnable = null
         bannerWatchdogRunnable = null
+        binding.bannerAdView.destroy()
         super.onDestroy()
     }
 
