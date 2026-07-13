@@ -211,6 +211,37 @@
         text-align: center;
       }
 
+      .web-ad-banner {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 40;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 50px;
+        padding: 4px 0;
+        background: #f1f5f9;
+        border-top: 1px solid #e2e8f0;
+        box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.06);
+      }
+
+      .web-ad-banner[hidden] {
+        display: none !important;
+      }
+
+      .web-ad-banner .adsbygoogle {
+        display: block;
+        width: 100%;
+        max-width: 1100px;
+        min-height: 50px;
+      }
+
+      body.has-web-ad-banner {
+        padding-bottom: 72px;
+      }
+
       .contact-link {
         background: none;
         border: 0;
@@ -633,8 +664,10 @@
         </form>
       </div>
     </footer>
+    <div id="webAdBanner" class="web-ad-banner" hidden aria-label="Advertisement"></div>
     <script src="app-settings.js"></script>
     <script src="feature-access.js"></script>
     <script src="frontend.js"></script>
+    <script src="web-ads.js"></script>
   </body>
 </html>
