@@ -1,13 +1,13 @@
 (function () {
   "use strict";
 
-  // Google AdSense (web only). Publisher number matches your AdMob account.
-  // Create a Display ad unit in AdSense and paste its ID into `slot`.
+  // Fixed small bottom banner (not auto/multiplex — those expand huge when empty).
   const ADS_CONFIG = {
     client: "ca-pub-1598347178644013",
     slot: "2034855132",
-    enableAutoAnchor: true,
   };
+
+  const BANNER_HEIGHT_PX = 50;
 
   function isAndroidAppWebView() {
     if (typeof window.AndroidApp !== "undefined") return true;
@@ -29,7 +29,7 @@
     return host;
   }
 
-  function loadAdsScript(options = {}) {
+  function loadAdsScript() {
     const existing = document.querySelector('script[src*="adsbygoogle.js"]');
     if (existing) return Promise.resolve();
 
@@ -40,9 +40,6 @@
         "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=" +
         encodeURIComponent(ADS_CONFIG.client);
       script.crossOrigin = "anonymous";
-      if (options.overlays) {
-        script.setAttribute("data-overlays", options.overlays);
-      }
       script.onload = () => resolve();
       script.onerror = () => reject(new Error("Failed to load AdSense"));
       document.head.appendChild(script);
@@ -56,10 +53,14 @@
     const ins = document.createElement("ins");
     ins.className = "adsbygoogle";
     ins.style.display = "block";
-    ins.style.minHeight = "50px";
+    ins.style.width = "100%";
+    ins.style.height = BANNER_HEIGHT_PX + "px";
+    ins.style.maxHeight = BANNER_HEIGHT_PX + "px";
+    ins.style.overflow = "hidden";
     ins.setAttribute("data-ad-client", ADS_CONFIG.client);
     ins.setAttribute("data-ad-slot", ADS_CONFIG.slot);
-    ins.setAttribute("data-ad-format", "auto");
+    // Force a slim banner shape (avoid "auto", which can grow huge when blank).
+    ins.setAttribute("data-ad-format", "horizontal");
     ins.setAttribute("data-full-width-responsive", "true");
     host.appendChild(ins);
 
@@ -73,9 +74,7 @@
     const host = ensureBannerHost();
 
     try {
-      await loadAdsScript(
-        ADS_CONFIG.enableAutoAnchor ? { overlays: "bottom" } : {}
-      );
+      await loadAdsScript();
       mountDisplayBanner(host);
     } catch (error) {
       console.warn("[WebAds]", error);

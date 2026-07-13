@@ -220,11 +220,13 @@
         display: flex;
         justify-content: center;
         align-items: center;
+        height: 56px;
+        max-height: 56px;
         min-height: 50px;
-        padding: 4px 0;
-        background: #f1f5f9;
+        overflow: hidden;
+        padding: 3px 0;
+        background: #f8fafc;
         border-top: 1px solid #e2e8f0;
-        box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.06);
       }
 
       .web-ad-banner[hidden] {
@@ -232,14 +234,21 @@
       }
 
       .web-ad-banner .adsbygoogle {
-        display: block;
+        display: block !important;
         width: 100%;
-        max-width: 1100px;
-        min-height: 50px;
+        max-width: 728px;
+        height: 50px !important;
+        max-height: 50px !important;
+        min-height: 50px !important;
+        overflow: hidden;
+      }
+
+      .web-ad-banner iframe {
+        max-height: 50px !important;
       }
 
       body.has-web-ad-banner {
-        padding-bottom: 72px;
+        padding-bottom: 60px;
       }
 
       .contact-link {
