@@ -1,14 +1,12 @@
 (function () {
   "use strict";
 
-  // Same IDs as your AdSense "Web Banner" unit.
   const ADS_CONFIG = {
     client: "ca-pub-1598347178644013",
     slot: "2034855132",
   };
 
   function isAndroidAppWebView() {
-    // Only skip inside our Android WebView bridge (AdMob shows there instead).
     return typeof window.AndroidApp !== "undefined";
   }
 
@@ -21,9 +19,23 @@
       host.setAttribute("aria-label", "Advertisement");
       document.body.appendChild(host);
     }
-    host.hidden = false;
-    document.body.classList.add("has-web-ad-banner");
+    hideBanner(host);
     return host;
+  }
+
+  function showBanner(host) {
+    host.hidden = false;
+    host.style.visibility = "visible";
+    host.style.pointerEvents = "";
+    document.body.classList.add("has-web-ad-banner");
+  }
+
+  function hideBanner(host) {
+    host.hidden = true;
+    host.innerHTML = "";
+    host.style.visibility = "";
+    host.style.pointerEvents = "";
+    document.body.classList.remove("has-web-ad-banner");
   }
 
   function loadAdsScript() {
@@ -38,60 +50,61 @@
         encodeURIComponent(ADS_CONFIG.client);
       script.crossOrigin = "anonymous";
       script.onload = () => resolve();
-      script.onerror = () => reject(new Error("Failed to load AdSense script (blocked or network)"));
+      script.onerror = () => reject(new Error("Failed to load AdSense script"));
       document.head.appendChild(script);
     });
-  }
-
-  function diagnoseFill(ins) {
-    // AdSense sets data-ad-status after attempting to fill.
-    let tries = 0;
-    const timer = setInterval(() => {
-      tries += 1;
-      const status = ins.getAttribute("data-ad-status");
-      if (status === "filled") {
-        clearInterval(timer);
-        console.info("[WebAds] Ad filled OK");
-        return;
-      }
-      if (status === "unfilled" || tries >= 12) {
-        clearInterval(timer);
-        console.warn(
-          "[WebAds] No ad fill. status=" +
-            (status || "pending") +
-            ". Common causes: site still under AdSense review, ad blocker/tracking prevention, or no inventory yet."
-        );
-      }
-    }, 1000);
   }
 
   function mountDisplayBanner(host) {
     if (!ADS_CONFIG.slot) return;
 
     host.innerHTML = "";
-    // Match AdSense-generated snippet closely (forced 50px height often prevents fill).
     const ins = document.createElement("ins");
     ins.className = "adsbygoogle";
     ins.style.display = "block";
+    ins.style.width = "100%";
     ins.setAttribute("data-ad-client", ADS_CONFIG.client);
     ins.setAttribute("data-ad-slot", ADS_CONFIG.slot);
     ins.setAttribute("data-ad-format", "horizontal");
     ins.setAttribute("data-full-width-responsive", "true");
     host.appendChild(ins);
 
+    // Load off-screen/invisible so AdSense can measure, without a blank gap.
+    host.hidden = false;
+    host.style.visibility = "hidden";
+    host.style.pointerEvents = "none";
+    document.body.classList.remove("has-web-ad-banner");
+
     try {
       (window.adsbygoogle = window.adsbygoogle || []).push({});
     } catch (error) {
       console.warn("[WebAds] adsbygoogle.push failed", error);
+      hideBanner(host);
+      return;
     }
-    diagnoseFill(ins);
+
+    let tries = 0;
+    const timer = setInterval(() => {
+      tries += 1;
+      const status = ins.getAttribute("data-ad-status");
+
+      if (status === "filled") {
+        clearInterval(timer);
+        showBanner(host);
+        console.info("[WebAds] Ad filled — showing small banner");
+        return;
+      }
+
+      if (status === "unfilled" || tries >= 15) {
+        clearInterval(timer);
+        hideBanner(host);
+        console.warn("[WebAds] No ad fill — blank banner removed");
+      }
+    }, 1000);
   }
 
   async function initWebAds() {
-    if (!ADS_CONFIG.client || isAndroidAppWebView()) {
-      console.info("[WebAds] Skipped (Android app WebView uses AdMob)");
-      return;
-    }
+    if (!ADS_CONFIG.client || isAndroidAppWebView()) return;
 
     const host = ensureBannerHost();
 
@@ -99,6 +112,7 @@
       await loadAdsScript();
       mountDisplayBanner(host);
     } catch (error) {
+      hideBanner(host);
       console.warn("[WebAds]", error);
     }
   }
