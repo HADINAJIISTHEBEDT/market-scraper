@@ -487,7 +487,10 @@ class MainActivity : AppCompatActivity() {
                                 bannerWatchdogRunnable = null
                             }
 
-                            fun scheduleBannerRetry(reason: String) {
+                            lateinit var requestBannerLoad: (String) -> Unit
+                            lateinit var scheduleBannerRetry: (String) -> Unit
+
+                            scheduleBannerRetry = fun(reason: String) {
                                 if (bannerRetryAttempt >= bannerRetryDelaysMs.size) {
                                     Log.w(adTag, "Retry limit reached, stopping retries (reason=$reason)")
                                     return
@@ -506,7 +509,7 @@ class MainActivity : AppCompatActivity() {
                                 )
                             }
 
-                            fun requestBannerLoad(trigger: String) {
+                            requestBannerLoad = fun(trigger: String) {
                                 adCallbackSeen = false
                                 clearBannerWatchdog()
                                 Log.i(adTag, "Loading banner ad (unit=$configuredUnitId, trigger=$trigger)")
