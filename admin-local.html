@@ -1,0 +1,2651 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin (Local)</title>
+  <link rel="stylesheet" href="css.css" />
+  <style>
+    body { max-width: 1100px; margin: 0 auto; padding: 24px; background: #f8fafc; }
+    #adminGuard, #accessDenied { display: none; }
+    #adminLoading, #accessDenied { text-align: center; margin-top: 80px; color: #1e293b; }
+    #accessDenied { color: #b91c1c; }
+    #adminLoading {
+      border: 1px solid #e5e7eb; border-radius: 14px; padding: 24px; background: #fff;
+    }
+    .nav-bar {
+      display: flex; justify-content: space-between; align-items: center; gap: 12px;
+      margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid #e5e7eb; flex-wrap: wrap;
+    }
+    .nav-bar a, .nav-bar button { color: #2563eb; text-decoration: none; font-weight: 600; background: none; border: none; cursor: pointer; font: inherit; }
+    .lang-select, .field-input, .field-textarea, .status-select {
+      padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font: inherit; background: #fff;
+    }
+    .field-textarea { min-height: 80px; resize: vertical; width: 100%; }
+    .field-input { width: 100%; }
+    .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+    .tab-btn {
+      padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 999px; background: #fff; cursor: pointer; font-weight: 700;
+    }
+    .tab-btn.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+    .panel-section {
+      display: none; background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; padding: 18px; margin-bottom: 18px;
+    }
+    .panel-section.active { display: block; }
+    .panel-section h2 { margin: 0 0 12px; font-size: 22px; }
+    .panel-section p.help { margin: 0 0 14px; color: #64748b; }
+    .form-grid { display: grid; gap: 12px; }
+    .form-grid label { display: grid; gap: 6px; font-weight: 600; }
+    .toggle-row { display: flex; align-items: center; gap: 10px; font-weight: 700; }
+    .stats-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+    .stat-box {
+      flex: 1; min-width: 120px; border: 1px solid #e5e7eb; border-radius: 10px;
+      padding: 14px; text-align: center; background: #fff;
+    }
+    .stat-num { font-size: 28px; font-weight: 800; color: #2563eb; }
+    .stat-label { font-size: 12px; color: #64748b; margin-top: 4px; }
+    .card {
+      border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px; margin-bottom: 12px; background: #fff;
+    }
+    .card-header { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: flex-start; }
+    .card-title { font-weight: 800; color: #1e293b; }
+    .card-meta { font-size: 13px; color: #64748b; margin-top: 4px; }
+    .btn-primary, .btn-secondary, .btn-danger, .btn-warning, .btn-update {
+      padding: 8px 14px; border: none; border-radius: 8px; cursor: pointer; font: inherit; font-weight: 700;
+    }
+    .btn-primary { background: #2563eb; color: #fff; }
+    .btn-secondary { background: #e2e8f0; color: #1e293b; }
+    .btn-danger { background: #fee2e2; color: #b91c1c; }
+    .btn-warning { background: #fef3c7; color: #92400e; }
+    .btn-update { background: #2563eb; color: #fff; }
+    .actions-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .status-badge {
+      display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 600;
+    }
+    .status-pending, .status-waiting { background: #fef9c3; color: #854d0e; }
+    .status-preparing { background: #dbeafe; color: #1e40af; }
+    .status-on-the-way { background: #fce7f3; color: #9d174d; }
+    .status-delivered, .status-arrived { background: #dcfce7; color: #166534; }
+    .status-blocked { background: #fee2e2; color: #991b1b; }
+    .status-done { background: #dcfce7; color: #166534; }
+    .status-completed { background: #e0e7ff; color: #3730a3; }
+    .message-box { margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: #f8fafc; white-space: pre-wrap; }
+    .order-item-row, .tile-preview-row { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
+    .tile-preview {
+      width: 72px; height: 52px; border-radius: 8px; background-size: cover; background-position: center; border: 1px solid #e2e8f0;
+    }
+    .tile-editor { display: grid; grid-template-columns: 72px 1fr auto; gap: 10px; align-items: start; }
+    .toast {
+      position: fixed; right: 20px; bottom: 20px; background: #166534; color: #fff; padding: 12px 16px;
+      border-radius: 10px; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.2); display: none; z-index: 20;
+    }
+    .empty-msg { color: #64748b; text-align: center; padding: 24px 0; }
+    .chat-box { margin-top: 10px; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px; max-height: 180px; overflow-y: auto; background: #f8fafc; }
+    .chat-msg { margin-bottom: 8px; padding: 8px 10px; border-radius: 10px; font-size: 13px; max-width: 90%; }
+    .chat-msg.customer { background: #dbeafe; margin-right: auto; }
+    .chat-msg.market { background: #dcfce7; margin-left: auto; }
+    .chat-msg.driver { background: #fef3c7; margin-right: auto; }
+    .chat-msg.admin { background: #ede9fe; margin-left: auto; }
+    .chat-msg-meta { font-size: 11px; color: #64748b; margin-bottom: 4px; }
+    .chat-compose { display: flex; gap: 8px; margin-top: 10px; align-items: center; }
+    .chat-compose .field-input { flex: 1; min-width: 0; }
+    .market-stat { border-left: 4px solid #2563eb; }
+  </style>
+</head>
+<body>
+  <div id="adminLoading">
+    <h2>Admin panel yukleniyor...</h2>
+    <p>Bir sey gorunmezse sayfayi yenileyin.</p>
+  </div>
+
+  <div id="accessDenied">
+    <h2 id="deniedTitle">Access Denied</h2>
+    <p id="deniedMessage">You must be an admin to view this page.</p>
+    <a id="deniedBack" href="index.html">Go back</a>
+  </div>
+
+  <div id="adminGuard">
+    <div class="nav-bar">
+      <span id="adminTitle" style="font-weight:800;font-size:20px;">Admin Panel</span>
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+        <a id="backLink" href="index.html">Back to App</a>
+        <select id="langSelect" class="lang-select">
+          <option value="tr">Türkçe</option>
+          <option value="en">English</option>
+          <option value="ar">العربية</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-box"><div class="stat-num" id="statTotal">0</div><div class="stat-label" id="statTotalLabel">Total Orders</div></div>
+      <div class="stat-box"><div class="stat-num" id="statPending">0</div><div class="stat-label" id="statPendingLabel">Pending</div></div>
+      <div class="stat-box"><div class="stat-num" id="statUsers">0</div><div class="stat-label" id="statUsersLabel">Users</div></div>
+      <div class="stat-box"><div class="stat-num" id="statTiles">0</div><div class="stat-label" id="statTilesLabel">Homepage tiles</div></div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="settings" id="tabSettings">App settings</button>
+      <button class="tab-btn" data-tab="homepage" id="tabHomepage">Homepage</button>
+      <button class="tab-btn" data-tab="orders" id="tabOrders">Orders</button>
+      <button class="tab-btn" data-tab="users" id="tabUsers">Users</button>
+      <button class="tab-btn" data-tab="markets" id="tabMarkets">Markets</button>
+      <button class="tab-btn" data-tab="inbox" id="tabInbox">Inbox</button>
+    </div>
+
+    <section class="panel-section active" id="panel-settings">
+      <h2 id="settingsTitle">Global app settings</h2>
+      <p class="help" id="settingsHelp">Changes here are saved to Firebase and appear live for all users.</p>
+      <div class="form-grid">
+        <label>
+          <span id="featuresAccessLabel">Login/cart/profile/orders access</span>
+          <select id="featuresAccessMode" class="status-select">
+            <option id="featuresLockOption" value="locked">Lock for normal users</option>
+            <option id="featuresUnlockOption" value="unlocked">Unlock for all users</option>
+          </select>
+        </label>
+        <label>
+          <span id="announcementLabel">Announcement banner</span>
+          <textarea id="announcementInput" class="field-textarea"></textarea>
+        </label>
+        <label>
+          <span id="appPauseModeLabel">App availability</span>
+          <select id="appPauseMode" class="status-select">
+            <option id="appRunOption" value="running">Run app for normal users</option>
+            <option id="appPauseOption" value="paused">Pause app for normal users</option>
+          </select>
+        </label>
+        <label>
+          <span id="commandMessageLabel">Command message</span>
+          <textarea id="commandMessageInput" class="field-textarea"></textarea>
+        </label>
+        <label>
+          <span id="heroTitleLabel">Homepage title override</span>
+          <input id="heroTitleInput" class="field-input" type="text" />
+        </label>
+        <label>
+          <span id="heroSubtitleLabel">Homepage subtitle override</span>
+          <textarea id="heroSubtitleInput" class="field-textarea"></textarea>
+        </label>
+        <div class="actions-row">
+          <button class="btn-primary" id="saveSettingsBtn" type="button">Save settings</button>
+        </div>
+        <p id="settingsSaveStatus" class="empty-msg" style="padding:0;text-align:left;"></p>
+      </div>
+    </section>
+
+    <section class="panel-section" id="panel-homepage">
+      <h2 id="homepageTitle">Homepage tiles</h2>
+      <p class="help" id="homepageHelp">Add, edit, or remove category tiles shown on the homepage.</p>
+      <div id="tilesList"></div>
+      <div class="card">
+        <h3 id="addTileTitle" style="margin:0 0 10px;">Add tile</h3>
+        <div class="form-grid">
+          <label>
+            <span id="tileLabelLabel">Label</span>
+            <input id="newTileLabel" class="field-input" type="text" />
+          </label>
+          <label>
+            <span id="tileImageLabel">Image URL</span>
+            <input id="newTileImage" class="field-input" type="url" />
+          </label>
+          <div class="actions-row">
+            <button class="btn-primary" id="addTileBtn" type="button">Add tile</button>
+            <button class="btn-primary" id="saveTilesBtn" type="button">Save homepage</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel-section" id="panel-orders">
+      <h2 id="ordersTitle">All orders</h2>
+      <p id="ordersLoading" class="empty-msg">Loading orders...</p>
+      <div id="ordersList"></div>
+      <h2 id="adminHistoryTitle" style="font-size:20px;margin:24px 0 12px;">Order history</h2>
+      <div id="adminHistoryList"></div>
+      <h2 id="adminCallHistoryTitle" style="font-size:20px;margin:24px 0 12px;">Call history</h2>
+      <div class="actions-row" style="margin-bottom:12px;">
+        <button class="btn-danger" type="button" data-admin-action="delete-all-call-history" id="deleteAllCallHistoryBtn">Delete all call history</button>
+      </div>
+      <div id="adminCallHistoryList"></div>
+    </section>
+
+    <section class="panel-section" id="panel-users">
+      <h2 id="usersTitle">Signed-in users</h2>
+      <p id="usersLoading" class="empty-msg">Loading users...</p>
+      <div class="actions-row" style="margin-bottom:14px;">
+        <button class="btn-danger" type="button" data-admin-action="delete-all-users" id="deleteAllUsersBtn">Delete all users</button>
+      </div>
+      <h3 id="deleteRequestsTitle" hidden>Delete requests</h3>
+      <div id="deleteRequestsList" hidden></div>
+      <div id="usersList"></div>
+    </section>
+
+    <section class="panel-section" id="panel-markets">
+      <h2 id="marketsTitle">Markets overview</h2>
+      <p class="help" id="marketsHelp">Track orders and live conversations from every market.</p>
+      <div class="stats-row" id="marketStatsRow"></div>
+      <label>
+        <span id="marketFilterLabel">Filter market</span>
+        <select id="marketFilterSelect" class="status-select"></select>
+      </label>
+      <h3 id="marketOrdersTitle" style="margin-top:18px;">Market orders</h3>
+      <div id="marketOrdersList"></div>
+      <h3 id="adminDriversTitle" style="margin-top:24px;">Market drivers</h3>
+      <p class="help" id="adminDriversHelp">Manage saved drivers per market.</p>
+      <label>
+        <span id="adminDriverMarketLabel">Market</span>
+        <select id="adminDriverMarketSelect" class="status-select"></select>
+      </label>
+      <div id="adminDriversPanel"></div>
+    </section>
+
+    <section class="panel-section" id="panel-inbox">
+      <h2 id="inboxTitle">Inbox</h2>
+      <p class="help" id="inboxHelp">Delete request messages are saved here. You can delete individual messages manually.</p>
+      <div id="inboxList"></div>
+    </section>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    window.__adminBooted = false;
+    window.showAdminLoadError = function(message) {
+      if (window.__adminBooted) return;
+      const loading = document.getElementById("adminLoading");
+      const denied = document.getElementById("accessDenied");
+      if (loading) loading.style.display = "none";
+      if (denied) {
+        denied.style.display = "block";
+        document.getElementById("deniedTitle").textContent = "Admin panel yuklenemedi";
+        document.getElementById("deniedMessage").textContent = message || "Admin dosyalari yuklenemedi. Sayfayi yenileyin.";
+      }
+    };
+    window.addEventListener("error", (event) => window.showAdminLoadError(event.message));
+    window.addEventListener("unhandledrejection", (event) => window.showAdminLoadError(event.reason?.message || String(event.reason || "")));
+  </script>
+
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script>
+window.FIREBASE_CONFIG = {
+  apiKey: "AIzaSyA4ZmYg5sTs4gU1Nm25s7of6oqJ4xGpR28",
+  authDomain: "st-business-86a9b.firebaseapp.com",
+  projectId: "st-business-86a9b",
+  storageBucket: "st-business-86a9b.firebasestorage.app",
+  messagingSenderId: "472603409840",
+  appId: "1:472603409840:web:30127c81e74c3b3c4e2a75",
+};
+
+  </script>
+  <script>
+(function () {
+  "use strict";
+
+  const MARKETS = [
+    { key: "bim", label: "BIM", color: "#c8102e" },
+    { key: "a101", label: "A101", color: "#0054a6" },
+    { key: "sok", label: "SOK", color: "#f9b000" },
+    { key: "migros", label: "Migros", color: "#f58220" },
+    { key: "tahtakale", label: "Tahtakale", color: "#2d6a4f" },
+    { key: "carrefour", label: "Carrefour", color: "#004e9a" },
+  ];
+
+  function normalizeMarketKey(value) {
+    return String(value || "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "_")
+      .replace(/[^a-z0-9_]/g, "");
+  }
+
+  function getMarketByKey(key) {
+    const normalized = normalizeMarketKey(key);
+    return MARKETS.find((market) => market.key === normalized) || null;
+  }
+
+  function getMarketLabel(key) {
+    const market = getMarketByKey(key);
+    if (market) return market.label;
+    const raw = String(key || "").trim();
+    return raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : "Unknown";
+  }
+
+  function resolveOrderMarketId(cartItems) {
+    const items = Array.isArray(cartItems) ? cartItems : [];
+    const counts = new Map();
+    for (const item of items) {
+      const key = normalizeMarketKey(item.market);
+      if (!key) continue;
+      counts.set(key, (counts.get(key) || 0) + (item.qty || 1));
+    }
+    let topKey = "";
+    let topCount = 0;
+    for (const [key, count] of counts.entries()) {
+      if (count > topCount) {
+        topKey = key;
+        topCount = count;
+      }
+    }
+    if (topKey) return topKey;
+    const first = items.find((item) => normalizeMarketKey(item.market));
+    return first ? normalizeMarketKey(first.market) : "unknown";
+  }
+
+  function orderMatchesMarket(order, marketId) {
+    const target = normalizeMarketKey(marketId);
+    if (!target) return true;
+    const orderMarket = normalizeMarketKey(order.marketId || order.marketName);
+    if (orderMarket && orderMarket === target) return true;
+    const items = Array.isArray(order.items) ? order.items : [];
+    return items.some((item) => normalizeMarketKey(item.market) === target);
+  }
+
+  window.MarketsConfig = {
+    MARKETS,
+    normalizeMarketKey,
+    getMarketByKey,
+    getMarketLabel,
+    resolveOrderMarketId,
+    orderMatchesMarket,
+  };
+})();
+
+  </script>
+  <script>
+(function () {
+  "use strict";
+
+  const ORDER_STATUSES = ["waiting", "awaiting-payment", "preparing", "on-the-way", "arrived"];
+  const PAYMENT_TIMEOUT_MS = 20 * 60 * 1000;
+
+  const LEGACY_STATUS_MAP = {
+    pending: "waiting",
+    preparing: "preparing",
+    waiting: "waiting",
+    "awaiting-payment": "awaiting-payment",
+    "on-the-way": "on-the-way",
+    delivered: "arrived",
+    arrived: "arrived",
+    closed: "closed",
+  };
+
+  function normalizeOrderStatus(status) {
+    const key = String(status || "waiting").trim().toLowerCase();
+    return LEGACY_STATUS_MAP[key] || "waiting";
+  }
+
+  function isOrderClosed(status) {
+    return String(status || "").trim().toLowerCase() === "closed";
+  }
+
+  function writeOrderInboxNotifications(db, entry) {
+    const now = new Date().toISOString();
+    const base = {
+      inboxType: entry.inboxType || "order_event",
+      orderId: String(entry.orderId || ""),
+      orderNumber: entry.orderNumber != null ? entry.orderNumber : "",
+      marketId: String(entry.marketId || ""),
+      marketName: String(entry.marketName || ""),
+      message: String(entry.message || ""),
+      userName: String(entry.userName || ""),
+      userEmail: String(entry.userEmail || ""),
+      name: String(entry.userName || entry.name || ""),
+      email: String(entry.userEmail || entry.email || ""),
+      requestedAt: now,
+      createdAt: now,
+      status: entry.status || "new",
+    };
+    const adminWrite = db.collection("adminInbox").add(Object.assign({}, base, { scope: "admin" }));
+    const marketWrite = base.marketId
+      ? db.collection("marketInbox").add(Object.assign({}, base, { scope: "market" }))
+      : Promise.resolve();
+    return Promise.all([adminWrite, marketWrite]);
+  }
+
+  function formatOrderNumber(value) {
+    if (value == null || value === "") return "";
+    const raw = String(value).trim();
+    if (!raw) return "";
+    return raw.startsWith("#") ? raw : `#${raw}`;
+  }
+
+  function orderNumberDisplay(order) {
+    if (!order) return "";
+    return formatOrderNumber(order.orderNumber ?? order.orderNo ?? "");
+  }
+
+  function statusIndex(status) {
+    return ORDER_STATUSES.indexOf(normalizeOrderStatus(status));
+  }
+
+  function getSelectableStatuses(currentStatus) {
+    var normalized = normalizeOrderStatus(currentStatus);
+    if (isOrderClosed(currentStatus)) return ["closed"];
+    var idx = ORDER_STATUSES.indexOf(normalized);
+    if (idx < 0) return [normalized];
+    var options = [ORDER_STATUSES[idx]];
+    if (idx + 1 < ORDER_STATUSES.length) options.push(ORDER_STATUSES[idx + 1]);
+    return options;
+  }
+
+  function canAdvanceToStatus(currentStatus, targetStatus) {
+    var current = normalizeOrderStatus(currentStatus);
+    var target = normalizeOrderStatus(targetStatus);
+    if (current === target) return true;
+    if (isOrderClosed(currentStatus)) return false;
+    var curIdx = ORDER_STATUSES.indexOf(current);
+    var tgtIdx = ORDER_STATUSES.indexOf(target);
+    if (curIdx < 0 || tgtIdx < 0) return false;
+    return tgtIdx === curIdx + 1;
+  }
+
+  const DRIVER_STATUSES = ["preparing", "on-the-way", "arrived"];
+
+  function getDriverStatusOptions(currentStatus) {
+    var normalized = normalizeOrderStatus(currentStatus);
+    var options = DRIVER_STATUSES.slice();
+    if (normalized && options.indexOf(normalized) === -1) options.unshift(normalized);
+    return options;
+  }
+
+  function canDriverSetStatus(currentStatus, targetStatus) {
+    if (isOrderClosed(currentStatus)) return false;
+    var target = normalizeOrderStatus(targetStatus);
+    if (DRIVER_STATUSES.indexOf(target) >= 0) return true;
+    return normalizeOrderStatus(currentStatus) === target;
+  }
+
+  function allocateOrderNumber(db) {
+    return db.runTransaction(function (transaction) {
+      var ref = db.collection("counters").doc("orders");
+      return transaction.get(ref).then(function (snap) {
+        var num = snap.exists ? Number(snap.data().next) || 1001 : 1001;
+        transaction.set(ref, { next: num + 1 }, { merge: true });
+        return num;
+      });
+    });
+  }
+
+  function normalizeMarketKey(value) {
+    return String(value || "").trim().toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
+  }
+
+  function orderMatchesMarket(order, marketId) {
+    var target = normalizeMarketKey(marketId);
+    if (!target || !order) return false;
+    if (normalizeMarketKey(order.marketId || order.marketName) === target) return true;
+    return (Array.isArray(order.items) ? order.items : []).some(function (item) {
+      return normalizeMarketKey(item.market) === target;
+    });
+  }
+
+  function normalizePhone(value) {
+    var digits = String(value || "").replace(/\D/g, "");
+    if (!digits) return "";
+    if (digits.length === 12 && digits.indexOf("90") === 0) digits = digits.slice(2);
+    if (digits.length === 11 && digits.charAt(0) === "0") digits = digits.slice(1);
+    return digits;
+  }
+
+  function phonesMatch(a, b) {
+    var left = normalizePhone(a);
+    var right = normalizePhone(b);
+    if (!left || !right) return false;
+    if (left === right) return true;
+    if (left.length >= 10 && right.length >= 10) {
+      return left.slice(-10) === right.slice(-10);
+    }
+    return false;
+  }
+
+  function normalizeDriverName(value) {
+    return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
+  }
+
+  function driverNamesMatch(a, b) {
+    var left = normalizeDriverName(a);
+    var right = normalizeDriverName(b);
+    if (!left || !right) return false;
+    return left === right;
+  }
+
+  function orderAssignedToDriver(order, driverPhone) {
+    if (!driverPhone) return false;
+    return phonesMatch(order.driver && order.driver.phone, driverPhone);
+  }
+
+  function orderAssignedToDriverIdentity(order, identity) {
+    identity = identity || {};
+    var driver = order && order.driver;
+    if (!driver || !identity.name) return false;
+    if (!driverNamesMatch(driver.name, identity.name)) return false;
+    if (identity.phone && driver.phone) {
+      return phonesMatch(driver.phone, identity.phone);
+    }
+    return true;
+  }
+
+  function hasAssignedDriver(order) {
+    var driver = order && order.driver;
+    return !!(driver && (driver.name || driver.phone || driver.driverId));
+  }
+
+  function allItemsAvailable(order) {
+    var items = Array.isArray(order && order.items) ? order.items : [];
+    if (!items.length) return false;
+    return items.every(function (item) {
+      return item && item.available !== false;
+    });
+  }
+
+  function isAwaitingPayment(order) {
+    return normalizeOrderStatus(order && order.status) === "awaiting-payment";
+  }
+
+  function isOrderPaid(order) {
+    return !!(order && (order.paidAt || order.paymentMethod));
+  }
+
+  function paymentDeadlinePassed(order) {
+    if (!order || !order.paymentDeadline) return false;
+    return Date.now() > new Date(order.paymentDeadline).getTime();
+  }
+
+  function parseMapCoordinates(mapLink) {
+    var raw = String(mapLink || "").trim();
+    if (!raw) return null;
+    var atMatch = raw.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+    if (atMatch) return { lat: parseFloat(atMatch[1]), lng: parseFloat(atMatch[2]) };
+    var qMatch = raw.match(/[?&]q=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+    if (qMatch) return { lat: parseFloat(qMatch[1]), lng: parseFloat(qMatch[2]) };
+    var pathMatch = raw.match(/\/(-?\d+\.?\d*),(-?\d+\.?\d*)(?:\/?|$|\?)/);
+    if (pathMatch) return { lat: parseFloat(pathMatch[1]), lng: parseFloat(pathMatch[2]) };
+    return null;
+  }
+
+  function getOrderCustomerLocation(order) {
+    order = order || {};
+    if (order.userLat != null && order.userLng != null) {
+      return { lat: Number(order.userLat), lng: Number(order.userLng) };
+    }
+    return parseMapCoordinates(order.userMapLink || order.mapLink || "");
+  }
+
+  function isOrderCommunicationActive(order) {
+    if (!order || isOrderClosed(order.status)) return false;
+    if (!hasAssignedDriver(order)) return false;
+    var status = normalizeOrderStatus(order.status);
+    return status === "on-the-way" || status === "arrived";
+  }
+
+  function isCustomerChatActive(order) {
+    if (!order || isOrderClosed(order.status)) return false;
+    return true;
+  }
+
+  function isDeliveryChatActive(order) {
+    if (!order || isOrderClosed(order.status)) return false;
+    if (!hasAssignedDriver(order)) return false;
+    var status = normalizeOrderStatus(order.status);
+    return status === "preparing" || status === "on-the-way" || status === "arrived";
+  }
+
+  function archiveOrderConversation(db, orderId, order, reason) {
+    order = order || {};
+    reason = String(reason || "archived");
+    return orderChatCollection(db, orderId).orderBy("createdAt", "asc").get().then(function (snapshot) {
+      var messages = snapshot.docs.map(function (entry) {
+        return Object.assign({ id: entry.id }, entry.data());
+      });
+      if (!messages.length) return null;
+      var now = new Date().toISOString();
+      return db.collection("orderConversations").doc(String(orderId || "")).set({
+        orderId: String(orderId || ""),
+        orderNumber: order.orderNumber != null ? order.orderNumber : "",
+        userId: String(order.userId || ""),
+        userName: String(order.userName || ""),
+        userEmail: String(order.userEmail || ""),
+        marketId: String(order.marketId || ""),
+        marketName: String(order.marketName || ""),
+        driverName: String(order.driver && order.driver.name || ""),
+        messages: messages,
+        messageCount: messages.length,
+        archivedAt: now,
+        archiveReason: reason,
+        updatedAt: now,
+      }, { merge: true });
+    });
+  }
+
+  function buildDualLocationMapHtml(customer, driver, options) {
+    options = options || {};
+    customer = customer || null;
+    driver = driver && driver.lat != null && driver.lng != null ? driver : null;
+    if (!customer && !driver) return { html: "", openUrl: "" };
+
+    var openUrl = "https://www.google.com/maps";
+    var embedSrc = "";
+    if (customer && driver) {
+      openUrl = "https://www.google.com/maps/dir/?api=1&origin=" + driver.lat + "," + driver.lng +
+        "&destination=" + customer.lat + "," + customer.lng;
+      embedSrc = "https://www.google.com/maps?output=embed&saddr=" + driver.lat + "," + driver.lng +
+        "&daddr=" + customer.lat + "," + customer.lng;
+    } else if (customer) {
+      openUrl = "https://www.google.com/maps/search/?api=1&query=" + customer.lat + "," + customer.lng;
+      embedSrc = "https://maps.google.com/maps?q=" + customer.lat + "," + customer.lng + "&output=embed";
+    } else if (driver) {
+      openUrl = "https://www.google.com/maps/search/?api=1&query=" + driver.lat + "," + driver.lng;
+      embedSrc = "https://maps.google.com/maps?q=" + driver.lat + "," + driver.lng + "&output=embed";
+    }
+
+    var html =
+      '<div class="live-map-panel">' +
+      (options.liveBadge ? '<span class="live-badge">' + String(options.liveBadge) + "</span>" : "") +
+      '<iframe class="live-map-frame" title="Map" loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="' + embedSrc + '"></iframe>' +
+      "</div>";
+    return { html: html, openUrl: openUrl };
+  }
+
+  function formatTelHref(phone) {
+    var digits = normalizePhone(phone);
+    if (!digits) return "";
+    if (digits.length === 10 && digits.charAt(0) === "5") return "tel:+90" + digits;
+    if (digits.length === 11 && digits.charAt(0) === "0") return "tel:+9" + digits;
+    if (digits.indexOf("90") === 0) return "tel:+" + digits;
+    return "tel:+" + digits;
+  }
+
+  function getVideoCallRoom(orderId) {
+    return "marketfiyati-" + String(orderId || "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 48);
+  }
+
+  function getVideoCallUrl(orderId, displayName) {
+    var room = getVideoCallRoom(orderId);
+    var name = encodeURIComponent(String(displayName || "Guest").slice(0, 40));
+    return "https://meet.jit.si/" + room + "#userInfo.displayName=" + name;
+  }
+
+  function orderChatCollection(db, orderId) {
+    return db.collection("orderChats").doc(String(orderId || "")).collection("messages");
+  }
+
+  function orderCallDoc(db, orderId) {
+    return db.collection("orderCalls").doc(String(orderId || ""));
+  }
+
+  function writeCallHistory(db, entry) {
+    var now = new Date().toISOString();
+    return db.collection("orderCallHistory").add({
+      orderId: String(entry.orderId || ""),
+      orderNumber: entry.orderNumber != null ? entry.orderNumber : "",
+      marketId: String(entry.marketId || ""),
+      marketName: String(entry.marketName || ""),
+      driverName: String(entry.driverName || ""),
+      customerName: String(entry.customerName || ""),
+      callerName: String(entry.callerName || ""),
+      callerRole: String(entry.callerRole || ""),
+      mode: String(entry.mode || "voice"),
+      outcome: String(entry.outcome || "completed"),
+      startedAt: String(entry.startedAt || now),
+      endedAt: String(entry.endedAt || now),
+      createdAt: now,
+      recordingUrl: String(entry.recordingUrl || ""),
+      recordingMime: String(entry.recordingMime || ""),
+    });
+  }
+
+  function isUserProfileComplete(profile) {
+    profile = profile || {};
+    var address = String(profile.address || "").trim();
+    var name = String(profile.name || "").trim();
+    return name.length >= 2 && address.length >= 8;
+  }
+
+  function computeOrderTotal(items) {
+    return (Array.isArray(items) ? items : []).reduce(function (sum, item) {
+      if (item && item.available === false) return sum;
+      return sum + (Number(item.price) || 0) * (Number(item.qty) || 1);
+    }, 0);
+  }
+
+  function chatRoleClass(role) {
+    var key = String(role || "").trim().toLowerCase();
+    if (key === "driver") return "driver";
+    if (key === "market") return "market";
+    if (key === "admin") return "admin";
+    return "customer";
+  }
+
+  function resolveChatSenderDisplayName(msg, order, options) {
+    options = options || {};
+    var getMarketLabel = options.getMarketLabel || function (key) {
+      var raw = String(key || "").trim();
+      return raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : "Unknown";
+    };
+    var role = String(msg && msg.senderRole || "").trim().toLowerCase();
+    if (role === "admin") {
+      return options.adminLabel || "Admin";
+    }
+    if (role === "market") {
+      return getMarketLabel(msg.marketId || (order && (order.marketId || order.marketName)) || "");
+    }
+    if (role === "driver") {
+      return (order && order.driver && order.driver.name) || (msg && msg.senderName) || options.driverLabel || "Driver";
+    }
+    return (msg && msg.senderName) || options.unknownLabel || "Unknown";
+  }
+
+  function groupItemsByCategory(items) {
+    var groups = [];
+    var map = new Map();
+    (Array.isArray(items) ? items : []).forEach(function (item, index) {
+      var category = String(item.category || item._searchTerm || "General").trim() || "General";
+      if (!map.has(category)) {
+        var group = { category: category, entries: [] };
+        map.set(category, group);
+        groups.push(group);
+      }
+      map.get(category).entries.push({ item: item, index: index });
+    });
+    return groups;
+  }
+
+  window.OrderLifecycle = {
+    ORDER_STATUSES: ORDER_STATUSES,
+    PAYMENT_TIMEOUT_MS: PAYMENT_TIMEOUT_MS,
+    allItemsAvailable: allItemsAvailable,
+    isAwaitingPayment: isAwaitingPayment,
+    isOrderPaid: isOrderPaid,
+    paymentDeadlinePassed: paymentDeadlinePassed,
+    parseMapCoordinates: parseMapCoordinates,
+    getOrderCustomerLocation: getOrderCustomerLocation,
+    isCustomerChatActive: isCustomerChatActive,
+    isDeliveryChatActive: isDeliveryChatActive,
+    archiveOrderConversation: archiveOrderConversation,
+    buildDualLocationMapHtml: buildDualLocationMapHtml,
+    normalizeOrderStatus: normalizeOrderStatus,
+    formatOrderNumber: formatOrderNumber,
+    orderNumberDisplay: orderNumberDisplay,
+    statusIndex: statusIndex,
+    getSelectableStatuses: getSelectableStatuses,
+    canAdvanceToStatus: canAdvanceToStatus,
+    DRIVER_STATUSES: DRIVER_STATUSES,
+    getDriverStatusOptions: getDriverStatusOptions,
+    canDriverSetStatus: canDriverSetStatus,
+    allocateOrderNumber: allocateOrderNumber,
+    normalizeMarketKey: normalizeMarketKey,
+    orderMatchesMarket: orderMatchesMarket,
+    normalizePhone: normalizePhone,
+    phonesMatch: phonesMatch,
+    normalizeDriverName: normalizeDriverName,
+    driverNamesMatch: driverNamesMatch,
+    orderAssignedToDriver: orderAssignedToDriver,
+    orderAssignedToDriverIdentity: orderAssignedToDriverIdentity,
+    chatRoleClass: chatRoleClass,
+    resolveChatSenderDisplayName: resolveChatSenderDisplayName,
+    groupItemsByCategory: groupItemsByCategory,
+    isOrderClosed: isOrderClosed,
+    hasAssignedDriver: hasAssignedDriver,
+    isOrderCommunicationActive: isOrderCommunicationActive,
+    formatTelHref: formatTelHref,
+    getVideoCallRoom: getVideoCallRoom,
+    getVideoCallUrl: getVideoCallUrl,
+    orderChatCollection: orderChatCollection,
+    orderCallDoc: orderCallDoc,
+    writeCallHistory: writeCallHistory,
+    isUserProfileComplete: isUserProfileComplete,
+    computeOrderTotal: computeOrderTotal,
+    writeOrderInboxNotifications: writeOrderInboxNotifications,
+  };
+})();
+
+  </script>
+  <script>
+(async function () {
+
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+if (!window.FIREBASE_CONFIG || !window.MarketsConfig || !window.OrderLifecycle) {
+      window.showAdminLoadError("Config dosyalari yuklenemedi. Tum dosyalarin ayni klasorde oldugundan emin olun.");
+      throw new Error("Missing global config");
+    }
+
+    const { ORDER_STATUSES, normalizeOrderStatus, orderNumberDisplay, isOrderClosed, normalizePhone, hasAssignedDriver, computeOrderTotal, resolveChatSenderDisplayName, chatRoleClass, getSelectableStatuses, canAdvanceToStatus, isOrderPaid } = window.OrderLifecycle;
+    const { MARKETS, orderMatchesMarket, getMarketLabel } = window.MarketsConfig;
+
+    const firebaseConfig = window.FIREBASE_CONFIG;
+
+    // Compat shims so existing modular-style calls work with firebase-*-compat.
+    function collection(db, ...path) {
+      let ref = db;
+      for (let i = 0; i < path.length; i++) {
+        ref = (i % 2 === 0) ? ref.collection(path[i]) : ref.doc(path[i]);
+      }
+      return ref;
+    }
+    function doc(db, ...path) {
+      let ref = db;
+      for (let i = 0; i < path.length; i++) {
+        ref = (i % 2 === 0) ? ref.collection(path[i]) : ref.doc(path[i]);
+      }
+      return ref;
+    }
+    function query(ref, ...constraints) {
+      let q = ref;
+      for (const c of constraints) {
+        if (!c) continue;
+        if (c.type === 'orderBy') q = q.orderBy(c.field, c.dir || 'asc');
+        else if (c.type === 'where') q = q.where(c.field, c.op, c.value);
+        else if (typeof c === 'function') q = c(q);
+      }
+      return q;
+    }
+    function orderBy(field, dir) { return { type: 'orderBy', field, dir }; }
+    function where(field, op, value) { return { type: 'where', field, op, value }; }
+    function onSnapshot(ref, onNext, onError) {
+      return ref.onSnapshot(onNext, onError || function () {});
+    }
+    function onAuthStateChanged(auth, cb) { return auth.onAuthStateChanged(cb); }
+    async function getDoc(ref) { return ref.get(); }
+    async function getDocs(ref) { return ref.get(); }
+    async function setDoc(ref, data, opts) { return opts ? ref.set(data, opts) : ref.set(data); }
+    async function updateDoc(ref, data) { return ref.update(data); }
+    async function addDoc(ref, data) { return ref.add(data); }
+    async function deleteDoc(ref) { return ref.delete(); }
+
+
+    const I18N = {
+      tr: {
+        adminTitle: "Admin Paneli", backLink: "Uygulamaya don", deniedTitle: "Erisim reddedildi",
+        deniedMessage: "Bu sayfayi gormek icin admin olmalisiniz.", deniedBack: "Geri don",
+        totalOrders: "Toplam siparis", pending: "Beklemede", users: "Kullanicilar", tiles: "Ana sayfa kartlari",
+        tabSettings: "Uygulama ayarlari", tabHomepage: "Ana sayfa", tabOrders: "Siparisler", tabUsers: "Kullanicilar", tabMarkets: "Marketler", tabInbox: "Gelen kutusu",
+        settingsTitle: "Genel uygulama ayarlari", settingsHelp: "Buradaki degisiklikler Firebase'e kaydedilir ve tum kullanicilara canli yansir.",
+        featuresAccessLabel: "Giris, sepet, profil ve siparis erisimi", featuresLockOption: "Normal kullanicilar icin kilitle", featuresUnlockOption: "Tum kullanicilar icin ac",
+        announcementLabel: "Duyuru bandi", appPauseModeLabel: "Uygulama durumu", appRunOption: "Uygulamayi normal kullanicilar icin calistir", appPauseOption: "Uygulamayi normal kullanicilar icin duraklat", commandMessageLabel: "Komut mesaji",
+        heroTitleLabel: "Ana sayfa baslik degistirme", heroSubtitleLabel: "Ana sayfa alt baslik degistirme",
+        saveSettings: "Ayarlari kaydet", saving: "Kaydediliyor...", saveFailed: "Firebase'e kaydedilemedi", homepageTitle: "Ana sayfa kartlari", homepageHelp: "Ana sayfada gorunen kategori kartlarini ekleyin, duzenleyin veya kaldirin.",
+        addTileTitle: "Kart ekle", tileLabel: "Etiket", tileImage: "Gorsel URL", addTile: "Kart ekle", saveHomepage: "Ana sayfayi kaydet",
+        allOrders: "Tum siparisler", loading: "Yukleniyor...", noOrders: "Henuz siparis yok.", noUsers: "Henuz kullanici yok.", noTiles: "Henuz kart yok.",
+        waiting: "Siparis inceleniyor", awaitingPayment: "Odeme bekleniyor", preparing: "Hazirlaniyor", onTheWay: "Yolda", arrived: "Teslim edildi", orderClosed: "Siparis kapatildi", orderNumber: "Siparis no", unknown: "Bilinmiyor",
+        driver: "Surucu", reassignDriver: "Surucu ata", chatHistory: "Sohbet gecmisi", sendChat: "Mesaj gonder", chatPlaceholder: "Musteriye yanit yazin...", savedDrivers: "Kayitli suruculer", addDriver: "Surucu ekle", driverName: "Surucu adi", driverPhone: "Surucu telefonu",
+        updateStatus: "Durumu guncelle", delete: "Sil", saveUser: "Kullaniciyi kaydet", updated: "Guncellendi",
+        statusMustAdvanceStep: "Durum sirayla guncellenmeli (bir adim ileri).",
+        confirmDeleteUser: "Bu kullaniciyi silmek istediginize emin misiniz?",
+        deleteCallHistory: "Aramayi sil", deleteAllCallHistory: "Tum arama gecmisini sil",
+        deleteAllCallHistoryConfirm: "Tum arama gecmisi silinsin mi?",
+        playRecording: "Kaydi dinle",
+        saved: "Kaydedildi", removed: "Silindi", id: "ID", role: "Rol", name: "Ad", phone: "Telefon", address: "Adres", email: "E-posta",
+        deleteRequestsTitle: "Hesap silme istekleri", noDeleteRequests: "Henuz silme istegi yok.", requestedAt: "Istek tarihi", markRequestDone: "Tamamlandi olarak isaretle",
+        inboxTitle: "Gelen kutusu", inboxHelp: "Silme istegi mesajlari burada saklanir. Tek tek silebilirsiniz.", noInboxMessages: "Henuz mesaj yok.", message: "Mesaj", deleteMessage: "Mesaji sil", deleteReason: "Silme nedeni",
+        marketsTitle: "Marketler", marketsHelp: "Tum marketlerden gelen siparisleri ve canli konusmalari takip edin.", marketFilterLabel: "Market filtrele", marketOrdersTitle: "Market siparisleri", noMarketOrders: "Bu market icin siparis yok.", chatTitle: "Canli sohbet", allMarkets: "Tum marketler", marketOrders: "Siparis", marketChats: "Mesaj", payment: "Odeme", available: "Mevcut", unavailable: "Yok",
+        inboxDone: "Tamamlandi", inboxCompleted: "Hesap silindi", inboxEmailQueued: "E-posta siraya alindi", inboxEmailSent: "E-posta gonderildi", inboxEmailFailed: "E-posta gonderilemedi",
+        emailQueued: "E-posta gonderim siraya alindi", emailQueueFailed: "E-posta siraya alinamadi", emailServerNotConfigured: "Render SMTP ayarlari eksik",
+        deleteUserFirst: "Once kullaniciyi silin, sonra tamamlandi olarak isaretleyin.",
+        removeRequest: "Istegi kaldir",
+        deleteAllUsers: "Tum kullanicilari sil",
+        deleteAllUsersConfirm: "{count} kullanicinin profili kalici olarak silinecek. E-posta gonderilmez. Devam edilsin mi?",
+        deleteAllUsersDone: "{count} kullanici silindi.",
+        inboxUserDeleted: "Kullanici silindi",
+        sendingEmail: "Gmail gonderiliyor...",
+        block: "Engelle", unblock: "Engeli kaldir", blocked: "Engellendi",
+        historyTitle: "Siparis gecmisi", callHistoryTitle: "Arama gecmisi", noHistory: "Henuz gecmis yok.",
+        callWith: "Konusan", callMode: "Tur", callOutcome: "Sonuc", callCompleted: "Tamamlandi",
+        callDeclined: "Reddedildi", callRemoteEnded: "Karsi taraf kapatti",
+        voiceCall: "Sesli arama", videoCall: "Goruntulu arama"
+      },
+      en: {
+        adminTitle: "Admin Panel", backLink: "Back to App", deniedTitle: "Access Denied",
+        deniedMessage: "You must be an admin to view this page.", deniedBack: "Go back",
+        totalOrders: "Total Orders", pending: "Pending", users: "Users", tiles: "Homepage tiles",
+        tabSettings: "App settings", tabHomepage: "Homepage", tabOrders: "Orders", tabUsers: "Users", tabMarkets: "Markets", tabInbox: "Inbox",
+        settingsTitle: "Global app settings", settingsHelp: "Changes here are saved to Firebase and appear live for all users.",
+        featuresAccessLabel: "Login, cart, profile, and orders access", featuresLockOption: "Lock for normal users", featuresUnlockOption: "Unlock for all users",
+        announcementLabel: "Announcement banner", appPauseModeLabel: "App availability", appRunOption: "Run app for normal users", appPauseOption: "Pause app for normal users", commandMessageLabel: "Command message",
+        heroTitleLabel: "Homepage title override", heroSubtitleLabel: "Homepage subtitle override",
+        saveSettings: "Save settings", saving: "Saving...", saveFailed: "Could not save to Firebase", homepageTitle: "Homepage tiles", homepageHelp: "Add, edit, or remove category tiles shown on the homepage.",
+        addTileTitle: "Add tile", tileLabel: "Label", tileImage: "Image URL", addTile: "Add tile", saveHomepage: "Save homepage",
+        allOrders: "All orders", loading: "Loading...", noOrders: "No orders yet.", noUsers: "No users yet.", noTiles: "No tiles yet.",
+        waiting: "Waiting / reviewing", awaitingPayment: "Awaiting payment", preparing: "Preparing", onTheWay: "On the way", arrived: "Arrived", orderClosed: "Order closed", orderNumber: "Order no", unknown: "Unknown",
+        driver: "Driver", reassignDriver: "Assign driver", chatHistory: "Chat history", sendChat: "Send message", chatPlaceholder: "Reply to customer...", savedDrivers: "Saved drivers", addDriver: "Add driver", driverName: "Driver name", driverPhone: "Driver phone",
+        updateStatus: "Update status", delete: "Delete", saveUser: "Save user", updated: "Updated",
+        statusMustAdvanceStep: "Update status one step at a time.",
+        confirmDeleteUser: "Are you sure you want to delete this user?",
+        deleteCallHistory: "Delete call", deleteAllCallHistory: "Delete all call history",
+        deleteAllCallHistoryConfirm: "Delete all call history entries?",
+        playRecording: "Play recording",
+        saved: "Saved", removed: "Removed", id: "ID", role: "Role", name: "Name", phone: "Phone", address: "Address", email: "Email",
+        deleteRequestsTitle: "Account delete requests", noDeleteRequests: "No delete requests yet.", requestedAt: "Requested at", markRequestDone: "Mark request done",
+        inboxTitle: "Inbox", inboxHelp: "Delete request messages are saved here. You can delete individual messages.", noInboxMessages: "No messages yet.", message: "Message", deleteMessage: "Delete message", deleteReason: "Deletion reason",
+        marketsTitle: "Markets overview", marketsHelp: "Track orders and live conversations from every market.", marketFilterLabel: "Filter market", marketOrdersTitle: "Market orders", noMarketOrders: "No orders for this market.", chatTitle: "Live chat", allMarkets: "All markets", marketOrders: "Orders", marketChats: "Messages", payment: "Payment", available: "Available", unavailable: "Unavailable",
+        inboxDone: "Done", inboxCompleted: "Account deleted", inboxEmailQueued: "Email queued", inboxEmailSent: "Email sent", inboxEmailFailed: "Email failed",
+        emailQueued: "Email send queued", emailQueueFailed: "Could not queue email", emailServerNotConfigured: "Render SMTP settings are missing",
+        deleteUserFirst: "Delete the user first, then mark the request done.",
+        removeRequest: "Remove request",
+        deleteAllUsers: "Delete all users",
+        deleteAllUsersConfirm: "This will permanently delete {count} user profile(s). No emails will be sent. Continue?",
+        deleteAllUsersDone: "Deleted {count} user(s).",
+        inboxUserDeleted: "User deleted",
+        sendingEmail: "Sending Gmail...",
+        block: "Block", unblock: "Unblock", blocked: "Blocked",
+        historyTitle: "Order history", callHistoryTitle: "Call history", noHistory: "No history yet.",
+        callWith: "With", callMode: "Type", callOutcome: "Outcome", callCompleted: "Completed",
+        callDeclined: "Declined", callRemoteEnded: "Remote ended",
+        voiceCall: "Voice call", videoCall: "Video call"
+      },
+      ar: {
+        adminTitle: "لوحة الإدارة", backLink: "العودة إلى التطبيق", deniedTitle: "تم رفض الوصول",
+        deniedMessage: "يجب أن تكون مسؤولا لعرض هذه الصفحة.", deniedBack: "رجوع",
+        totalOrders: "إجمالي الطلبات", pending: "قيد الانتظار", users: "المستخدمون", tiles: "بطاقات الصفحة الرئيسية",
+        tabSettings: "إعدادات التطبيق", tabHomepage: "الصفحة الرئيسية", tabOrders: "الطلبات", tabUsers: "المستخدمون", tabMarkets: "الأسواق", tabInbox: "صندوق الوارد",
+        settingsTitle: "إعدادات التطبيق العامة", settingsHelp: "يتم حفظ التغييرات في Firebase وتظهر مباشرة لجميع المستخدمين.",
+        featuresAccessLabel: "الوصول إلى تسجيل الدخول والسلة والملف الشخصي والطلبات", featuresLockOption: "قفل للمستخدمين العاديين", featuresUnlockOption: "فتح لجميع المستخدمين",
+        announcementLabel: "شريط الإعلان", appPauseModeLabel: "حالة التطبيق", appRunOption: "تشغيل التطبيق للمستخدمين العاديين", appPauseOption: "إيقاف التطبيق للمستخدمين العاديين", commandMessageLabel: "رسالة الأمر",
+        heroTitleLabel: "عنوان الصفحة الرئيسية", heroSubtitleLabel: "العنوان الفرعي للصفحة الرئيسية",
+        saveSettings: "حفظ الإعدادات", saving: "جار الحفظ...", saveFailed: "تعذر الحفظ في Firebase", homepageTitle: "بطاقات الصفحة الرئيسية", homepageHelp: "أضف أو عدّل أو احذف بطاقات الفئات في الصفحة الرئيسية.",
+        addTileTitle: "إضافة بطاقة", tileLabel: "التسمية", tileImage: "رابط الصورة", addTile: "إضافة بطاقة", saveHomepage: "حفظ الصفحة الرئيسية",
+        allOrders: "كل الطلبات", loading: "جار التحميل...", noOrders: "لا توجد طلبات بعد.", noUsers: "لا يوجد مستخدمون بعد.", noTiles: "لا توجد بطاقات بعد.",
+        waiting: "قيد المراجعة", awaitingPayment: "في انتظار الدفع", preparing: "قيد التحضير", onTheWay: "في الطريق", arrived: "تم التسليم", orderClosed: "تم إغلاق الطلب", orderNumber: "رقم الطلب", unknown: "غير معروف",
+        driver: "السائق", reassignDriver: "تعيين السائق", chatHistory: "سجل الدردشة", sendChat: "إرسال رسالة", chatPlaceholder: "الرد على العميل...", savedDrivers: "السائقون المحفوظون", addDriver: "إضافة سائق", driverName: "اسم السائق", driverPhone: "هاتف السائق",
+        updateStatus: "تحديث الحالة", delete: "حذف", saveUser: "حفظ المستخدم", updated: "تم التحديث",
+        statusMustAdvanceStep: "يجب تحديث الحالة خطوة واحدة في كل مرة.",
+        confirmDeleteUser: "هل أنت متأكد من حذف هذا المستخدم؟",
+        deleteCallHistory: "حذف المكالمة", deleteAllCallHistory: "حذف كل سجل المكالمات",
+        deleteAllCallHistoryConfirm: "حذف كل سجل المكالمات؟",
+        playRecording: "تشغيل التسجيل",
+        saved: "تم الحفظ", removed: "تم الحذف", id: "المعرف", role: "الدور", name: "الاسم", phone: "الهاتف", address: "العنوان", email: "البريد الإلكتروني",
+        deleteRequestsTitle: "طلبات حذف الحساب", noDeleteRequests: "لا توجد طلبات حذف بعد.", requestedAt: "تاريخ الطلب", markRequestDone: "وضع علامة مكتمل",
+        inboxTitle: "صندوق الوارد", inboxHelp: "يتم حفظ رسائل طلبات الحذف هنا. يمكنك حذف الرسائل يدوياً.", noInboxMessages: "لا توجد رسائل بعد.", message: "الرسالة", deleteMessage: "حذف الرسالة", deleteReason: "سبب الحذف",
+        marketsTitle: "نظرة عامة على الأسواق", marketsHelp: "تتبع الطلبات والمحادثات المباشرة من كل سوق.", marketFilterLabel: "تصفية السوق", marketOrdersTitle: "طلبات السوق", noMarketOrders: "لا توجد طلبات لهذا السوق.", chatTitle: "محادثة مباشرة", allMarkets: "كل الأسواق", marketOrders: "طلبات", marketChats: "رسائل", payment: "الدفع", available: "متوفر", unavailable: "غير متوفر",
+        inboxDone: "مكتمل", inboxCompleted: "تم حذف الحساب", inboxEmailQueued: "تمت جدولة البريد", inboxEmailSent: "تم إرسال البريد", inboxEmailFailed: "فشل إرسال البريد",
+        emailQueued: "تمت إضافة البريد الإلكتروني إلى قائمة الإرسال", emailQueueFailed: "تعذر إضافة البريد الإلكتروني إلى قائمة الإرسال", emailServerNotConfigured: "إعدادات SMTP على Render غير مكتملة",
+        deleteUserFirst: "احذف المستخدم أولاً، ثم ضع علامة مكتمل على الطلب.",
+        removeRequest: "إزالة الطلب",
+        deleteAllUsers: "حذف جميع المستخدمين",
+        deleteAllUsersConfirm: "سيتم حذف {count} ملف مستخدم نهائياً. لن يتم إرسال رسائل بريد. هل تريد المتابعة؟",
+        deleteAllUsersDone: "تم حذف {count} مستخدم.",
+        inboxUserDeleted: "تم حذف المستخدم",
+        sendingEmail: "جار إرسال Gmail...",
+        block: "حظر", unblock: "إلغاء الحظر", blocked: "محظور",
+        historyTitle: "سجل الطلبات", callHistoryTitle: "سجل المكالمات", noHistory: "لا يوجد سجل بعد.",
+        callWith: "مع", callMode: "النوع", callOutcome: "النتيجة", callCompleted: "مكتملة",
+        callDeclined: "مرفوضة", callRemoteEnded: "أنهى الطرف الآخر",
+        voiceCall: "مكالمة صوتية", videoCall: "مكالمة فيديو"
+      }
+    };
+
+    const OWNER_EMAIL = "pazarfiyati@gmail.com";
+    const MAIL_API_BASE = "https://market-scraper-0k36.onrender.com";
+    const STATUSES = ORDER_STATUSES;
+
+    const app = firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    let currentLang = localStorage.getItem("app_lang") || "tr";
+    let currentOrders = [];
+    let currentUsers = [];
+    let currentDeleteRequests = [];
+    let currentInboxMessages = [];
+    const recentlyDeletedUserIds = new Set();
+    let currentMarketFilter = "all";
+    let currentAdminDriverMarket = MARKETS[0]?.key || "bim";
+    let adminMarketDrivers = [];
+    let adminCallHistoryEntries = [];
+    const marketChatUnsubs = new Map();
+    const adminOrderChatUnsubs = new Map();
+    let currentTiles = [];
+    let currentSettings = {
+      featuresUnlocked: false,
+      announcement: "",
+      appPaused: false,
+      commandMessage: "",
+      heroTitle: "",
+      heroSubtitle: "",
+      homepageTiles: [],
+    };
+
+    function t(key) {
+      return (I18N[currentLang] && I18N[currentLang][key]) || I18N.tr[key] || key;
+    }
+
+    function normalizeGmail(email) {
+      const value = String(email || "").trim().toLowerCase();
+      const [local, domain] = value.split("@");
+      if (domain === "gmail.com" || domain === "googlemail.com") {
+        return `${local.replace(/\./g, "")}@gmail.com`;
+      }
+      return value;
+    }
+
+    function escapeHtml(text) {
+      return String(text).replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
+      }[char]));
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById("toast");
+      toast.textContent = message;
+      toast.style.display = "block";
+      setTimeout(() => { toast.style.display = "none"; }, 2200);
+    }
+
+    function getUserAddress(user, request) {
+      user = user || {};
+      request = request || {};
+      return String(user.address || request.address || "").trim();
+    }
+
+    function setSaveStatus(message, isError = false) {
+      const status = document.getElementById("settingsSaveStatus");
+      if (!status) return;
+      status.textContent = message || "";
+      status.style.color = isError ? "#b91c1c" : "#166534";
+    }
+
+    function withTimeout(promise, ms, message) {
+      const timeoutMessage = message || "Firebase save timed out. Check your internet connection or Firebase permissions.";
+      return Promise.race([
+        promise,
+        new Promise((_, reject) => {
+          setTimeout(() => reject(new Error(timeoutMessage)), ms);
+        }),
+      ]);
+    }
+
+    async function retryAsync(fn, attempts = 3, delayMs = 1500) {
+      let lastError = null;
+      for (let attempt = 1; attempt <= attempts; attempt++) {
+        try {
+          return await fn();
+        } catch (error) {
+          lastError = error;
+          console.warn(`Retry ${attempt}/${attempts} failed`, error);
+          if (attempt < attempts) {
+            await new Promise((resolve) => setTimeout(resolve, delayMs * attempt));
+          }
+        }
+      }
+      throw lastError || new Error("Operation failed after retries.");
+    }
+
+    async function safeFirestoreWrite(label, fn) {
+      try {
+        await retryAsync(fn, 3, 1500);
+        return true;
+      } catch (error) {
+        console.warn(`${label} failed after retries`, error);
+        return false;
+      }
+    }
+
+    function toFirestoreValue(value) {
+      if (value === null || value === undefined) return { nullValue: null };
+      if (typeof value === "boolean") return { booleanValue: value };
+      if (typeof value === "number") return { doubleValue: value };
+      if (Array.isArray(value)) {
+        return { arrayValue: { values: value.map((entry) => toFirestoreValue(entry)) } };
+      }
+      if (typeof value === "object") {
+        const fields = {};
+        Object.entries(value).forEach(([key, entry]) => {
+          fields[key] = toFirestoreValue(entry);
+        });
+        return { mapValue: { fields } };
+      }
+      return { stringValue: String(value) };
+    }
+
+    async function saveSettingsWithRest(payload) {
+      const fields = {};
+      Object.entries(payload).forEach(([key, value]) => {
+        fields[key] = toFirestoreValue(value);
+      });
+
+      const updateMask = Object.keys(payload)
+        .map((key) => `updateMask.fieldPaths=${encodeURIComponent(key)}`)
+        .join("&");
+      const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/appSettings/global?key=${firebaseConfig.apiKey}&${updateMask}`;
+      const response = await withTimeout(fetch(url, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fields }),
+      }), 12000);
+
+      if (!response.ok) {
+        let message = await response.text();
+        try {
+          const data = JSON.parse(message);
+          message = data.error?.message || message;
+        } catch {
+        }
+        throw new Error(`REST ${response.status}: ${message}`);
+      }
+    }
+
+    async function saveSettingsToCloud(payload) {
+      try {
+        await withTimeout(setDoc(doc(db, "appSettings", "global"), payload, { merge: true }), 8000);
+      } catch (sdkError) {
+        setSaveStatus(`SDK save stalled. Trying direct Firebase save...`);
+        try {
+          await saveSettingsWithRest(payload);
+        } catch (restError) {
+          throw new Error(`${sdkError.message}; direct save failed: ${restError.message}`);
+        }
+      }
+    }
+
+    function formatPrice(price) {
+      return `${Number(price || 0).toFixed(2).replace(".", ",")} TL`;
+    }
+
+    function formatDate(iso) {
+      if (!iso) return "";
+      const d = new Date(iso);
+      return d.toLocaleDateString("tr-TR") + " " + d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+    }
+
+    function statusLabel(status) {
+      if (isOrderClosed(status)) return t("orderClosed");
+      const normalized = normalizeOrderStatus(status);
+      return {
+        waiting: t("waiting"),
+        "awaiting-payment": t("awaitingPayment"),
+        preparing: t("preparing"),
+        "on-the-way": t("onTheWay"),
+        arrived: t("arrived"),
+      }[normalized] || normalized;
+    }
+
+    function applyLanguage() {
+      document.documentElement.lang = currentLang;
+      document.documentElement.dir = currentLang === "ar" ? "rtl" : "ltr";
+      document.getElementById("langSelect").value = currentLang;
+      document.title = t("adminTitle");
+      const textIds = {
+        adminTitle: "adminTitle", backLink: "backLink", deniedTitle: "deniedTitle", deniedMessage: "deniedMessage",
+        deniedBack: "deniedBack", statTotalLabel: "totalOrders", statPendingLabel: "pending", statUsersLabel: "users",
+        statTilesLabel: "tiles", tabSettings: "tabSettings", tabHomepage: "tabHomepage", tabOrders: "tabOrders", tabUsers: "tabUsers", tabMarkets: "tabMarkets", tabInbox: "tabInbox",
+        deleteAllUsersBtn: "deleteAllUsers",
+        settingsTitle: "settingsTitle", settingsHelp: "settingsHelp", featuresAccessLabel: "featuresAccessLabel",
+        featuresLockOption: "featuresLockOption", featuresUnlockOption: "featuresUnlockOption",
+        announcementLabel: "announcementLabel", appPauseModeLabel: "appPauseModeLabel", appRunOption: "appRunOption", appPauseOption: "appPauseOption", commandMessageLabel: "commandMessageLabel",
+        heroTitleLabel: "heroTitleLabel", heroSubtitleLabel: "heroSubtitleLabel",
+        saveSettingsBtn: "saveSettings", homepageTitle: "homepageTitle", homepageHelp: "homepageHelp", addTileTitle: "addTileTitle",
+        tileLabelLabel: "tileLabel", tileImageLabel: "tileImage", addTileBtn: "addTile", saveTilesBtn: "saveHomepage",
+        ordersTitle: "allOrders", usersTitle: "users", ordersLoading: "loading", usersLoading: "loading",
+        deleteRequestsTitle: "deleteRequestsTitle", inboxTitle: "inboxTitle", inboxHelp: "inboxHelp",
+        tabMarkets: "tabMarkets", marketsTitle: "marketsTitle", marketsHelp: "marketsHelp", marketFilterLabel: "marketFilterLabel", marketOrdersTitle: "marketOrdersTitle",
+        adminDriversTitle: "savedDrivers", adminDriversHelp: "marketsHelp", adminDriverMarketLabel: "marketFilterLabel",
+        adminHistoryTitle: "historyTitle", adminCallHistoryTitle: "callHistoryTitle"
+      };
+      Object.entries(textIds).forEach(([id, key]) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = t(key);
+      });
+      renderOrders(currentOrders);
+      renderUsers(currentUsers);
+      renderDeleteRequests(currentDeleteRequests);
+      renderInbox(currentInboxMessages);
+      renderMarketsOverview(currentOrders);
+      renderTilesEditor();
+    }
+
+    async function checkAdmin() {
+      if (window.location.protocol === "file:") {
+        return true;
+      }
+
+      const ownerAccess = localStorage.getItem("owner_access") === "true";
+      const ownerEmail = normalizeGmail(localStorage.getItem("owner_email"));
+      const userEmail = normalizeGmail(localStorage.getItem("user_email"));
+      if (ownerAccess && ownerEmail === normalizeGmail(OWNER_EMAIL) && userEmail === normalizeGmail(OWNER_EMAIL)) {
+        return true;
+      }
+      const userUid = localStorage.getItem("user_uid");
+      if (!userUid) return false;
+      try {
+        const snap = await getDoc(doc(db, "users", userUid));
+        const data = snap.exists ? snap.data() : {};
+        return data.role === "admin" || normalizeGmail(data.email) === normalizeGmail(OWNER_EMAIL);
+      } catch {
+        return false;
+      }
+    }
+
+    function fillSettingsForm(settings) {
+      currentSettings = settings;
+      document.getElementById("featuresAccessMode").value = settings.featuresUnlocked ? "unlocked" : "locked";
+      document.getElementById("announcementInput").value = settings.announcement || "";
+      document.getElementById("appPauseMode").value = settings.appPaused ? "paused" : "running";
+      document.getElementById("commandMessageInput").value = settings.commandMessage || "";
+      document.getElementById("heroTitleInput").value = settings.heroTitle || "";
+      document.getElementById("heroSubtitleInput").value = settings.heroSubtitle || "";
+      currentTiles = Array.isArray(settings.homepageTiles) ? settings.homepageTiles.map((tile) => ({ ...tile })) : [];
+      document.getElementById("statTiles").textContent = currentTiles.length;
+      renderTilesEditor();
+    }
+
+    function renderTilesEditor() {
+      const root = document.getElementById("tilesList");
+      if (!currentTiles.length) {
+        root.innerHTML = `<p class="empty-msg">${escapeHtml(t("noTiles"))}</p>`;
+        return;
+      }
+      root.innerHTML = currentTiles.map((tile, index) => `
+        <div class="card">
+          <div class="tile-editor">
+            <div class="tile-preview" style="background-image:url('${escapeHtml(tile.imageUrl)}')"></div>
+            <div class="form-grid">
+              <label>${escapeHtml(t("tileLabel"))}
+                <input class="field-input tile-label-input" data-index="${index}" type="text" value="${escapeHtml(tile.label)}" />
+              </label>
+              <label>${escapeHtml(t("tileImage"))}
+                <input class="field-input tile-image-input" data-index="${index}" type="url" value="${escapeHtml(tile.imageUrl)}" />
+              </label>
+            </div>
+            <button class="btn-danger tile-delete-btn" data-index="${index}" type="button">${escapeHtml(t("delete"))}</button>
+          </div>
+        </div>
+      `).join("");
+
+      root.querySelectorAll(".tile-label-input").forEach((input) => {
+        input.addEventListener("input", (event) => {
+          currentTiles[Number(event.target.dataset.index)].label = event.target.value;
+        });
+      });
+      root.querySelectorAll(".tile-image-input").forEach((input) => {
+        input.addEventListener("input", (event) => {
+          currentTiles[Number(event.target.dataset.index)].imageUrl = event.target.value;
+          const preview = input.closest(".tile-editor")?.querySelector(".tile-preview");
+          if (preview) preview.style.backgroundImage = `url('${event.target.value}')`;
+        });
+      });
+      root.querySelectorAll(".tile-delete-btn").forEach((button) => {
+        button.addEventListener("click", () => {
+          currentTiles.splice(Number(button.dataset.index), 1);
+          document.getElementById("statTiles").textContent = currentTiles.length;
+          renderTilesEditor();
+        });
+      });
+    }
+
+    async function saveSettings() {
+      const featuresUnlocked = document.getElementById("featuresAccessMode").value === "unlocked";
+      const payload = {
+        featuresUnlocked,
+        announcement: document.getElementById("announcementInput").value.trim(),
+        appPaused: document.getElementById("appPauseMode").value === "paused",
+        commandMessage: document.getElementById("commandMessageInput").value.trim(),
+        heroTitle: document.getElementById("heroTitleInput").value.trim(),
+        heroSubtitle: document.getElementById("heroSubtitleInput").value.trim(),
+        homepageTiles: currentTiles,
+        updatedAt: new Date().toISOString(),
+        updatedBy: localStorage.getItem("user_email") || OWNER_EMAIL,
+      };
+
+      localStorage.setItem("app_features_unlocked", featuresUnlocked ? "true" : "false");
+      currentSettings = { ...currentSettings, ...payload };
+      setSaveStatus(t("saving"));
+      await saveSettingsToCloud(payload);
+      setSaveStatus(t("saved"));
+      showToast(t("saved"));
+    }
+
+    function updateStats(orders, users) {
+      document.getElementById("statTotal").textContent = orders.length;
+      document.getElementById("statPending").textContent = orders.filter((order) => {
+        const status = normalizeOrderStatus(order.status);
+        return status === "waiting" || status === "awaiting-payment";
+      }).length;
+      document.getElementById("statUsers").textContent = users.length;
+    }
+
+    function renderUsers(users) {
+      currentUsers = users;
+      users.forEach((user) => recentlyDeletedUserIds.delete(user.id));
+      updateStats(currentOrders, users);
+      const root = document.getElementById("usersList");
+      document.getElementById("usersLoading").style.display = "none";
+      if (!users.length) {
+        root.innerHTML = `<p class="empty-msg">${escapeHtml(t("noUsers"))}</p>`;
+        return;
+      }
+      root.innerHTML = users.map((user) => `
+        <div class="card" id="user-${user.id}">
+          <div class="form-grid">
+            <label>${escapeHtml(t("name"))}<input class="field-input" id="user-name-${user.id}" value="${escapeHtml(user.name || "")}" /></label>
+            <label>${escapeHtml(t("email"))}<input class="field-input" id="user-email-${user.id}" value="${escapeHtml(user.email || "")}" readonly /></label>
+            <label>${escapeHtml(t("phone"))}<input class="field-input" id="user-phone-${user.id}" value="${escapeHtml(user.phone || "")}" /></label>
+            <label>${escapeHtml(t("address"))}<textarea class="field-textarea" id="user-address-${user.id}">${escapeHtml(user.address || "")}</textarea></label>
+            <label>${escapeHtml(t("role"))}
+              <select class="status-select" id="user-role-${user.id}">
+                <option value="user" ${user.role === "user" ? "selected" : ""}>user</option>
+                <option value="admin" ${user.role === "admin" ? "selected" : ""}>admin</option>
+              </select>
+            </label>
+            ${user.blocked ? `<div><span class="status-badge status-blocked">${escapeHtml(t("blocked"))}</span></div>` : ""}
+            <div class="card-meta">${escapeHtml(formatDate(user.lastLoginAt || user.createdAt))}</div>
+            <div class="actions-row">
+              <button class="btn-primary" type="button" data-admin-action="save-user" data-user-id="${escapeHtml(user.id)}">${escapeHtml(t("saveUser"))}</button>
+              <button class="btn-danger" type="button" data-admin-action="delete-user" data-user-id="${escapeHtml(user.id)}">${escapeHtml(t("delete"))}</button>
+              ${user.blocked
+                ? `<button class="btn-secondary" type="button" data-admin-action="unblock-user" data-user-id="${escapeHtml(user.id)}">${escapeHtml(t("unblock"))}</button>`
+                : `<button class="btn-warning" type="button" data-admin-action="block-user" data-user-id="${escapeHtml(user.id)}">${escapeHtml(t("block"))}</button>`
+              }
+            </div>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    function isUserRegistered(userId) {
+      if (recentlyDeletedUserIds.has(userId)) return false;
+      return currentUsers.some((user) => user.id === userId);
+    }
+
+    function getInboxEmailState(entry) {
+      if (entry.emailSentAt) return "sent";
+      if (String(entry.emailDeliveryError || "").trim()) return "failed";
+      if (entry.doneEmailQueuedAt || entry.accountDeletedEmailQueuedAt) return "queued";
+      return "";
+    }
+
+    function getInboxEntryIdForRequest(request) {
+      if (request?.inboxEntryId) return request.inboxEntryId;
+      if (!request?.id) return "";
+      const exact = currentInboxMessages.find((entry) => entry.id === request.inboxEntryId);
+      if (exact) return exact.id;
+      const legacy = currentInboxMessages.find((entry) => entry.id === request.id && (!entry.userId || entry.userId === request.id));
+      if (legacy) return legacy.id;
+      const userEntries = currentInboxMessages
+        .filter((entry) => (entry.userId || entry.id) === request.id)
+        .sort((a, b) => String(b.requestedAt || "").localeCompare(String(a.requestedAt || "")));
+      return userEntries[0]?.id || request.id;
+    }
+
+    function formatPaymentSummary(order) {
+      if (!order?.paymentSummary && !order?.paymentMethod) return t("unknown");
+      const summary = order.paymentSummary || {};
+      if (summary.type === "card" || order.paymentMethod === "card") {
+        const last4 = summary.last4 ? ` ****${summary.last4}` : "";
+        return `${t("payment")}: Card${last4}`;
+      }
+      return `${t("payment")}: Cash`;
+    }
+
+    function getDeleteRequestReason(request) {
+      return String(request?.reason || request?.message || "").trim();
+    }
+
+    function getInboxStatus(request) {
+      const status = String(request.status || "pending").toLowerCase();
+      if (status === "done" || status === "done-pending-email") return "done";
+      if (status === "completed") return "completed";
+      if (status === "user-deleted" || request.userDeletedAt) return "user-deleted";
+      if (status === "pending") return "pending";
+      if (request.doneMarkedAt) return "done";
+      return "pending";
+    }
+
+    function isActiveDeleteRequest(request) {
+      const status = getInboxStatus(request);
+      return (status === "pending" || status === "user-deleted") && getDeleteRequestReason(request).length > 0;
+    }
+
+    function isPendingDeleteRequest(request) {
+      return isActiveDeleteRequest(request);
+    }
+
+    function inboxStatusLabel(status) {
+      if (status === "completed") return t("inboxCompleted");
+      if (status === "done") return t("inboxDone");
+      if (status === "user-deleted") return t("inboxUserDeleted");
+      return t("pending");
+    }
+
+    function inboxStatusClass(status) {
+      if (status === "completed") return "status-completed";
+      if (status === "done") return "status-done";
+      if (status === "user-deleted") return "status-preparing";
+      return "status-pending";
+    }
+
+    function refreshDeleteRequestViews(userId, updates, inboxEntryId) {
+      const entryId = inboxEntryId || getInboxEntryIdForRequest({ id: userId, ...updates });
+      currentDeleteRequests = currentDeleteRequests.map((entry) =>
+        entry.id === userId ? { ...entry, ...updates } : entry
+      );
+      currentInboxMessages = currentInboxMessages.map((entry) =>
+        entry.id === entryId ? { ...entry, ...updates } : entry
+      );
+      renderDeleteRequests(currentDeleteRequests);
+      renderInbox(currentInboxMessages);
+    }
+
+    function renderDeleteRequestActions(userId, status, inboxEntryId, request) {
+      const canMarkDone = (status === "pending" || status === "user-deleted") && status !== "done";
+      const inboxId = inboxEntryId || getInboxEntryIdForRequest(request || { id: userId });
+      return `
+        <div class="actions-row">
+          <button class="btn-secondary" type="button" data-admin-action="mark-done" data-user-id="${escapeHtml(userId)}" data-inbox-id="${escapeHtml(inboxId)}" ${canMarkDone ? "" : "disabled"}>${escapeHtml(t("markRequestDone"))}</button>
+        </div>
+      `;
+    }
+
+    function renderDeleteRequests(requests) {
+      currentDeleteRequests = requests;
+      const root = document.getElementById("deleteRequestsList");
+      if (!root || root.hidden) return;
+      const pending = requests.filter((request) => isActiveDeleteRequest(request));
+      if (!pending.length) {
+        root.innerHTML = `<p class="empty-msg">${escapeHtml(t("noDeleteRequests"))}</p>`;
+        return;
+      }
+      root.innerHTML = pending.map((request) => {
+        const status = getInboxStatus(request);
+        const inboxEntryId = getInboxEntryIdForRequest(request);
+        return `
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">${escapeHtml(request.email || t("unknown"))}</div>
+              <div class="card-meta">${escapeHtml(request.name || "")}</div>
+              <div class="card-meta">${escapeHtml(t("requestedAt"))}: ${escapeHtml(formatDate(request.requestedAt))}</div>
+              <div class="card-meta"><span class="status-badge ${inboxStatusClass(status)}">${escapeHtml(inboxStatusLabel(status))}</span></div>
+              ${getUserAddress(null, request) ? `<div class="card-meta"><strong>${escapeHtml(t("address"))}:</strong> ${escapeHtml(getUserAddress(null, request))}</div>` : ""}
+              ${getDeleteRequestReason(request) ? `<div class="message-box"><strong>${escapeHtml(t("deleteReason"))}:</strong> ${escapeHtml(getDeleteRequestReason(request))}</div>` : ""}
+            </div>
+          </div>
+          ${renderDeleteRequestActions(request.id, status, inboxEntryId, request)}
+        </div>
+      `;
+      }).join("");
+    }
+
+    function renderInbox(messages) {
+      const root = document.getElementById("inboxList");
+      if (!root) return;
+      const entries = messages.filter((entry) => getDeleteRequestReason(entry).length > 0);
+      if (!entries.length) {
+        root.innerHTML = `<p class="empty-msg">${escapeHtml(t("noInboxMessages"))}</p>`;
+        return;
+      }
+
+      function isOrderInboxEntry(entry) {
+        const type = String(entry.inboxType || "").toLowerCase();
+        if (type === "order_feedback" || type === "order_closed") return true;
+        return String(entry.scope || "").toLowerCase() === "order";
+      }
+
+      function orderInboxTypeLabel(entry) {
+        const type = String(entry.inboxType || "").toLowerCase();
+        if (type === "order_closed") {
+          return { tr: "Siparis kapatildi", en: "Order closed", ar: "تم إغلاق الطلب" }[currentLang] || "Siparis kapatildi";
+        }
+        return { tr: "Siparis geri bildirimi", en: "Order feedback", ar: "ملاحظات الطلب" }[currentLang] || "Siparis geri bildirimi";
+      }
+
+      function orderInboxMarketLabel() {
+        return { tr: "Market", en: "Market", ar: "السوق" }[currentLang] || "Market";
+      }
+
+      root.innerHTML = entries.map((entry) => {
+        if (isOrderInboxEntry(entry)) {
+          const orderNo = orderNumberDisplay({ orderNumber: entry.orderNumber });
+          const market = getMarketLabel(entry.marketId || entry.marketName);
+          return `
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">${escapeHtml(orderInboxTypeLabel(entry))}</div>
+              <div class="card-meta">${escapeHtml(t("orderNumber"))}: ${escapeHtml(orderNo || t("unknown"))}</div>
+              <div class="card-meta">${escapeHtml(orderInboxMarketLabel())}: ${escapeHtml(market)}</div>
+              <div class="card-meta">${escapeHtml(t("requestedAt"))}: ${escapeHtml(formatDate(entry.requestedAt || entry.createdAt))}</div>
+              ${entry.name || entry.userName ? `<div class="card-meta">${escapeHtml(entry.name || entry.userName || "")}</div>` : ""}
+            </div>
+            <button class="btn-danger" type="button" data-admin-action="delete-inbox" data-inbox-id="${escapeHtml(entry.id)}">${escapeHtml(t("deleteMessage"))}</button>
+          </div>
+          <div class="message-box"><strong>${escapeHtml(t("deleteReason"))}:</strong> ${escapeHtml(getDeleteRequestReason(entry))}</div>
+        </div>
+      `;
+        }
+
+        const status = getInboxStatus(entry);
+        const emailState = getInboxEmailState(entry);
+        const userId = entry.userId || entry.id;
+        const inboxEntryId = entry.id;
+        const actionsHtml = (status === "pending" || status === "user-deleted")
+          ? renderDeleteRequestActions(userId, status, inboxEntryId, entry)
+          : "";
+        const emailBadge = emailState === "sent"
+          ? `<span class="status-badge status-done">${escapeHtml(t("inboxEmailSent"))}</span>`
+          : emailState === "failed"
+            ? `<span class="status-badge status-blocked" title="${escapeHtml(entry.emailDeliveryError)}">${escapeHtml(t("inboxEmailFailed"))}</span>`
+            : emailState === "queued"
+              ? `<span class="status-badge status-preparing">${escapeHtml(t("inboxEmailQueued"))}</span>`
+              : "";
+        return `
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">${escapeHtml(entry.email || t("unknown"))}</div>
+              <div class="card-meta">${escapeHtml(entry.name || "")}</div>
+              <div class="card-meta">${escapeHtml(t("requestedAt"))}: ${escapeHtml(formatDate(entry.requestedAt))}</div>
+              <div class="card-meta">
+                <span class="status-badge ${inboxStatusClass(status)}">${escapeHtml(inboxStatusLabel(status))}</span>
+                ${emailBadge}
+              </div>
+              ${getUserAddress(null, entry) ? `<div class="card-meta"><strong>${escapeHtml(t("address"))}:</strong> ${escapeHtml(getUserAddress(null, entry))}</div>` : ""}
+            </div>
+            <button class="btn-danger" type="button" data-admin-action="delete-inbox" data-inbox-id="${escapeHtml(inboxEntryId)}">${escapeHtml(t("deleteMessage"))}</button>
+          </div>
+          <div class="message-box"><strong>${escapeHtml(t("deleteReason"))}:</strong> ${escapeHtml(getDeleteRequestReason(entry))}</div>
+          ${actionsHtml}
+        </div>
+      `;
+      }).join("");
+    }
+
+    function renderAdminChatMessages(orderId, messages) {
+      const root = document.getElementById(`admin-chat-${orderId}`);
+      if (!root) return;
+      const order = currentOrders.find((entry) => entry.id === orderId);
+      if (!messages.length) {
+        root.innerHTML = `<div class="card-meta">${escapeHtml(t("chatTitle"))}...</div>`;
+        return;
+      }
+      root.innerHTML = messages.map((msg) => {
+        const role = chatRoleClass(msg.senderRole);
+        const senderLabel = resolveChatSenderDisplayName(msg, order, {
+          getMarketLabel,
+          adminLabel: "Admin",
+          driverLabel: t("driver"),
+          unknownLabel: t("unknown"),
+        });
+        return `
+          <div class="chat-msg ${role}">
+            <div class="chat-msg-meta">${escapeHtml(senderLabel)} · ${escapeHtml(formatDate(msg.createdAt))}</div>
+            <div>${escapeHtml(msg.text || "")}</div>
+          </div>
+        `;
+      }).join("");
+      root.scrollTop = root.scrollHeight;
+    }
+
+    function adminChatComposeHtml(orderId) {
+      return `
+        <div class="chat-compose">
+          <input class="field-input" id="admin-chat-input-${escapeHtml(orderId)}" placeholder="${escapeHtml(t("chatPlaceholder"))}" />
+          <button class="btn-primary" type="button" data-admin-action="send-chat" data-order-id="${escapeHtml(orderId)}">${escapeHtml(t("sendChat"))}</button>
+        </div>
+      `;
+    }
+
+    async function sendAdminChatMessage(orderId) {
+      const order = currentOrders.find((entry) => entry.id === orderId);
+      if (!order || isOrderClosed(order.status)) return;
+      const input = document.getElementById(`admin-chat-input-${orderId}`);
+      const text = String(input?.value || "").trim();
+      if (!text) return;
+      await addDoc(collection(db, "orderChats", orderId, "messages"), {
+        senderId: "admin",
+        senderRole: "admin",
+        senderName: "Admin",
+        text,
+        createdAt: new Date().toISOString(),
+      });
+      input.value = "";
+      showToast(t("updated"));
+    }
+
+    function bindAdminMarketChat(orderId) {
+      if (marketChatUnsubs.has(orderId)) return;
+      const q = query(
+        collection(db, "orderChats", orderId, "messages"),
+        orderBy("createdAt", "asc")
+      );
+      const unsub = onSnapshot(q, (snapshot) => {
+        renderAdminChatMessages(orderId, snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() })));
+      });
+      marketChatUnsubs.set(orderId, unsub);
+    }
+
+    function clearAdminMarketChats(activeOrderIds) {
+      for (const [orderId, unsub] of marketChatUnsubs.entries()) {
+        if (!activeOrderIds.has(orderId)) {
+          unsub();
+          marketChatUnsubs.delete(orderId);
+        }
+      }
+    }
+
+    function renderMarketsOverview(orders) {
+      const statsRoot = document.getElementById("marketStatsRow");
+      const ordersRoot = document.getElementById("marketOrdersList");
+      const filterSelect = document.getElementById("marketFilterSelect");
+      if (!statsRoot || !ordersRoot || !filterSelect) return;
+
+      if (!filterSelect.dataset.ready) {
+        filterSelect.dataset.ready = "1";
+        filterSelect.innerHTML = `<option value="all">${escapeHtml(t("allMarkets"))}</option>` +
+          MARKETS.map((market) => `<option value="${escapeHtml(market.key)}">${escapeHtml(market.label)}</option>`).join("");
+        filterSelect.value = currentMarketFilter;
+        filterSelect.addEventListener("change", (event) => {
+          currentMarketFilter = String(event.target.value || "all");
+          renderMarketsOverview(currentOrders);
+        });
+      }
+
+      const marketOrders = orders.filter((order) => {
+        const marketId = order.marketId || order.marketName;
+        return marketId || (Array.isArray(order.items) && order.items.some((item) => item.market));
+      });
+
+      statsRoot.innerHTML = MARKETS.map((market) => {
+        const count = marketOrders.filter((order) => orderMatchesMarket(order, market.key)).length;
+        return `
+          <a class="stat-box market-stat" href="${escapeHtml(market.key)}.html" style="border-left-color:${market.color};text-decoration:none;color:inherit;">
+            <div class="stat-num">${count}</div>
+            <div class="stat-label">${escapeHtml(market.label)} · ${escapeHtml(t("marketOrders"))}</div>
+          </a>
+        `;
+      }).join("");
+
+      const filtered = currentMarketFilter === "all"
+        ? marketOrders
+        : marketOrders.filter((order) => orderMatchesMarket(order, currentMarketFilter));
+
+      if (!filtered.length) {
+        ordersRoot.innerHTML = `<p class="empty-msg">${escapeHtml(t("noMarketOrders"))}</p>`;
+        clearAdminMarketChats(new Set());
+        return;
+      }
+
+      const sorted = filtered.slice().sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+      const activeIds = new Set(sorted.slice(0, 30).map((order) => order.id));
+
+      ordersRoot.innerHTML = sorted.slice(0, 30).map((order) => {
+        const items = Array.isArray(order.items) ? order.items : [];
+        const itemsHtml = items.map((item) => {
+          const available = item.available !== false;
+          return `
+            <div class="order-item-row">
+              <span>${escapeHtml(item.name)} x ${item.qty || 1}</span>
+              <span class="status-badge ${available ? "status-done" : "status-blocked"}">${escapeHtml(available ? t("available") : t("unavailable"))}</span>
+            </div>
+          `;
+        }).join("");
+        const driver = order.driver || {};
+        const driverText = driver.name
+          ? `${driver.name}${driver.phone ? " · " + driver.phone : ""}`
+          : (order.driverLocation && order.driverLocation.lat != null
+            ? `${Number(order.driverLocation.lat).toFixed(4)}, ${Number(order.driverLocation.lng).toFixed(4)}`
+            : t("unknown"));
+        const orderNo = orderNumberDisplay(order);
+        return `
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">${escapeHtml(getMarketLabel(order.marketId || order.marketName))} · ${escapeHtml(order.userName || t("unknown"))}${orderNo ? ` · ${escapeHtml(orderNo)}` : ""}</div>
+                <div class="card-meta">${orderNo ? `${escapeHtml(t("orderNumber"))}: ${escapeHtml(orderNo)} · ` : ""}${escapeHtml(formatDate(order.createdAt))} · ${escapeHtml(statusLabel(order.status))}</div>
+                <div class="card-meta">${escapeHtml(order.userPhone || "")} · ${escapeHtml(order.userAddress || "")}</div>
+                <div class="card-meta">${escapeHtml(formatPaymentSummary(order))}</div>
+                <div class="card-meta">${escapeHtml(t("driver"))}: ${escapeHtml(driverText)}</div>
+              </div>
+              <div class="card-title">${formatPrice(computeOrderTotal(order.items))}</div>
+            </div>
+            <div>${itemsHtml}</div>
+            <div class="chat-box" id="admin-chat-${escapeHtml(order.id)}"></div>
+            ${adminChatComposeHtml(order.id)}
+          </div>
+        `;
+      }).join("");
+
+      clearAdminMarketChats(activeIds);
+      activeIds.forEach((orderId) => bindAdminMarketChat(orderId));
+    }
+
+    function bindAdminOrderChat(orderId) {
+      if (adminOrderChatUnsubs.has(orderId)) return;
+      const q = query(
+        collection(db, "orderChats", orderId, "messages"),
+        orderBy("createdAt", "asc")
+      );
+      const unsub = onSnapshot(q, (snapshot) => {
+        renderAdminChatMessages(orderId, snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() })));
+      });
+      adminOrderChatUnsubs.set(orderId, unsub);
+    }
+
+    function clearAdminOrderChats(activeOrderIds) {
+      for (const [orderId, unsub] of adminOrderChatUnsubs.entries()) {
+        if (!activeOrderIds.has(orderId)) {
+          unsub();
+          adminOrderChatUnsubs.delete(orderId);
+        }
+      }
+    }
+
+    async function loadAdminMarketDrivers(marketId) {
+      currentAdminDriverMarket = marketId || currentAdminDriverMarket;
+      try {
+        const snap = await getDoc(doc(db, "marketDrivers", currentAdminDriverMarket));
+        adminMarketDrivers = snap.exists && Array.isArray(snap.data().drivers) ? snap.data().drivers : [];
+      } catch (error) {
+        console.warn("Admin market drivers load failed", error);
+        adminMarketDrivers = [];
+      }
+      renderAdminDriversPanel();
+    }
+
+    function renderAdminDriversPanel() {
+      const root = document.getElementById("adminDriversPanel");
+      const select = document.getElementById("adminDriverMarketSelect");
+      if (!root || !select) return;
+      if (!select.dataset.ready) {
+        select.dataset.ready = "1";
+        select.innerHTML = MARKETS.map((market) =>
+          `<option value="${escapeHtml(market.key)}">${escapeHtml(market.label)}</option>`
+        ).join("");
+        select.value = currentAdminDriverMarket;
+        select.addEventListener("change", (event) => {
+          loadAdminMarketDrivers(String(event.target.value || MARKETS[0].key));
+        });
+      }
+      const rows = adminMarketDrivers.map((driver) =>
+        `<div class="order-item-row" style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+          <span>${escapeHtml(driver.name || t("unknown"))} · ${escapeHtml(driver.phone || "")}</span>
+          <button class="btn-danger" type="button" data-admin-action="delete-market-driver" data-driver-id="${escapeHtml(driver.id)}">${escapeHtml(t("delete"))}</button>
+        </div>`
+      ).join("");
+      root.innerHTML = `
+        <div class="card" style="margin-top:12px;">
+          <div class="card-title">${escapeHtml(t("savedDrivers"))} · ${escapeHtml(getMarketLabel(currentAdminDriverMarket))}</div>
+          ${rows || `<p class="empty-msg">${escapeHtml(t("unknown"))}</p>`}
+          <div class="form-grid" style="margin-top:12px;">
+            <input class="field-input" id="adminNewDriverName" placeholder="${escapeHtml(t("driverName"))}" />
+            <input class="field-input" id="adminNewDriverPhone" placeholder="${escapeHtml(t("driverPhone"))}" />
+            <button class="btn-primary" type="button" data-admin-action="add-market-driver">${escapeHtml(t("addDriver"))}</button>
+          </div>
+        </div>
+      `;
+    }
+
+    async function addAdminMarketDriver() {
+      const name = document.getElementById("adminNewDriverName")?.value.trim() || "";
+      const phoneRaw = document.getElementById("adminNewDriverPhone")?.value.trim() || "";
+      const phone = normalizePhone(phoneRaw) || phoneRaw;
+      if (!name || !phone) return;
+      adminMarketDrivers.push({ id: "drv_" + Date.now().toString(36), name, phone });
+      await setDoc(doc(db, "marketDrivers", currentAdminDriverMarket), {
+        marketId: currentAdminDriverMarket,
+        drivers: adminMarketDrivers,
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
+      renderAdminDriversPanel();
+      showToast(t("updated"));
+    }
+
+    async function deleteAdminMarketDriver(driverId) {
+      if (!driverId) return;
+      adminMarketDrivers = adminMarketDrivers.filter((entry) => entry.id !== driverId);
+      await setDoc(doc(db, "marketDrivers", currentAdminDriverMarket), {
+        marketId: currentAdminDriverMarket,
+        drivers: adminMarketDrivers,
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
+      renderAdminDriversPanel();
+      showToast(t("removed"));
+    }
+
+    async function reassignOrderDriver(orderId) {
+      const name = document.getElementById(`admin-driver-name-${orderId}`)?.value.trim() || "";
+      const phoneRaw = document.getElementById(`admin-driver-phone-${orderId}`)?.value.trim() || "";
+      const phone = normalizePhone(phoneRaw) || phoneRaw;
+      if (!name) return;
+      await updateDoc(doc(db, "orders", orderId), {
+        driver: { name, phone: phone || "" },
+        driverAssignedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      showToast(t("updated"));
+    }
+
+    function renderAdminOrderHistory(orders) {
+      const root = document.getElementById("adminHistoryList");
+      if (!root) return;
+      const closed = orders
+        .filter((order) => isOrderClosed(order.status))
+        .sort((a, b) => String(b.closedAt || b.updatedAt || b.createdAt || "").localeCompare(String(a.closedAt || a.updatedAt || a.createdAt || "")))
+        .slice(0, 40);
+      if (!closed.length) {
+        root.innerHTML = `<p class="empty-msg">${escapeHtml(t("noHistory"))}</p>`;
+        return;
+      }
+      root.innerHTML = closed.map((order) => {
+        const orderNo = orderNumberDisplay(order);
+        const driver = order.driver || {};
+        return `
+          <div class="card">
+            <div class="card-title">${escapeHtml(getMarketLabel(order.marketId || order.marketName))}${orderNo ? ` · ${escapeHtml(orderNo)}` : ""}</div>
+            <div class="card-meta">${escapeHtml(t("driver"))}: ${escapeHtml(driver.name || t("unknown"))}</div>
+            <div class="card-meta">${escapeHtml(formatDate(order.closedAt || order.updatedAt || order.createdAt))}</div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function renderAdminCallHistory() {
+      const root = document.getElementById("adminCallHistoryList");
+      const deleteAllBtn = document.getElementById("deleteAllCallHistoryBtn");
+      if (deleteAllBtn) deleteAllBtn.textContent = t("deleteAllCallHistory");
+      if (!root) return;
+      const rows = adminCallHistoryEntries.slice(0, 40);
+      if (!rows.length) {
+        root.innerHTML = `<p class="empty-msg">${escapeHtml(t("noHistory"))}</p>`;
+        return;
+      }
+      root.innerHTML = rows.map((entry) => {
+        const modeLabel = entry.mode === "video" ? t("videoCall") : t("voiceCall");
+        const outcomeKey = entry.outcome === "declined" ? "callDeclined"
+          : entry.outcome === "remote-ended" ? "callRemoteEnded" : "callCompleted";
+        const recordingHtml = entry.recordingUrl
+          ? `<div class="card-meta"><a href="${escapeHtml(entry.recordingUrl)}" target="_blank" rel="noopener">${escapeHtml(t("playRecording"))}</a></div>`
+          : "";
+        return `
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">${escapeHtml(getMarketLabel(entry.marketId || entry.marketName))} · #${escapeHtml(String(entry.orderNumber || entry.orderId || ""))}</div>
+              <div class="card-meta">${escapeHtml(t("driver"))}: ${escapeHtml(entry.driverName || t("unknown"))}</div>
+              <div class="card-meta">${escapeHtml(t("callWith"))}: ${escapeHtml(entry.callerName || t("unknown"))} (${escapeHtml(entry.callerRole || "")})</div>
+              <div class="card-meta">${escapeHtml(t("callMode"))}: ${escapeHtml(modeLabel)} · ${escapeHtml(t("callOutcome"))}: ${escapeHtml(t(outcomeKey))}</div>
+              <div class="card-meta">${escapeHtml(formatDate(entry.startedAt || entry.createdAt))}${entry.endedAt ? " → " + escapeHtml(formatDate(entry.endedAt)) : ""}</div>
+              ${recordingHtml}
+            </div>
+            <button class="btn-danger" type="button" data-admin-action="delete-call-history" data-call-id="${escapeHtml(entry.id)}">${escapeHtml(t("deleteCallHistory"))}</button>
+          </div>
+        </div>
+      `;
+      }).join("");
+    }
+
+    function renderOrders(orders) {
+      currentOrders = orders;
+      updateStats(orders, currentUsers);
+      renderMarketsOverview(orders);
+      loadAdminMarketDrivers(currentAdminDriverMarket);
+      const root = document.getElementById("ordersList");
+      document.getElementById("ordersLoading").style.display = "none";
+      if (!orders.length) {
+        root.innerHTML = `<p class="empty-msg">${escapeHtml(t("noOrders"))}</p>`;
+        clearAdminOrderChats(new Set());
+        renderAdminOrderHistory(orders);
+        return;
+      }
+      const sorted = orders.slice().sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+      const activeIds = new Set(sorted.slice(0, 40).map((order) => order.id));
+      root.innerHTML = sorted.slice(0, 40).map((order) => {
+        const items = Array.isArray(order.items) ? order.items : [];
+        const itemsHtml = items.map((item) => `
+          <div class="order-item-row">
+            <span>${escapeHtml(item.name)} x ${item.qty || 1}</span>
+            <span>${formatPrice((item.price || 0) * (item.qty || 1))}</span>
+          </div>
+        `).join("");
+        const orderNo = orderNumberDisplay(order);
+        const currentStatus = normalizeOrderStatus(order.status);
+        const closed = isOrderClosed(order.status);
+        const statusOptions = getSelectableStatuses(currentStatus).map((status) =>
+          `<option value="${status}" ${currentStatus === status ? "selected" : ""}>${escapeHtml(statusLabel(status))}</option>`
+        ).join("");
+        const driver = order.driver || {};
+        return `
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">${escapeHtml(order.userName || t("unknown"))}${orderNo ? ` · ${escapeHtml(orderNo)}` : ""}</div>
+                <div class="card-meta">${orderNo ? `${escapeHtml(t("orderNumber"))}: ${escapeHtml(orderNo)} · ` : ""}${escapeHtml(formatDate(order.createdAt))} · ${escapeHtml(getMarketLabel(order.marketId || order.marketName))}</div>
+                <div class="card-meta">${escapeHtml(t("phone"))}: ${escapeHtml(order.userPhone || t("unknown"))} · ${escapeHtml(order.userAddress || t("unknown"))}</div>
+                <div class="card-meta">${escapeHtml(t("driver"))}: ${escapeHtml(driver.name || t("unknown"))}${driver.phone ? " · " + escapeHtml(driver.phone) : ""}</div>
+                <span class="status-badge status-${closed ? "completed" : currentStatus.replace(/\s+/g, "-")}">${escapeHtml(statusLabel(order.status))}</span>
+              </div>
+              <div class="card-title">${formatPrice(computeOrderTotal(order.items))}</div>
+            </div>
+            <div>${itemsHtml}</div>
+            <div class="actions-row">
+              <select class="status-select" id="sel-${order.id}">${statusOptions}</select>
+              <button class="btn-update" type="button" data-admin-action="update-order" data-order-id="${escapeHtml(order.id)}">${escapeHtml(t("updateStatus"))}</button>
+              <button class="btn-danger" type="button" data-admin-action="delete-order" data-order-id="${escapeHtml(order.id)}">${escapeHtml(t("delete"))}</button>
+            </div>
+            ${closed ? "" : `
+            <div class="form-grid" style="margin-top:10px;">
+              <input class="field-input" id="admin-driver-name-${escapeHtml(order.id)}" placeholder="${escapeHtml(t("driverName"))}" value="${escapeHtml(driver.name || "")}" />
+              <input class="field-input" id="admin-driver-phone-${escapeHtml(order.id)}" placeholder="${escapeHtml(t("driverPhone"))}" value="${escapeHtml(driver.phone || "")}" />
+              <button class="btn-secondary" type="button" data-admin-action="reassign-driver" data-order-id="${escapeHtml(order.id)}">${escapeHtml(t("reassignDriver"))}</button>
+            </div>`}
+            <div class="card-meta" style="margin-top:10px;">${escapeHtml(t("chatHistory"))}</div>
+            <div class="chat-box" id="admin-chat-${escapeHtml(order.id)}"></div>
+            ${closed ? "" : adminChatComposeHtml(order.id)}
+          </div>
+        `;
+      }).join("");
+      clearAdminOrderChats(activeIds);
+      activeIds.forEach((orderId) => bindAdminOrderChat(orderId));
+      renderAdminOrderHistory(orders);
+    }
+
+    window.updateStatus = async function(orderId) {
+      const order = currentOrders.find((entry) => entry.id === orderId);
+      const select = document.getElementById(`sel-${orderId}`);
+      if (!order || !select) return;
+      const nextStatus = normalizeOrderStatus(select.value);
+      if (!canAdvanceToStatus(order.status, nextStatus)) {
+        showToast(t("statusMustAdvanceStep"), true);
+        select.value = normalizeOrderStatus(order.status);
+        return;
+      }
+      if (nextStatus === "preparing" && !isOrderPaid(order)) {
+        showToast(t("awaitingPayment"), true);
+        select.value = normalizeOrderStatus(order.status);
+        return;
+      }
+      await updateDoc(doc(db, "orders", orderId), { status: nextStatus, updatedAt: new Date().toISOString() });
+      showToast(t("updated"));
+    };
+
+    async function archiveOrderForAdmin(orderId, order, reason) {
+      const messagesSnap = await getDocs(
+        query(collection(db, "orderChats", orderId, "messages"), orderBy("createdAt", "asc"))
+      );
+      const messages = messagesSnap.docs.map((entry) => ({ id: entry.id, ...entry.data() }));
+      if (!messages.length) return;
+      const now = new Date().toISOString();
+      await setDoc(doc(db, "orderConversations", orderId), {
+        orderId: String(orderId || ""),
+        orderNumber: order.orderNumber != null ? order.orderNumber : "",
+        userId: String(order.userId || ""),
+        userName: String(order.userName || ""),
+        userEmail: String(order.userEmail || ""),
+        marketId: String(order.marketId || ""),
+        marketName: String(order.marketName || ""),
+        driverName: String(order.driver?.name || ""),
+        messages,
+        messageCount: messages.length,
+        archivedAt: now,
+        archiveReason: String(reason || "archived"),
+        updatedAt: now,
+      }, { merge: true });
+    }
+
+    window.deleteOrder = async function(orderId) {
+      const order = currentOrders.find((entry) => entry.id === orderId);
+      if (order) {
+        try {
+          await archiveOrderForAdmin(orderId, order, "admin_deleted");
+        } catch (error) {
+          console.warn("Conversation archive failed before delete", error);
+        }
+      }
+      await deleteDoc(doc(db, "orders", orderId));
+      showToast(t("removed"));
+    };
+
+    window.saveUser = async function(userId) {
+      await updateDoc(doc(db, "users", userId), {
+        name: document.getElementById(`user-name-${userId}`).value.trim(),
+        phone: document.getElementById(`user-phone-${userId}`).value.trim(),
+        address: document.getElementById(`user-address-${userId}`).value.trim(),
+        role: document.getElementById(`user-role-${userId}`).value,
+        updatedAt: new Date().toISOString(),
+      });
+      showToast(t("saved"));
+    };
+
+    async function getUserForAdmin(userId) {
+      const cachedUser = currentUsers.find((entry) => entry.id === userId);
+      if (cachedUser) return cachedUser;
+      const userSnap = await getDoc(doc(db, "users", userId));
+      const user = userSnap.exists ? { id: userSnap.id, ...userSnap.data() } : { id: userId };
+      if (!getUserAddress(user)) {
+        const request = await getDeleteRequestForUser(userId);
+        if (request?.address) user.address = request.address;
+      }
+      return user;
+    }
+
+    function getKnownDeviceIds(user) {
+      return Array.from(new Set([
+        ...(Array.isArray(user.deviceIds) ? user.deviceIds : []),
+        user.lastDeviceId,
+      ].filter(Boolean)));
+    }
+
+    window.setUserBlocked = async function(userId, blocked) {
+      const user = await getUserForAdmin(userId);
+      const deviceIds = getKnownDeviceIds(user);
+      const now = new Date().toISOString();
+      const adminEmail = localStorage.getItem("user_email") || OWNER_EMAIL;
+
+      await Promise.all(deviceIds.map((deviceId) => setDoc(doc(db, "blockedDevices", deviceId), {
+        blocked,
+        userId,
+        email: user.email || "",
+        blockedAt: blocked ? now : null,
+        blockedBy: blocked ? adminEmail : null,
+        unblockedAt: blocked ? null : now,
+        unblockedBy: blocked ? null : adminEmail,
+      }, { merge: true })));
+
+      await setDoc(doc(db, "users", userId), {
+        blocked,
+        blockedAt: blocked ? now : null,
+        blockedBy: blocked ? adminEmail : null,
+        blockedDeviceIds: blocked ? deviceIds : [],
+        blockedSessionIds: blocked && user.lastSessionId ? [user.lastSessionId] : [],
+        blockScope: blocked ? "account-device-session" : "",
+        unblockedAt: blocked ? null : now,
+        unblockedBy: blocked ? null : adminEmail,
+        updatedAt: now,
+      }, { merge: true });
+      showToast(t("updated"));
+    };
+
+    async function syncAdminInboxEntry(inboxEntryId, updates, user, request) {
+      if (!inboxEntryId) return;
+      const inboxRef = doc(db, "adminInbox", inboxEntryId);
+      const inboxSnap = await getDoc(inboxRef);
+      const existing = inboxSnap.exists ? inboxSnap.data() : {};
+      const userId = updates.userId || request?.id || existing.userId || "";
+      const message = updates.message ?? existing.message ?? request?.message ?? "";
+      await setDoc(inboxRef, {
+        userId,
+        email: updates.email || existing.email || request?.email || user?.email || "",
+        name: updates.name || existing.name || request?.name || user?.name || "",
+        address: updates.address || existing.address || request?.address || user?.address || "",
+        message,
+        requestedAt: updates.requestedAt || existing.requestedAt || request?.requestedAt || new Date().toISOString(),
+        source: existing.source || updates.source || "delete-request",
+        ...updates,
+        message,
+      }, { merge: true });
+    }
+
+    async function syncAdminInboxForUser(userId, updates, user, request) {
+      const inboxEntryId = getInboxEntryIdForRequest(request || { id: userId, inboxEntryId: updates.inboxEntryId });
+      await syncAdminInboxEntry(inboxEntryId, { userId, ...updates }, user, request);
+    }
+
+    async function updateAdminInboxForUser(userId, updates, inboxEntryId) {
+      const request = await getDeleteRequestForUser(userId);
+      const user = currentUsers.find((entry) => entry.id === userId) || null;
+      const entryId = inboxEntryId || getInboxEntryIdForRequest(request || { id: userId });
+      await syncAdminInboxEntry(entryId, { userId, ...updates }, user, request);
+    }
+
+    const legacyInboxMigrated = new Set();
+
+    async function ensureLegacyInboxEntry(request) {
+      const message = getDeleteRequestReason(request);
+      if (!message) return;
+      const inboxRef = doc(db, "adminInbox", request.id);
+      const inboxSnap = await getDoc(inboxRef);
+      if (inboxSnap.exists) return;
+      await setDoc(inboxRef, {
+        userId: request.id,
+        email: request.email || "",
+        name: request.name || "",
+        message,
+        reason: message,
+        status: getInboxStatus(request),
+        requestedAt: request.requestedAt || new Date().toISOString(),
+        source: "legacy-delete-request",
+        doneMarkedAt: request.doneMarkedAt || null,
+        completedAt: request.completedAt || null,
+        doneEmailQueuedAt: request.doneEmailQueuedAt || null,
+        accountDeletedEmailQueuedAt: request.emailQueuedAt || null,
+      });
+    }
+
+    async function getDeleteRequestForUser(userId) {
+      const cachedRequest = currentDeleteRequests.find((request) => request.id === userId);
+      if (cachedRequest) return cachedRequest;
+      const requestSnap = await getDoc(doc(db, "deleteRequests", userId));
+      return requestSnap.exists ? { id: requestSnap.id, ...requestSnap.data() } : null;
+    }
+
+    async function ensureMailServiceReady() {
+      await wakeMailService();
+      const response = await fetch(`${MAIL_API_BASE}/health`, { cache: "no-store" });
+      let data = {};
+      try {
+        data = await response.json();
+      } catch (error) {
+        data = {};
+      }
+      if (!response.ok || !data.mail) {
+        throw new Error(data.mailError || t("emailServerNotConfigured"));
+      }
+      return data;
+    }
+
+    async function deliverEmailViaServerOnce(userId, emailPayload, inboxEntryId) {
+      const response = await withTimeout(fetch(`${MAIL_API_BASE}/send-account-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...emailPayload,
+          deleteRequestId: userId,
+          inboxEntryId: inboxEntryId || userId,
+        }),
+      }), 90000, "Email send request timed out. The message may still arrive; check the user's inbox.");
+      let data = {};
+      try {
+        data = await response.json();
+      } catch (error) {
+        data = { ok: false, error: "Invalid server response" };
+      }
+      if (!response.ok || !data.ok) {
+        const errorMessage = data.error || data.mail?.reason || t("emailServerNotConfigured");
+        throw new Error(errorMessage);
+      }
+      const sentAt = data.sentAt || new Date().toISOString();
+      await safeFirestoreWrite("inbox email status", () => updateAdminInboxForUser(userId, {
+        emailSentAt: sentAt,
+        emailDeliveryError: "",
+      }, inboxEntryId));
+      return sentAt;
+    }
+
+    async function deliverEmailViaServer(userId, emailPayload, inboxEntryId) {
+      let lastError = null;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          await ensureMailServiceReady();
+          return await deliverEmailViaServerOnce(userId, emailPayload, inboxEntryId);
+        } catch (error) {
+          lastError = error;
+          console.warn(`Email send attempt ${attempt} failed`, error);
+          if (attempt < 3) {
+            await new Promise((resolve) => setTimeout(resolve, 3000 * attempt));
+          }
+        }
+      }
+      throw lastError || new Error(t("emailQueueFailed"));
+    }
+
+    async function wakeMailService() {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 20000);
+        await fetch(`${MAIL_API_BASE}/health`, { signal: controller.signal });
+        clearTimeout(timeout);
+      } catch (error) {
+        console.warn("Mail service wake failed", error);
+      }
+    }
+
+    async function queueDeleteRequestDoneEmail(userId) {
+      const request = await getDeleteRequestForUser(userId);
+      const user = currentUsers.find((entry) => entry.id === userId) || {};
+      const email = request?.email || user.email || "";
+      if (!email) throw new Error("No Gmail found for this delete request.");
+
+      const name = request?.name || user.name || email;
+      const subject = "Your Pazar Fiyatı account deletion request was processed";
+      const text = `Hello ${name},
+
+We received your account deletion request and marked it as done. Your data will be deleted within a maximum of 7 days, as promised.
+
+If you did not request this, please contact ${OWNER_EMAIL}.
+
+Pazar Fiyatı Admin`;
+      const html = `
+        <p>Hello ${escapeHtml(name)},</p>
+        <p>We received your account deletion request and marked it as done. Your data will be deleted within a maximum of 7 days, as promised.</p>
+        <p>If you did not request this, please contact <a href="mailto:${OWNER_EMAIL}">${OWNER_EMAIL}</a>.</p>
+        <p>Pazar Fiyatı Admin</p>
+      `;
+
+      await setDoc(doc(db, "mail", `delete-request-done-${userId}-${Date.now()}`), {
+        to: email,
+        message: { subject, text, html },
+        deleteRequestId: userId,
+        queuedAt: new Date().toISOString(),
+        queuedBy: localStorage.getItem("user_email") || OWNER_EMAIL,
+      });
+      const inboxEntryId = getInboxEntryIdForRequest(request || { id: userId });
+      await deliverEmailViaServer(userId, { to: email, subject, text, html }, inboxEntryId);
+      return true;
+    }
+
+    function accountDeletedEmailContent(name, lang) {
+      lang = lang || "tr";
+      const templates = {
+        tr: {
+          subject: "Pazar Fiyati hesabiniz silindi",
+          text: `Merhaba ${name},\n\nHesap silme talebiniz uzerine Pazar Fiyati hesabiniz ve kisisel verileriniz silindi.\n\nBunu siz talep etmediyseniz ${OWNER_EMAIL} adresine yazin.\n\nPazar Fiyati Admin`,
+          html: `<p>Merhaba ${escapeHtml(name)},</p><p>Hesap silme talebiniz uzerine Pazar Fiyati hesabiniz ve kisisel verileriniz silindi.</p><p>Bunu siz talep etmediyseniz <a href="mailto:${OWNER_EMAIL}">${OWNER_EMAIL}</a> adresine yazin.</p><p>Pazar Fiyati Admin</p>`,
+        },
+        en: {
+          subject: "Your Pazar Fiyati account was deleted",
+          text: `Hello ${name},\n\nYour Pazar Fiyati account and personal data have been deleted after your account deletion request.\n\nIf you did not request this, please contact ${OWNER_EMAIL}.\n\nPazar Fiyati Admin`,
+          html: `<p>Hello ${escapeHtml(name)},</p><p>Your Pazar Fiyati account and personal data have been deleted after your account deletion request.</p><p>If you did not request this, please contact <a href="mailto:${OWNER_EMAIL}">${OWNER_EMAIL}</a>.</p><p>Pazar Fiyati Admin</p>`,
+        },
+        ar: {
+          subject: "تم حذف حسابك في <span dir=\"ltr\" class=\"brand-ltr\">Pazar Fiyati</span>",
+          text: `مرحباً ${name},\n\nتم حذف حسابك وبياناتك الشخصية في Pazar Fiyati بناءً على طلب حذف الحساب.\n\nإذا لم تطلب ذلك، يرجى التواصل مع ${OWNER_EMAIL}.\n\nإدارة Pazar Fiyati`,
+          html: `<p>مرحباً ${escapeHtml(name)},</p><p>تم حذف حسابك وبياناتك الشخصية في <span dir="ltr" class="brand-ltr">Pazar Fiyati</span> بناءً على طلب حذف الحساب.</p><p>إذا لم تطلب ذلك، يرجى التواصل مع <a href="mailto:${OWNER_EMAIL}">${OWNER_EMAIL}</a>.</p><p>إدارة <span dir="ltr" class="brand-ltr">Pazar Fiyati</span></p>`,
+        },
+      };
+      return templates[lang] || templates.tr;
+    }
+
+    async function queueAccountDeletedEmail(userId, requestOverride) {
+      const request = requestOverride || await getDeleteRequestForUser(userId);
+      if (!request) return false;
+      const user = currentUsers.find((entry) => entry.id === userId) || {};
+      const email = request.email || user.email || "";
+      if (!email) throw new Error("No Gmail found for this delete request.");
+
+      const name = request.name || user.name || email;
+      const lang = request.lang || user.lang || "tr";
+      const content = accountDeletedEmailContent(name, lang);
+      const subject = content.subject;
+      const text = content.text;
+      const html = content.html;
+
+      const payload = { to: email, subject, text, html };
+      const inboxEntryId = getInboxEntryIdForRequest(request);
+      const sentAt = await deliverEmailViaServer(userId, payload, inboxEntryId);
+      await safeFirestoreWrite("account deleted mail log", () => setDoc(doc(db, "mail", `account-deleted-${userId}-${Date.now()}`), {
+        to: email,
+        message: { subject, text, html },
+        deleteRequestId: userId,
+        inboxEntryId,
+        queuedAt: new Date().toISOString(),
+        queuedBy: localStorage.getItem("user_email") || OWNER_EMAIL,
+        delivery: { state: "SUCCESS" },
+        emailSentAt: sentAt,
+      }));
+      return sentAt;
+    }
+
+    async function removeUserAccount(userId, user, request) {
+      const now = new Date().toISOString();
+      const address = getUserAddress(user, request);
+      const phone = String(user.phone || request?.phone || "").trim();
+      await setDoc(doc(db, "deletedAccounts", userId), {
+        forceLogout: true,
+        deletedAt: now,
+        deletedBy: localStorage.getItem("user_email") || OWNER_EMAIL,
+        email: user.email || request?.email || "",
+        name: user.name || request?.name || "",
+        address: "",
+        phone: "",
+        profileCleared: true,
+      }, { merge: true });
+      await deleteDoc(doc(db, "users", userId));
+      recentlyDeletedUserIds.add(userId);
+      currentUsers = currentUsers.filter((entry) => entry.id !== userId);
+      if (request) {
+        const preserve = {
+          userDeletedAt: now,
+          status: "user-deleted",
+          message: request.message || getDeleteRequestReason(request),
+          reason: getDeleteRequestReason(request),
+          email: request.email || user.email || "",
+          name: request.name || user.name || "",
+          address: "",
+          phone: "",
+          requestedAt: request.requestedAt || now,
+        };
+        await setDoc(doc(db, "deleteRequests", userId), preserve, { merge: true });
+        await syncAdminInboxForUser(userId, preserve, user, request);
+        refreshDeleteRequestViews(userId, preserve, getInboxEntryIdForRequest(request));
+      }
+      renderUsers(currentUsers);
+      return now;
+    }
+
+    window.deleteUser = async function(userId) {
+      try {
+        if (!isUserRegistered(userId)) {
+          showToast(t("removed"));
+          return;
+        }
+        if (!window.confirm(t("confirmDeleteUser"))) return;
+        const user = await getUserForAdmin(userId);
+        const request = await getDeleteRequestForUser(userId);
+        if (request && getDeleteRequestReason(request)) {
+          try {
+            await withTimeout(ensureMailServiceReady(), 25000, "Mail service check timed out.");
+            await queueAccountDeletedEmail(userId, request);
+          } catch (mailError) {
+            console.warn("Delete email skipped", mailError);
+          }
+        }
+        await retryAsync(() => removeUserAccount(userId, user, request), 3, 2000);
+        showToast(t("removed"));
+      } catch (error) {
+        console.error("Delete user failed", error);
+        showToast(`${t("saveFailed")}: ${error.message}`, true);
+      }
+    };
+
+    window.deleteCallHistoryEntry = async function(callId) {
+      if (!callId) return;
+      await deleteDoc(doc(db, "orderCallHistory", callId));
+      adminCallHistoryEntries = adminCallHistoryEntries.filter((entry) => entry.id !== callId);
+      renderAdminCallHistory();
+      showToast(t("removed"));
+    };
+
+    window.deleteAllCallHistory = async function(button) {
+      if (!adminCallHistoryEntries.length) {
+        showToast(t("noHistory"), true);
+        return;
+      }
+      if (!window.confirm(t("deleteAllCallHistoryConfirm"))) return;
+      const originalText = button ? button.textContent : "";
+      if (button) {
+        button.disabled = true;
+        button.textContent = t("saving");
+      }
+      for (const entry of [...adminCallHistoryEntries]) {
+        try {
+          await deleteDoc(doc(db, "orderCallHistory", entry.id));
+        } catch (error) {
+          console.error("Call history delete failed", entry.id, error);
+        }
+      }
+      adminCallHistoryEntries = [];
+      renderAdminCallHistory();
+      if (button) {
+        button.disabled = false;
+        button.textContent = originalText || t("deleteAllCallHistory");
+      }
+      showToast(t("removed"));
+    };
+
+    window.deleteAllUsers = async function(button) {
+      const users = [...currentUsers];
+      if (!users.length) {
+        showToast(t("noUsers"), true);
+        return;
+      }
+      const confirmText = t("deleteAllUsersConfirm").replace("{count}", String(users.length));
+      if (!window.confirm(confirmText)) return;
+
+      const originalText = button ? button.textContent : "";
+      if (button) {
+        button.disabled = true;
+        button.textContent = t("saving");
+      }
+
+      let deleted = 0;
+      for (const user of users) {
+        try {
+          await retryAsync(() => removeUserAccount(user.id, user, null), 3, 1500);
+          deleted += 1;
+        } catch (error) {
+          console.error("Bulk delete failed for user", user.id, error);
+        }
+      }
+
+      if (button) {
+        button.disabled = false;
+        button.textContent = originalText || t("deleteAllUsers");
+      }
+      showToast(t("deleteAllUsersDone").replace("{count}", String(deleted)));
+    };
+
+    window.dismissDeleteRequest = async function(userId, inboxEntryId) {
+      const entryId = inboxEntryId || getInboxEntryIdForRequest({ id: userId });
+      try {
+        if (entryId) await deleteDoc(doc(db, "adminInbox", entryId));
+        await deleteDoc(doc(db, "deleteRequests", userId));
+        currentDeleteRequests = currentDeleteRequests.filter((entry) => entry.id !== userId);
+        currentInboxMessages = currentInboxMessages.filter((entry) => entry.id !== entryId);
+        renderDeleteRequests(currentDeleteRequests);
+        renderInbox(currentInboxMessages);
+        showToast(t("removed"));
+      } catch (error) {
+        console.error("Dismiss delete request failed", error);
+        showToast(`${t("saveFailed")}: ${error.message}`);
+      }
+    };
+
+    window.deleteInboxMessage = async function(inboxEntryId) {
+      if (!inboxEntryId) return;
+      await deleteDoc(doc(db, "adminInbox", inboxEntryId));
+      showToast(t("removed"));
+    };
+
+    window.markDeleteRequestDone = async function(userId, button, inboxEntryId) {
+      const request = await getDeleteRequestForUser(userId);
+      if (!request || !getDeleteRequestReason(request)) {
+        showToast(t("noDeleteRequests"), true);
+        return;
+      }
+
+      const entryId = inboxEntryId || getInboxEntryIdForRequest(request);
+      const originalText = button ? button.textContent : "";
+      if (button) {
+        button.disabled = true;
+        button.textContent = t("sendingEmail");
+      }
+
+      let succeeded = false;
+      let sentAt = null;
+      try {
+        await withTimeout(ensureMailServiceReady(), 30000, "Mail service check timed out.");
+        sentAt = await queueAccountDeletedEmail(userId, request);
+      } catch (error) {
+        console.error("Mark delete request done failed", error);
+        await safeFirestoreWrite("email delivery error", () => updateAdminInboxForUser(userId, { emailDeliveryError: error.message }, entryId));
+        showToast(`${t("emailQueueFailed")}: ${error.message}`);
+        return;
+      }
+
+      try {
+        if (isUserRegistered(userId)) {
+          const user = await getUserForAdmin(userId);
+          await retryAsync(() => removeUserAccount(userId, user, request), 3, 2000);
+        }
+
+        const now = new Date().toISOString();
+        const doneUpdate = {
+          status: "done",
+          doneMarkedAt: now,
+          doneEmailQueuedAt: now,
+          emailSentAt: sentAt || now,
+          emailDeliveryError: "",
+          message: request.message || getDeleteRequestReason(request),
+          reason: getDeleteRequestReason(request),
+          address: "",
+          phone: "",
+        };
+        const statusSaved = await safeFirestoreWrite("mark delete request done", async () => {
+          await syncAdminInboxEntry(entryId, { userId, ...doneUpdate }, null, request);
+          await setDoc(doc(db, "deleteRequests", userId), {
+            ...doneUpdate,
+            doneMarkedBy: localStorage.getItem("user_email") || OWNER_EMAIL,
+          }, { merge: true });
+        });
+        refreshDeleteRequestViews(userId, doneUpdate, entryId);
+        if (statusSaved) {
+          showToast(`${t("updated")} - ${t("inboxEmailSent")}`);
+        } else {
+          showToast(`${t("inboxEmailSent")}. ${t("saveFailed")}: status update will retry on refresh.`, true);
+        }
+        succeeded = true;
+      } catch (error) {
+        console.error("Post-email cleanup failed after email was sent", error);
+        showToast(`${t("inboxEmailSent")}. ${t("saveFailed")}: ${error.message}`, true);
+        succeeded = true;
+      } finally {
+        if (button && !succeeded) {
+          button.disabled = false;
+          button.textContent = originalText || t("markRequestDone");
+        }
+      }
+    };
+
+    function bindAdminActions() {
+      const root = document.getElementById("adminGuard");
+      if (!root || root.dataset.actionsBound === "1") return;
+      root.dataset.actionsBound = "1";
+      root.addEventListener("click", async (event) => {
+        const button = event.target.closest("[data-admin-action]");
+        if (!button || button.disabled) return;
+        const action = button.dataset.adminAction;
+        const userId = button.dataset.userId || "";
+        const orderId = button.dataset.orderId || "";
+        const inboxId = button.dataset.inboxId || "";
+        try {
+          if (action === "delete-user") await window.deleteUser(userId);
+          else if (action === "delete-all-users") await window.deleteAllUsers(button);
+          else if (action === "dismiss-delete-request") await window.dismissDeleteRequest(userId, inboxId);
+          else if (action === "mark-done") await window.markDeleteRequestDone(userId, button, inboxId);
+          else if (action === "delete-inbox") await window.deleteInboxMessage(inboxId);
+          else if (action === "delete-call-history") await window.deleteCallHistoryEntry(button.dataset.callId || "");
+          else if (action === "delete-all-call-history") await window.deleteAllCallHistory(button);
+          else if (action === "save-user") await window.saveUser(userId);
+          else if (action === "block-user") await window.setUserBlocked(userId, true);
+          else if (action === "unblock-user") await window.setUserBlocked(userId, false);
+          else if (action === "update-order") await window.updateStatus(orderId);
+          else if (action === "delete-order") await window.deleteOrder(orderId);
+          else if (action === "reassign-driver") await reassignOrderDriver(orderId);
+          else if (action === "add-market-driver") await addAdminMarketDriver();
+          else if (action === "delete-market-driver") await deleteAdminMarketDriver(button.dataset.driverId || "");
+          else if (action === "send-chat") await sendAdminChatMessage(orderId);
+        } catch (error) {
+          console.error("Admin action failed", action, error);
+          showToast(`${t("saveFailed")}: ${error.message}`, true);
+        }
+      });
+      root.addEventListener("keydown", async (event) => {
+        if (event.key !== "Enter") return;
+        const input = event.target.closest("[id^='admin-chat-input-']");
+        if (!input) return;
+        event.preventDefault();
+        const orderId = input.id.replace("admin-chat-input-", "");
+        try {
+          await sendAdminChatMessage(orderId);
+        } catch (error) {
+          console.error("Admin chat send failed", error);
+          showToast(`${t("saveFailed")}: ${error.message}`, true);
+        }
+      });
+    }
+
+    document.querySelectorAll(".tab-btn").forEach((button) => {
+      button.addEventListener("click", () => {
+        document.querySelectorAll(".tab-btn").forEach((el) => el.classList.remove("active"));
+        document.querySelectorAll(".panel-section").forEach((el) => el.classList.remove("active"));
+        button.classList.add("active");
+        document.getElementById(`panel-${button.dataset.tab}`).classList.add("active");
+      });
+    });
+
+    document.getElementById("langSelect").addEventListener("change", (event) => {
+      currentLang = String(event.target.value || "tr");
+      localStorage.setItem("app_lang", currentLang);
+      applyLanguage();
+    });
+
+    document.getElementById("saveSettingsBtn").addEventListener("click", () => {
+      saveSettings().catch((error) => {
+        setSaveStatus(`${t("saveFailed")}: ${error.message}`, true);
+        alert(`${t("saveFailed")}: ${error.message}`);
+      });
+    });
+    document.getElementById("saveTilesBtn").addEventListener("click", () => {
+      saveSettings().catch((error) => {
+        setSaveStatus(`${t("saveFailed")}: ${error.message}`, true);
+        alert(`${t("saveFailed")}: ${error.message}`);
+      });
+    });
+    document.getElementById("addTileBtn").addEventListener("click", () => {
+      const label = document.getElementById("newTileLabel").value.trim();
+      const imageUrl = document.getElementById("newTileImage").value.trim();
+      if (!label || !imageUrl) return;
+      currentTiles.push({ id: `tile-${Date.now()}`, label, imageUrl });
+      document.getElementById("newTileLabel").value = "";
+      document.getElementById("newTileImage").value = "";
+      document.getElementById("statTiles").textContent = currentTiles.length;
+      renderTilesEditor();
+    });
+
+    applyLanguage();
+    const isAdmin = await checkAdmin();
+    window.__adminBooted = true;
+    document.getElementById("adminLoading").style.display = "none";
+    if (!isAdmin) {
+      document.getElementById("accessDenied").style.display = "block";
+    } else {
+      document.getElementById("accessDenied").style.display = "none";
+      document.getElementById("adminGuard").style.display = "block";
+      bindAdminActions();
+      renderMarketsOverview([]);
+
+      onSnapshot(doc(db, "appSettings", "global"), (snapshot) => {
+        const data = snapshot.exists ? snapshot.data() : {};
+        fillSettingsForm({
+          featuresUnlocked: Boolean(data.featuresUnlocked),
+          announcement: data.announcement || "",
+          appPaused: Boolean(data.appPaused),
+          commandMessage: data.commandMessage || "",
+          heroTitle: data.heroTitle || "",
+          heroSubtitle: data.heroSubtitle || "",
+          homepageTiles: Array.isArray(data.homepageTiles) ? data.homepageTiles : [],
+        });
+      });
+
+      onSnapshot(query(collection(db, "orders"), orderBy("createdAt", "desc")), (snapshot) => {
+        renderOrders(snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() })));
+      });
+
+      onSnapshot(query(collection(db, "orderCallHistory"), orderBy("createdAt", "desc")), (snapshot) => {
+        adminCallHistoryEntries = snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() }));
+        renderAdminCallHistory();
+      });
+
+      onSnapshot(query(collection(db, "users"), orderBy("lastLoginAt", "desc")), (snapshot) => {
+        renderUsers(snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() })));
+      });
+
+      onSnapshot(query(collection(db, "deleteRequests"), orderBy("requestedAt", "desc")), (snapshot) => {
+        const requests = snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() }));
+        renderDeleteRequests(requests);
+        requests.forEach((request) => {
+          if (legacyInboxMigrated.has(request.id)) return;
+          legacyInboxMigrated.add(request.id);
+          ensureLegacyInboxEntry(request).catch((error) => {
+            console.error("Legacy inbox archive failed", error);
+          });
+        });
+      });
+
+      onSnapshot(query(collection(db, "adminInbox"), orderBy("requestedAt", "desc")), (snapshot) => {
+        currentInboxMessages = snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() }));
+        renderInbox(currentInboxMessages);
+      });
+    }
+  
+})().catch(function (error) {
+  if (window.showAdminLoadError) {
+    window.showAdminLoadError(error && error.message ? error.message : String(error));
+  }
+  console.error(error);
+});
+  </script>
+
+</body>
+</html>
