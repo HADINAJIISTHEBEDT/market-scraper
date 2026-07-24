@@ -101,14 +101,17 @@
   <div id="accessDenied">
     <h2 id="deniedTitle">Access Denied</h2>
     <p id="deniedMessage">You must be an admin to view this page.</p>
-    <a id="deniedBack" href="index.html">Go back</a>
+    <p style="margin-top:12px;">
+      <a id="deniedLogin" href="login.html" data-app-nav="login.html" style="display:inline-block;margin:8px 8px 0 0;padding:10px 14px;border-radius:10px;background:#2563eb;color:#fff;font-weight:700;text-decoration:none;">Admin girisi</a>
+      <a id="deniedBack" href="index.html" data-app-nav="index.html">Go back</a>
+    </p>
   </div>
 
   <div id="adminGuard">
     <div class="nav-bar">
       <span id="adminTitle" style="font-weight:800;font-size:20px;">Admin Panel</span>
       <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
-        <a id="backLink" href="index.html">Back to App</a>
+        <a id="backLink" href="index.html" data-app-nav="index.html">Back to App</a>
         <select id="langSelect" class="lang-select">
           <option value="tr">Türkçe</option>
           <option value="en">English</option>
@@ -629,6 +632,40 @@
       renderTilesEditor();
     }
 
+    function markOwnerSession(user) {
+      if (!user) return;
+      localStorage.setItem("user_uid", user.uid || localStorage.getItem("user_uid") || "");
+      localStorage.setItem("user_email", user.email || localStorage.getItem("user_email") || "");
+      localStorage.setItem("user_name", user.displayName || localStorage.getItem("user_name") || "Admin");
+      if (user.photoURL) localStorage.setItem("user_photo", user.photoURL);
+      localStorage.setItem("owner_access", "true");
+      localStorage.setItem("owner_email", normalizeGmail(OWNER_EMAIL));
+      localStorage.setItem("user_role", "admin");
+    }
+
+    function waitForAuthUser(timeoutMs = 8000) {
+      return new Promise((resolve) => {
+        if (auth.currentUser) {
+          resolve(auth.currentUser);
+          return;
+        }
+        let done = false;
+        const timer = setTimeout(() => {
+          if (done) return;
+          done = true;
+          unsub();
+          resolve(auth.currentUser || null);
+        }, timeoutMs);
+        const unsub = onAuthStateChanged(auth, (user) => {
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
+          unsub();
+          resolve(user || null);
+        });
+      });
+    }
+
     async function checkAdmin() {
       if (window.location.protocol === "file:") {
         return true;
@@ -640,12 +677,31 @@
       if (ownerAccess && ownerEmail === normalizeGmail(OWNER_EMAIL) && userEmail === normalizeGmail(OWNER_EMAIL)) {
         return true;
       }
-      const userUid = localStorage.getItem("user_uid");
+
+      // Prefer live Firebase Auth — needed when Admin opens without localStorage session.
+      const authUser = await waitForAuthUser();
+      if (authUser && normalizeGmail(authUser.email) === normalizeGmail(OWNER_EMAIL)) {
+        markOwnerSession(authUser);
+        try {
+          await setDoc(doc(db, "users", authUser.uid), {
+            role: "admin",
+            email: authUser.email || OWNER_EMAIL,
+            ownerAccessAt: new Date().toISOString(),
+          }, { merge: true });
+        } catch (error) {
+          console.warn("Owner role sync failed", error);
+        }
+        return true;
+      }
+
+      const userUid = localStorage.getItem("user_uid") || (authUser && authUser.uid) || "";
       if (!userUid) return false;
       try {
         const snap = await getDoc(doc(db, "users", userUid));
         const data = snap.exists() ? snap.data() : {};
-        return data.role === "admin" || normalizeGmail(data.email) === normalizeGmail(OWNER_EMAIL);
+        const allowed = data.role === "admin" || normalizeGmail(data.email) === normalizeGmail(OWNER_EMAIL);
+        if (allowed && authUser) markOwnerSession(authUser);
+        return allowed;
       } catch {
         return false;
       }

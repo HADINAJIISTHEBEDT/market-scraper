@@ -130,7 +130,9 @@
     const role = localStorage.getItem("user_role");
     const userUid = localStorage.getItem("user_uid");
     const ownerMatch = normalizeGmail(OWNER_EMAIL);
+    const ownerAccess = localStorage.getItem("owner_access") === "true";
 
+    if (userEmail === ownerMatch && (role === "admin" || ownerAccess)) return true;
     if (userUid && role === "admin" && userEmail === ownerMatch) return true;
     return false;
   }

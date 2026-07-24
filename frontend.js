@@ -773,6 +773,9 @@ function updateNavbar() {
       navLogoutBtn.hidden = false;
       navLogoutBtn.style.display = "inline-block";
     }
+    if (navAdminBtn && window.FeatureAccess?.isAdminUser?.() === true) {
+      navAdminBtn.hidden = false;
+    }
   } else if (navLoginBtn) {
     navLoginBtn.hidden = false;
   }
