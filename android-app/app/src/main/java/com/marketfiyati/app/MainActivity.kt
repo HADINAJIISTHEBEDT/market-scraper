@@ -307,6 +307,12 @@ class MainActivity : AppCompatActivity() {
                         // Fall through and let WebView try to load the URL.
                     }
                 }
+                if (loadUrl.contains("admin.html", ignoreCase = true) &&
+                    (loadUrl.startsWith("file:") || loadUrl.startsWith("content:"))
+                ) {
+                    mainWebView.loadUrl(APP_URL + "admin.html")
+                    return true
+                }
                 if (isAppLoginReturnUrl(loadUrl)) {
                     mainWebView.loadUrl(loadUrl)
                     dismissAuthPopup()
