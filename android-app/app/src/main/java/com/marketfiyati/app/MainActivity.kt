@@ -352,6 +352,17 @@ class MainActivity : AppCompatActivity() {
                 request: WebResourceRequest?
             ): Boolean {
                 val url = request?.url?.toString() ?: return false
+                if (url.contains("admin.html", ignoreCase = true)) {
+                    // Keep Admin inside the app WebView so login/localStorage session is available.
+                    val adminUrl = if (url.startsWith("http://") || url.startsWith("https://")) {
+                        url
+                    } else {
+                        APP_URL + "admin.html"
+                    }
+                    mainWebView.loadUrl(adminUrl)
+                    closePopup?.invoke()
+                    return true
+                }
                 if (view == mainWebView && isAuthBridgeUrl(url)) {
                     openAuthInAppWebView(url)
                     return true
