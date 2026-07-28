@@ -47,22 +47,23 @@ const OWNER_ADMIN_PASSWORD =
   process.env.OWNER_ADMIN_PASSWORD ||
   process.env.OWNER_PASSWORD ||
   "1";
-const DEPLOY_MARK = "ads-settings-20260728c";
+const DEPLOY_MARK = "ads-settings-20260728d";
 const APP_SETTINGS_PATH = path.join(__dirname, "data", "app-settings.json");
 const ADS_TXT_BODY =
   "google.com, pub-1598347178644013, DIRECT, f08c47fec0942fa0\n";
+// Empty "Disallow:" means allow everything. AdsBot is listed explicitly so
+// AdMob verification cannot treat a missing group as blocked.
 const ROBOTS_TXT_BODY = `User-agent: *
-Allow: /
-Allow: /ads.txt
-Allow: /app-ads.txt
+Disallow:
+
+User-agent: Googlebot
+Disallow:
 
 User-agent: AdsBot-Google
-Allow: /
+Disallow:
 
 User-agent: Mediapartners-Google
-Allow: /
-
-Sitemap: https://market-scraper-0k36.onrender.com/sitemap.xml
+Disallow:
 `;
 
 let secureTokenCertsCache = null;
@@ -94,12 +95,13 @@ function readTextFileOrFallback(fileName, fallback) {
   }
 }
 
-function textResponse(body, contentType = "text/plain; charset=utf-8") {
+function textResponse(body, contentType = "text/plain") {
   return {
     statusCode: 200,
     headers: {
       "Content-Type": contentType,
-      "Cache-Control": "no-cache",
+      "Cache-Control": "public, max-age=300",
+      "X-Content-Type-Options": "nosniff",
       ...corsHeaders(),
     },
     body: String(body || ""),
@@ -325,16 +327,17 @@ function normalizeMarket(value) {
 
 async function routeApiRequest(method, urlPath, body) {
   // Serve crawler/static text endpoints before initializing Firebase/mail.
+  // Always serve the known-good crawler files (do not depend on disk contents).
   if (method === "GET" && urlPath === "/app-ads.txt") {
-    return textResponse(readTextFileOrFallback("app-ads.txt", ADS_TXT_BODY));
+    return textResponse(ADS_TXT_BODY);
   }
 
   if (method === "GET" && urlPath === "/ads.txt") {
-    return textResponse(readTextFileOrFallback("ads.txt", ADS_TXT_BODY));
+    return textResponse(ADS_TXT_BODY);
   }
 
   if (method === "GET" && urlPath === "/robots.txt") {
-    return textResponse(readTextFileOrFallback("robots.txt", ROBOTS_TXT_BODY));
+    return textResponse(ROBOTS_TXT_BODY);
   }
 
   if (method === "GET" && urlPath === "/app-settings") {

@@ -1,12 +1,11 @@
 User-agent: *
-Allow: /
-Allow: /ads.txt
-Allow: /app-ads.txt
+Disallow:
+
+User-agent: Googlebot
+Disallow:
 
 User-agent: AdsBot-Google
-Allow: /
+Disallow:
 
 User-agent: Mediapartners-Google
-Allow: /
-
-Sitemap: https://market-scraper-0k36.onrender.com/sitemap.xml
+Disallow:
