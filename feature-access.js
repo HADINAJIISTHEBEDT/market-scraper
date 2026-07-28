@@ -550,6 +550,24 @@
   startDeletedAccountWatcher();
   startBlockedDeviceWatcher();
 
+  function refreshFeatureAccessUi() {
+    try {
+      initComingSoonPanel();
+      initLockedFooterLinks();
+      initLoginNotice();
+      if (typeof window.updateNavbar === "function") {
+        window.updateNavbar();
+      }
+      if (typeof window.applyRemoteSettings === "function" && window.AppSettings?.get) {
+        window.applyRemoteSettings(window.AppSettings.get());
+      }
+    } catch (error) {
+      console.warn("[FeatureAccess] UI refresh failed", error);
+    }
+  }
+
+  window.addEventListener("app-settings-changed", refreshFeatureAccessUi);
+
   document.addEventListener("click", (event) => {
     const link = event.target.closest("[data-app-nav]");
     if (!link) return;
