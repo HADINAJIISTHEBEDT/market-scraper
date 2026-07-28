@@ -1,11 +1,14 @@
-User-agent: *
+User-agent: Google-adstxt
 Disallow:
 
 User-agent: Googlebot
 Disallow:
 
+User-agent: Mediapartners-Google
+Disallow:
+
 User-agent: AdsBot-Google
 Disallow:
 
-User-agent: Mediapartners-Google
+User-agent: *
 Disallow:

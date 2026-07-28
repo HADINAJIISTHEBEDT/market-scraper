@@ -47,22 +47,24 @@ const OWNER_ADMIN_PASSWORD =
   process.env.OWNER_ADMIN_PASSWORD ||
   process.env.OWNER_PASSWORD ||
   "1";
-const DEPLOY_MARK = "ads-settings-20260728d";
+const DEPLOY_MARK = "ads-settings-20260728e";
 const APP_SETTINGS_PATH = path.join(__dirname, "data", "app-settings.json");
 const ADS_TXT_BODY =
   "google.com, pub-1598347178644013, DIRECT, f08c47fec0942fa0\n";
-// Empty "Disallow:" means allow everything. AdsBot is listed explicitly so
-// AdMob verification cannot treat a missing group as blocked.
-const ROBOTS_TXT_BODY = `User-agent: *
+// Official AdMob crawler is "Google-adstxt" (see AdMob help: ensure app-ads.txt can be crawled).
+const ROBOTS_TXT_BODY = `User-agent: Google-adstxt
 Disallow:
 
 User-agent: Googlebot
 Disallow:
 
+User-agent: Mediapartners-Google
+Disallow:
+
 User-agent: AdsBot-Google
 Disallow:
 
-User-agent: Mediapartners-Google
+User-agent: *
 Disallow:
 `;
 
