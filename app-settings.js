@@ -98,6 +98,22 @@
     return undefined;
   }
 
+  async function loadSettingsFromServer() {
+    const response = await fetch("/app-settings", { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`Server settings ${response.status}`);
+    }
+    const data = await response.json();
+    if (!data || !data.settings || typeof data.settings !== "object") {
+      throw new Error("Server settings empty");
+    }
+    // Empty object means nothing saved yet.
+    if (!Object.keys(data.settings).length) {
+      throw new Error("Server settings empty");
+    }
+    publishSettings(data.settings);
+  }
+
   async function loadSettingsWithRest() {
     const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/appSettings/global?key=${firebaseConfig.apiKey}`;
     const response = await fetch(url);
@@ -113,6 +129,12 @@
   }
 
   async function subscribeToSettings() {
+    try {
+      await loadSettingsFromServer();
+    } catch (serverError) {
+      console.warn("[AppSettings] Server settings unavailable:", serverError.message || serverError);
+    }
+
     try {
       const [{ initializeApp, getApp, getApps }, { doc, initializeFirestore, getFirestore, onSnapshot }] = await Promise.all([
         import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"),
@@ -136,18 +158,22 @@
         },
         (error) => {
           console.error("[AppSettings] Failed to load settings:", error);
-          loadSettingsWithRest().catch((restError) => {
-            console.error("[AppSettings] REST settings load failed:", restError);
-            publishLocalFallbackSettings();
-          });
+          loadSettingsFromServer()
+            .catch(() => loadSettingsWithRest())
+            .catch((restError) => {
+              console.error("[AppSettings] REST settings load failed:", restError);
+              if (!hasReady) publishLocalFallbackSettings();
+            });
         },
       );
     } catch (error) {
       console.error("[AppSettings] Failed to start settings listener:", error);
-      loadSettingsWithRest().catch((restError) => {
-        console.error("[AppSettings] REST settings load failed:", restError);
-        publishLocalFallbackSettings();
-      });
+      loadSettingsFromServer()
+        .catch(() => loadSettingsWithRest())
+        .catch((restError) => {
+          console.error("[AppSettings] REST settings load failed:", restError);
+          if (!hasReady) publishLocalFallbackSettings();
+        });
     }
   }
 
@@ -161,7 +187,9 @@
   subscribeToSettings();
   setTimeout(() => {
     if (!hasReady) {
-      loadSettingsWithRest().catch(() => publishLocalFallbackSettings());
+      loadSettingsFromServer()
+        .catch(() => loadSettingsWithRest())
+        .catch(() => publishLocalFallbackSettings());
     }
   }, 5000);
 })();

@@ -3,4 +3,10 @@ Allow: /
 Allow: /ads.txt
 Allow: /app-ads.txt
 
+User-agent: AdsBot-Google
+Allow: /
+
+User-agent: Mediapartners-Google
+Allow: /
+
 Sitemap: https://market-scraper-0k36.onrender.com/sitemap.xml
