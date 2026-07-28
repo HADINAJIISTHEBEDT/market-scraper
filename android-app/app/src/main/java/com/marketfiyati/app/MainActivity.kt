@@ -38,6 +38,7 @@ import androidx.core.content.edit
 import com.google.android.gms.ads.AdListener
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdSize
+import com.google.android.gms.ads.AdView
 import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.MobileAds
 import com.google.android.gms.ads.RequestConfiguration
@@ -49,6 +50,7 @@ import java.util.concurrent.Executors
 class MainActivity : AppCompatActivity() {
     private val adTag = "AdMobBanner"
     private lateinit var binding: ActivityMainBinding
+    private var bannerAdView: AdView? = null
     private var uploadMessage: ValueCallback<Array<Uri>>? = null
     private var pendingWebPermissionRequest: PermissionRequest? = null
     private var pendingGeoOrigin: String? = null
@@ -305,6 +307,12 @@ class MainActivity : AppCompatActivity() {
                         // Fall through and let WebView try to load the URL.
                     }
                 }
+                if (loadUrl.contains("admin.html", ignoreCase = true) &&
+                    (loadUrl.startsWith("file:") || loadUrl.startsWith("content:"))
+                ) {
+                    mainWebView.loadUrl(APP_URL + "admin.html")
+                    return true
+                }
                 if (isAppLoginReturnUrl(loadUrl)) {
                     mainWebView.loadUrl(loadUrl)
                     dismissAuthPopup()
@@ -344,6 +352,17 @@ class MainActivity : AppCompatActivity() {
                 request: WebResourceRequest?
             ): Boolean {
                 val url = request?.url?.toString() ?: return false
+                if (url.contains("admin.html", ignoreCase = true)) {
+                    // Keep Admin inside the app WebView so login/localStorage session is available.
+                    val adminUrl = if (url.startsWith("http://") || url.startsWith("https://")) {
+                        url
+                    } else {
+                        APP_URL + "admin.html"
+                    }
+                    mainWebView.loadUrl(adminUrl)
+                    closePopup?.invoke()
+                    return true
+                }
                 if (view == mainWebView && isAuthBridgeUrl(url)) {
                     openAuthInAppWebView(url)
                     return true
@@ -474,7 +493,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun configureAds() {
-        binding.bannerAdView.visibility = android.view.View.GONE
+        binding.bannerAdContainer.visibility = android.view.View.GONE
         binding.root.post {
             try {
                 MobileAds.initialize(this) { initStatus ->
@@ -493,8 +512,30 @@ class MainActivity : AppCompatActivity() {
                                 "MobileAds initialized. debug=$isDebuggable, adapters=[$adapterStates]"
                             )
 
-                            // Ad unit ID is configured in XML via @string/admob_banner_ad_unit_id.
-                            val configuredUnitId = binding.bannerAdView.adUnitId
+                            // Create AdView in code with an explicit size so we never hit
+                            // "Required XML attribute 'adSize' was missing".
+                            val unitId = getString(R.string.admob_banner_ad_unit_id)
+                            val adSize = try {
+                                getAdaptiveBannerSize()
+                            } catch (error: Exception) {
+                                Log.w(adTag, "Adaptive ad size failed, using BANNER", error)
+                                AdSize.BANNER
+                            }
+                            val adView = AdView(this).apply {
+                                setAdSize(adSize)
+                                adUnitId = unitId
+                                visibility = android.view.View.GONE
+                            }
+                            bannerAdView?.destroy()
+                            bannerAdView = adView
+                            binding.bannerAdContainer.removeAllViews()
+                            binding.bannerAdContainer.addView(
+                                adView,
+                                android.widget.FrameLayout.LayoutParams(
+                                    android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                                    android.widget.FrameLayout.LayoutParams.WRAP_CONTENT
+                                )
+                            )
 
                             if (isDebuggable) {
                                 MobileAds.setRequestConfiguration(
@@ -504,44 +545,51 @@ class MainActivity : AppCompatActivity() {
                                 )
                             }
 
-                            binding.bannerAdView.adListener = object : AdListener() {
+                            adView.adListener = object : AdListener() {
                                 override fun onAdLoaded() {
                                     adCallbackSeen = true
                                     adLoaded = true
-                                    binding.bannerAdView.visibility = android.view.View.VISIBLE
-                                    Log.i(adTag, "Banner ad loaded (unit=${binding.bannerAdView.adUnitId})")
+                                    adView.visibility = android.view.View.VISIBLE
+                                    binding.bannerAdContainer.visibility = android.view.View.VISIBLE
+                                    Log.i(adTag, "Banner ad loaded (unit=${adView.adUnitId})")
                                 }
 
                                 override fun onAdFailedToLoad(error: LoadAdError) {
                                     adCallbackSeen = true
                                     Log.e(
                                         adTag,
-                                        "Banner failed (unit=${binding.bannerAdView.adUnitId}): " +
+                                        "Banner failed (unit=${adView.adUnitId}): " +
                                             "code=${error.code}, domain=${error.domain}, message=${error.message}"
                                     )
-                                    binding.bannerAdView.visibility = android.view.View.GONE
+                                    adView.visibility = android.view.View.GONE
+                                    binding.bannerAdContainer.visibility = android.view.View.GONE
                                 }
                             }
-                            Log.i(adTag, "Loading banner ad (unit=$configuredUnitId)")
-                            binding.bannerAdView.loadAd(AdRequest.Builder().build())
+                            Log.i(adTag, "Loading banner ad (unit=$unitId, size=$adSize)")
+                            adView.loadAd(AdRequest.Builder().build())
 
-                            // Safety watchdog: if no callback arrives, log explicitly for diagnosis.
-                            binding.bannerAdView.postDelayed({
+                            adView.postDelayed({
                                 if (!adLoaded && !adCallbackSeen) {
-                                    Log.w(adTag, "No ad callback after timeout for unit=$configuredUnitId")
+                                    Log.w(adTag, "No ad callback after timeout for unit=$unitId")
                                 }
                             }, 12000L)
                         } catch (error: Exception) {
-                            binding.bannerAdView.visibility = android.view.View.GONE
+                            binding.bannerAdContainer.visibility = android.view.View.GONE
                             Log.e(adTag, "Banner setup exception", error)
                         }
                     }
                 }
             } catch (error: Exception) {
-                binding.bannerAdView.visibility = android.view.View.GONE
+                binding.bannerAdContainer.visibility = android.view.View.GONE
                 Log.e(adTag, "MobileAds init exception", error)
             }
         }
+    }
+
+    override fun onDestroy() {
+        bannerAdView?.destroy()
+        bannerAdView = null
+        super.onDestroy()
     }
 
     private fun getAdaptiveBannerSize(): AdSize {
