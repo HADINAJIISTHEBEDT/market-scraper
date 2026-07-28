@@ -536,19 +536,31 @@
       return { stringValue: String(value) };
     }
 
+    async function getOwnerIdToken() {
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error("Not signed in. Open Admin from the app after owner login.");
+      }
+      return user.getIdToken(true);
+    }
+
     async function saveSettingsWithRest(payload) {
       const fields = {};
       Object.entries(payload).forEach(([key, value]) => {
         fields[key] = toFirestoreValue(value);
       });
 
+      const idToken = await getOwnerIdToken();
       const updateMask = Object.keys(payload)
         .map((key) => `updateMask.fieldPaths=${encodeURIComponent(key)}`)
         .join("&");
-      const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/appSettings/global?key=${firebaseConfig.apiKey}&${updateMask}`;
+      const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/appSettings/global?${updateMask}`;
       const response = await withTimeout(fetch(url, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
         body: JSON.stringify({ fields }),
       }), 12000);
 
@@ -563,15 +575,53 @@
       }
     }
 
+    async function saveSettingsWithServer(payload) {
+      const idToken = await getOwnerIdToken();
+      const response = await withTimeout(fetch("/admin-save-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken, settings: payload }),
+      }), 15000);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.ok === false) {
+        throw new Error(data.error || `Server save failed (${response.status})`);
+      }
+    }
+
     async function saveSettingsToCloud(payload) {
+      // Prefer authenticated SDK write first.
       try {
+        if (!auth.currentUser) {
+          await new Promise((resolve) => {
+            const unsub = onAuthStateChanged(auth, () => {
+              unsub();
+              resolve();
+            });
+            setTimeout(() => { try { unsub(); } catch (_) {} resolve(); }, 4000);
+          });
+        }
+        if (!auth.currentUser) {
+          throw new Error("Not signed in as admin");
+        }
         await withTimeout(setDoc(doc(db, "appSettings", "global"), payload, { merge: true }), 8000);
+        return;
       } catch (sdkError) {
-        setSaveStatus(`SDK save stalled. Trying direct Firebase save...`);
+        console.warn("SDK save failed, trying authenticated REST", sdkError);
+        setSaveStatus("SDK save stalled. Trying authenticated Firebase save...");
         try {
           await saveSettingsWithRest(payload);
+          return;
         } catch (restError) {
-          throw new Error(`${sdkError.message}; direct save failed: ${restError.message}`);
+          console.warn("REST save failed, trying server admin endpoint", restError);
+          setSaveStatus("Direct Firebase blocked. Saving via secure server...");
+          try {
+            await saveSettingsWithServer(payload);
+            return;
+          } catch (serverError) {
+            throw new Error(
+              `${sdkError.message}; direct save failed: ${restError.message}; server save failed: ${serverError.message}`
+            );
+          }
         }
       }
     }

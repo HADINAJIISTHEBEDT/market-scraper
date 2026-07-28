@@ -33,7 +33,7 @@ const MIME = {
   ".gif": "image/gif",
   ".svg": "image/svg+xml",
   ".ico": "image/x-icon",
-  ".txt": "text/plain",
+  ".txt": "text/plain; charset=utf-8",
   ".xml": "application/xml",
   ".webmanifest": "application/manifest+json",
 };
@@ -205,6 +205,61 @@ async function routeApiRequest(method, urlPath, body) {
     }
   }
 
+
+  if (urlPath === "/admin-save-settings") {
+    const admin = require("firebase-admin");
+    const OWNER_EMAIL = "pazarfiyati@gmail.com";
+
+    function normalizeGmail(email) {
+      const value = String(email || "").trim().toLowerCase();
+      const [local, domain] = value.split("@");
+      if (domain === "gmail.com" || domain === "googlemail.com") {
+        return local.replace(/\./g, "") + "@gmail.com";
+      }
+      return value;
+    }
+
+    // Ensure admin app is initialized (push/mail services usually do this).
+    if (!admin.apps.length) {
+      await initializePushService();
+    }
+    if (!admin.apps.length) {
+      return jsonResponse(503, {
+        ok: false,
+        error: "Firebase Admin is not configured on the server (FIREBASE_SERVICE_ACCOUNT_JSON)",
+      });
+    }
+
+    const idToken = String(body.idToken || "").trim();
+    const settings = body.settings && typeof body.settings === "object" ? body.settings : null;
+    if (!idToken || !settings) {
+      throw new HttpError(400, "idToken and settings are required");
+    }
+
+    let decoded;
+    try {
+      decoded = await admin.auth().verifyIdToken(idToken);
+    } catch (err) {
+      return jsonResponse(401, { ok: false, error: "Invalid or expired auth token" });
+    }
+
+    if (normalizeGmail(decoded.email) !== normalizeGmail(OWNER_EMAIL)) {
+      return jsonResponse(403, { ok: false, error: "Only the owner admin can save settings" });
+    }
+
+    const db = admin.firestore();
+    await db.collection("appSettings").doc("global").set(
+      {
+        ...settings,
+        updatedAt: new Date().toISOString(),
+        updatedBy: decoded.email || OWNER_EMAIL,
+      },
+      { merge: true },
+    );
+
+    return jsonResponse(200, { ok: true });
+  }
+
   throw new HttpError(404, "not found", notFoundPayload(urlPath));
 }
 
@@ -250,6 +305,17 @@ function serveStaticFile(res, filePath) {
 function createNodeRequestListener() {
   return (req, res) => {
     const urlPath = String(req.url || "/").split("?")[0] || "/";
+
+    // AdMob / crawlers must always get these plain-text files.
+    if (
+      req.method === "GET" &&
+      (urlPath === "/app-ads.txt" ||
+        urlPath === "/ads.txt" ||
+        urlPath === "/robots.txt")
+    ) {
+      serveStaticFile(res, path.join(__dirname, urlPath));
+      return;
+    }
 
     if (
       req.method === "GET" &&

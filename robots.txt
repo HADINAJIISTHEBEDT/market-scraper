@@ -1,2 +1,6 @@
 User-agent: *
 Allow: /
+Allow: /ads.txt
+Allow: /app-ads.txt
+
+Sitemap: https://market-scraper-0k36.onrender.com/sitemap.xml

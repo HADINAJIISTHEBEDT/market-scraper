@@ -1,0 +1,32 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function normalizedEmail() {
+      return signedIn() ? request.auth.token.email.lower() : '';
+    }
+
+    function isOwner() {
+      return normalizedEmail() == 'pazarfiyati@gmail.com';
+    }
+
+    match /appSettings/{docId} {
+      allow read: if true;
+      allow write: if isOwner();
+    }
+
+    match /users/{userId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() && (request.auth.uid == userId || isOwner());
+      allow delete: if isOwner();
+    }
+
+    match /{document=**} {
+      allow read: if true;
+      allow write: if isOwner();
+    }
+  }
+}
