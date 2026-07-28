@@ -38,6 +38,7 @@ import androidx.core.content.edit
 import com.google.android.gms.ads.AdListener
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdSize
+import com.google.android.gms.ads.AdView
 import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.MobileAds
 import com.google.android.gms.ads.RequestConfiguration
@@ -49,6 +50,7 @@ import java.util.concurrent.Executors
 class MainActivity : AppCompatActivity() {
     private val adTag = "AdMobBanner"
     private lateinit var binding: ActivityMainBinding
+    private var bannerAdView: AdView? = null
     private var uploadMessage: ValueCallback<Array<Uri>>? = null
     private var pendingWebPermissionRequest: PermissionRequest? = null
     private var pendingGeoOrigin: String? = null
@@ -139,16 +141,6 @@ class MainActivity : AppCompatActivity() {
         createNotificationChannel()
         createUpdateChannel()
         configureWebView(binding.webView)
-        binding.privacyPolicyLink.setOnClickListener {
-            binding.webView.evaluateJavascript(
-                "(function(){ return localStorage.getItem('app_lang') || 'tr'; })();"
-            ) { lang ->
-                val cleanLang = lang?.trim()?.removeSurrounding("\"")?.ifBlank { "tr" } ?: "tr"
-                binding.webView.loadUrl(
-                    getString(R.string.privacy_policy_url) + "?lang=" + cleanLang
-                )
-            }
-        }
 
         if (savedInstanceState == null) {
             binding.webView.loadUrl(APP_URL)
@@ -474,7 +466,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun configureAds() {
-        binding.bannerAdView.visibility = android.view.View.GONE
+        binding.bannerAdContainer.visibility = android.view.View.GONE
         binding.root.post {
             try {
                 MobileAds.initialize(this) { initStatus ->
@@ -482,9 +474,6 @@ class MainActivity : AppCompatActivity() {
                         try {
                             val isDebuggable =
                                 (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
-                            var adLoaded = false
-                            var adCallbackSeen = false
-
                             val adapterStates = initStatus.adapterStatusMap.entries.joinToString { entry ->
                                 "${entry.key}:${entry.value.initializationState}"
                             }
@@ -492,9 +481,6 @@ class MainActivity : AppCompatActivity() {
                                 adTag,
                                 "MobileAds initialized. debug=$isDebuggable, adapters=[$adapterStates]"
                             )
-
-                            // Ad unit ID is configured in XML via @string/admob_banner_ad_unit_id.
-                            val configuredUnitId = binding.bannerAdView.adUnitId
 
                             if (isDebuggable) {
                                 MobileAds.setRequestConfiguration(
@@ -504,44 +490,75 @@ class MainActivity : AppCompatActivity() {
                                 )
                             }
 
-                            binding.bannerAdView.adListener = object : AdListener() {
-                                override fun onAdLoaded() {
-                                    adCallbackSeen = true
-                                    adLoaded = true
-                                    binding.bannerAdView.visibility = android.view.View.VISIBLE
-                                    Log.i(adTag, "Banner ad loaded (unit=${binding.bannerAdView.adUnitId})")
-                                }
-
-                                override fun onAdFailedToLoad(error: LoadAdError) {
-                                    adCallbackSeen = true
-                                    Log.e(
-                                        adTag,
-                                        "Banner failed (unit=${binding.bannerAdView.adUnitId}): " +
-                                            "code=${error.code}, domain=${error.domain}, message=${error.message}"
-                                    )
-                                    binding.bannerAdView.visibility = android.view.View.GONE
-                                }
-                            }
-                            Log.i(adTag, "Loading banner ad (unit=$configuredUnitId)")
-                            binding.bannerAdView.loadAd(AdRequest.Builder().build())
-
-                            // Safety watchdog: if no callback arrives, log explicitly for diagnosis.
-                            binding.bannerAdView.postDelayed({
-                                if (!adLoaded && !adCallbackSeen) {
-                                    Log.w(adTag, "No ad callback after timeout for unit=$configuredUnitId")
-                                }
-                            }, 12000L)
+                            loadBannerAd(retryOnFailure = true)
                         } catch (error: Exception) {
-                            binding.bannerAdView.visibility = android.view.View.GONE
+                            binding.bannerAdContainer.visibility = android.view.View.GONE
                             Log.e(adTag, "Banner setup exception", error)
                         }
                     }
                 }
             } catch (error: Exception) {
-                binding.bannerAdView.visibility = android.view.View.GONE
+                binding.bannerAdContainer.visibility = android.view.View.GONE
                 Log.e(adTag, "MobileAds init exception", error)
             }
         }
+    }
+
+    private fun loadBannerAd(retryOnFailure: Boolean) {
+        val container = binding.bannerAdContainer
+        container.removeAllViews()
+        bannerAdView?.destroy()
+        bannerAdView = null
+
+        val unitId = getString(R.string.admob_banner_ad_unit_id)
+        val adView = AdView(this).apply {
+            setAdSize(getAdaptiveBannerSize())
+            adUnitId = unitId
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            )
+        }
+
+        var adLoaded = false
+        var adCallbackSeen = false
+        adView.adListener = object : AdListener() {
+            override fun onAdLoaded() {
+                adCallbackSeen = true
+                adLoaded = true
+                container.visibility = android.view.View.VISIBLE
+                Log.i(adTag, "Banner ad loaded (unit=${adView.adUnitId})")
+            }
+
+            override fun onAdFailedToLoad(error: LoadAdError) {
+                adCallbackSeen = true
+                Log.e(
+                    adTag,
+                    "Banner failed (unit=${adView.adUnitId}): " +
+                        "code=${error.code}, domain=${error.domain}, message=${error.message}"
+                )
+                container.visibility = android.view.View.GONE
+                if (retryOnFailure) {
+                    container.postDelayed({
+                        if (!adLoaded) {
+                            Log.i(adTag, "Retrying banner ad load")
+                            loadBannerAd(retryOnFailure = false)
+                        }
+                    }, 2500L)
+                }
+            }
+        }
+
+        container.addView(adView)
+        bannerAdView = adView
+        Log.i(adTag, "Loading adaptive banner ad (unit=$unitId)")
+        adView.loadAd(AdRequest.Builder().build())
+
+        adView.postDelayed({
+            if (!adLoaded && !adCallbackSeen) {
+                Log.w(adTag, "No ad callback after timeout for unit=$unitId")
+            }
+        }, 12000L)
     }
 
     private fun getAdaptiveBannerSize(): AdSize {
@@ -552,6 +569,22 @@ class MainActivity : AppCompatActivity() {
         val adWidthPixels = binding.root.width.takeIf { it > 0 } ?: displayMetrics.widthPixels
         val adWidth = (adWidthPixels / density).toInt().coerceAtLeast(320)
         return AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(this, adWidth)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        bannerAdView?.resume()
+    }
+
+    override fun onPause() {
+        bannerAdView?.pause()
+        super.onPause()
+    }
+
+    override fun onDestroy() {
+        bannerAdView?.destroy()
+        bannerAdView = null
+        super.onDestroy()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
