@@ -60,26 +60,6 @@ class MainActivity : AppCompatActivity() {
                 )
             }
         }
-    private val storagePermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            binding.webView.post {
-                binding.webView.evaluateJavascript(
-                    "window.dispatchEvent(new CustomEvent('android-storage-permission', { detail: { granted: ${if (granted) "true" else "false"} } }));",
-                    null
-                )
-            }
-        }
-    private val multiPermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
-            val allGranted = permissions.values.all { it }
-            binding.webView.post {
-                binding.webView.evaluateJavascript(
-                    "window.dispatchEvent(new CustomEvent('android-storage-permission', { detail: { granted: ${if (allGranted) "true" else "false"} } }));",
-                    null
-                )
-            }
-        }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -435,29 +415,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun hasStoragePermission(): Boolean {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            return ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.READ_MEDIA_IMAGES
-            ) == PackageManager.PERMISSION_GRANTED
-        }
-        return ContextCompat.checkSelfPermission(
-            this,
-            Manifest.permission.WRITE_EXTERNAL_STORAGE
-        ) == PackageManager.PERMISSION_GRANTED
+        // Uploads use the system file picker / SAF; no broad media or storage permission is needed.
+        return true
     }
 
     private fun requestStoragePermissionInternal() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            multiPermissionLauncher.launch(
-                arrayOf(
-                    Manifest.permission.READ_MEDIA_IMAGES,
-                    Manifest.permission.READ_MEDIA_VIDEO,
-                    Manifest.permission.READ_MEDIA_AUDIO
-                )
+        binding.webView.post {
+            binding.webView.evaluateJavascript(
+                "window.dispatchEvent(new CustomEvent('android-storage-permission', { detail: { granted: true } }));",
+                null
             )
-        } else {
-            storagePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
         }
     }
 

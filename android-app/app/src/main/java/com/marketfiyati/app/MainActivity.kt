@@ -48,12 +48,16 @@ import java.util.concurrent.Executors
 
 class MainActivity : AppCompatActivity() {
     private val adTag = "AdMobBanner"
+    private val bannerRetryDelaysMs = longArrayOf(15000L, 30000L, 60000L, 120000L)
     private lateinit var binding: ActivityMainBinding
     private var uploadMessage: ValueCallback<Array<Uri>>? = null
     private var pendingWebPermissionRequest: PermissionRequest? = null
     private var pendingGeoOrigin: String? = null
     private var pendingGeoCallback: GeolocationPermissions.Callback? = null
     private var authPopupDialog: Dialog? = null
+    private var bannerRetryAttempt = 0
+    private var bannerRetryRunnable: Runnable? = null
+    private var bannerWatchdogRunnable: Runnable? = null
     private val filePickerLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val uris = if (result.resultCode == Activity.RESULT_OK && result.data != null) {
             result.data?.data?.let { arrayOf(it) }
@@ -71,28 +75,6 @@ class MainActivity : AppCompatActivity() {
                 )
             }
         }
-    private val storagePermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (!::binding.isInitialized) return@registerForActivityResult
-            binding.webView.post {
-                binding.webView.evaluateJavascript(
-                    "window.dispatchEvent(new CustomEvent('android-storage-permission', { detail: { granted: ${if (granted) "true" else "false"} } }));",
-                    null
-                )
-            }
-        }
-    private val multiPermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
-            if (!::binding.isInitialized) return@registerForActivityResult
-            val allGranted = permissions.values.all { it }
-            binding.webView.post {
-                binding.webView.evaluateJavascript(
-                    "window.dispatchEvent(new CustomEvent('android-storage-permission', { detail: { granted: ${if (allGranted) "true" else "false"} } }));",
-                    null
-                )
-            }
-        }
-
     private val locationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
             val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
@@ -139,16 +121,6 @@ class MainActivity : AppCompatActivity() {
         createNotificationChannel()
         createUpdateChannel()
         configureWebView(binding.webView)
-        binding.privacyPolicyLink.setOnClickListener {
-            binding.webView.evaluateJavascript(
-                "(function(){ return localStorage.getItem('app_lang') || 'tr'; })();"
-            ) { lang ->
-                val cleanLang = lang?.trim()?.removeSurrounding("\"")?.ifBlank { "tr" } ?: "tr"
-                binding.webView.loadUrl(
-                    getString(R.string.privacy_policy_url) + "?lang=" + cleanLang
-                )
-            }
-        }
 
         if (savedInstanceState == null) {
             binding.webView.loadUrl(APP_URL)
@@ -474,7 +446,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun configureAds() {
-        binding.bannerAdView.visibility = android.view.View.GONE
+        binding.bannerAdView.visibility = android.view.View.VISIBLE
         binding.root.post {
             try {
                 MobileAds.initialize(this) { initStatus ->
@@ -482,7 +454,6 @@ class MainActivity : AppCompatActivity() {
                         try {
                             val isDebuggable =
                                 (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
-                            var adLoaded = false
                             var adCallbackSeen = false
 
                             val adapterStates = initStatus.adapterStatusMap.entries.joinToString { entry ->
@@ -493,7 +464,9 @@ class MainActivity : AppCompatActivity() {
                                 "MobileAds initialized. debug=$isDebuggable, adapters=[$adapterStates]"
                             )
 
-                            // Ad unit ID is configured in XML via @string/admob_banner_ad_unit_id.
+                            // Adaptive size needs measured width.
+                            binding.bannerAdView.setAdSize(getAdaptiveBannerSize())
+
                             val configuredUnitId = binding.bannerAdView.adUnitId
 
                             if (isDebuggable) {
@@ -504,44 +477,101 @@ class MainActivity : AppCompatActivity() {
                                 )
                             }
 
+                            fun clearBannerRetry() {
+                                bannerRetryRunnable?.let { binding.bannerAdView.removeCallbacks(it) }
+                                bannerRetryRunnable = null
+                            }
+
+                            fun clearBannerWatchdog() {
+                                bannerWatchdogRunnable?.let { binding.bannerAdView.removeCallbacks(it) }
+                                bannerWatchdogRunnable = null
+                            }
+
+                            lateinit var requestBannerLoad: (String) -> Unit
+                            lateinit var scheduleBannerRetry: (String) -> Unit
+
+                            scheduleBannerRetry = fun(reason: String) {
+                                if (bannerRetryAttempt >= bannerRetryDelaysMs.size) {
+                                    Log.w(adTag, "Retry limit reached, stopping retries (reason=$reason)")
+                                    return
+                                }
+                                val delayMs = bannerRetryDelaysMs[bannerRetryAttempt]
+                                bannerRetryAttempt += 1
+                                clearBannerRetry()
+                                val retryRunnable = Runnable {
+                                    requestBannerLoad("retry#$bannerRetryAttempt")
+                                }
+                                bannerRetryRunnable = retryRunnable
+                                binding.bannerAdView.postDelayed(retryRunnable, delayMs)
+                                Log.i(
+                                    adTag,
+                                    "Scheduling banner retry in ${delayMs}ms (attempt=$bannerRetryAttempt, reason=$reason)"
+                                )
+                            }
+
+                            requestBannerLoad = fun(trigger: String) {
+                                adCallbackSeen = false
+                                clearBannerWatchdog()
+                                Log.i(adTag, "Loading banner ad (unit=$configuredUnitId, trigger=$trigger)")
+                                binding.bannerAdView.visibility = android.view.View.VISIBLE
+                                binding.bannerAdView.loadAd(AdRequest.Builder().build())
+
+                                // If the SDK never responds for this request, retry with backoff.
+                                val watchdogRunnable = Runnable {
+                                    if (!adCallbackSeen) {
+                                        Log.w(adTag, "No ad callback after timeout (unit=$configuredUnitId)")
+                                        scheduleBannerRetry("no_callback")
+                                    }
+                                }
+                                bannerWatchdogRunnable = watchdogRunnable
+                                binding.bannerAdView.postDelayed(watchdogRunnable, 12000L)
+                            }
+
                             binding.bannerAdView.adListener = object : AdListener() {
                                 override fun onAdLoaded() {
                                     adCallbackSeen = true
-                                    adLoaded = true
+                                    bannerRetryAttempt = 0
+                                    clearBannerRetry()
+                                    clearBannerWatchdog()
                                     binding.bannerAdView.visibility = android.view.View.VISIBLE
                                     Log.i(adTag, "Banner ad loaded (unit=${binding.bannerAdView.adUnitId})")
                                 }
 
                                 override fun onAdFailedToLoad(error: LoadAdError) {
                                     adCallbackSeen = true
+                                    clearBannerWatchdog()
                                     Log.e(
                                         adTag,
                                         "Banner failed (unit=${binding.bannerAdView.adUnitId}): " +
                                             "code=${error.code}, domain=${error.domain}, message=${error.message}"
                                     )
-                                    binding.bannerAdView.visibility = android.view.View.GONE
+                                    // Keep the reserved banner slot visible while retries continue.
+                                    binding.bannerAdView.visibility = android.view.View.VISIBLE
+                                    scheduleBannerRetry("code=${error.code}")
                                 }
                             }
-                            Log.i(adTag, "Loading banner ad (unit=$configuredUnitId)")
-                            binding.bannerAdView.loadAd(AdRequest.Builder().build())
-
-                            // Safety watchdog: if no callback arrives, log explicitly for diagnosis.
-                            binding.bannerAdView.postDelayed({
-                                if (!adLoaded && !adCallbackSeen) {
-                                    Log.w(adTag, "No ad callback after timeout for unit=$configuredUnitId")
-                                }
-                            }, 12000L)
+                            bannerRetryAttempt = 0
+                            requestBannerLoad("initial")
                         } catch (error: Exception) {
-                            binding.bannerAdView.visibility = android.view.View.GONE
+                            binding.bannerAdView.visibility = android.view.View.VISIBLE
                             Log.e(adTag, "Banner setup exception", error)
                         }
                     }
                 }
             } catch (error: Exception) {
-                binding.bannerAdView.visibility = android.view.View.GONE
+                binding.bannerAdView.visibility = android.view.View.VISIBLE
                 Log.e(adTag, "MobileAds init exception", error)
             }
         }
+    }
+
+    override fun onDestroy() {
+        bannerRetryRunnable?.let { binding.bannerAdView.removeCallbacks(it) }
+        bannerWatchdogRunnable?.let { binding.bannerAdView.removeCallbacks(it) }
+        bannerRetryRunnable = null
+        bannerWatchdogRunnable = null
+        binding.bannerAdView.destroy()
+        super.onDestroy()
     }
 
     private fun getAdaptiveBannerSize(): AdSize {
@@ -818,16 +848,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun hasStoragePermission(): Boolean {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            return ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.READ_MEDIA_IMAGES
-            ) == PackageManager.PERMISSION_GRANTED
-        }
-        return ContextCompat.checkSelfPermission(
-            this,
-            Manifest.permission.WRITE_EXTERNAL_STORAGE
-        ) == PackageManager.PERMISSION_GRANTED
+        // Uploads use the system file picker / SAF; no broad media or storage permission is needed.
+        return true
     }
 
     private fun hasLocationPermission(): Boolean {
@@ -874,16 +896,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun requestStoragePermissionInternal() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            multiPermissionLauncher.launch(
-                arrayOf(
-                    Manifest.permission.READ_MEDIA_IMAGES,
-                    Manifest.permission.READ_MEDIA_VIDEO,
-                    Manifest.permission.READ_MEDIA_AUDIO
-                )
+        // No-op: keep the JS bridge API stable, but never request READ_MEDIA_* / storage.
+        if (!::binding.isInitialized) return
+        binding.webView.post {
+            binding.webView.evaluateJavascript(
+                "window.dispatchEvent(new CustomEvent('android-storage-permission', { detail: { granted: true } }));",
+                null
             )
-        } else {
-            storagePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
         }
     }
 

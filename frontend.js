@@ -157,6 +157,7 @@ const I18N = {
     contactClose: "Kapat",
     privacyPolicy: "Gizlilik Politikasi",
     deleteAccount: "Hesabi sil",
+    poweredBy: "Powered by HAI Software Intelligence",
     appPausedTitle: "Uygulama duraklatildi",
     appPausedMessage: "Uygulama gecici olarak duraklatildi. Lutfen daha sonra tekrar deneyin.",
     navBrand: "Pazar Fiyatı",
@@ -217,6 +218,7 @@ const I18N = {
     contactClose: "Close",
     privacyPolicy: "Privacy Policy",
     deleteAccount: "Delete Account",
+    poweredBy: "Powered by HAI Software Intelligence",
     appPausedTitle: "App paused",
     appPausedMessage: "The app is temporarily paused. Please check again later.",
     navBrand: "Pazar Fiyatı",
@@ -276,6 +278,7 @@ const I18N = {
     contactSubmit: "إرسال الرسالة",
     contactClose: "إغلاق",
     privacyPolicy: "سياسة الخصوصية",
+    poweredBy: "Powered by HAI Software Intelligence",
     deleteAccount: "حذف الحساب",
     appPausedTitle: "تم إيقاف التطبيق مؤقتاً",
     appPausedMessage: "تم إيقاف التطبيق مؤقتاً. يرجى المحاولة لاحقاً.",
@@ -409,6 +412,7 @@ function applyLanguage() {
   const contactClose = document.getElementById("contactClose");
   const privacyLink = document.getElementById("privacyLink");
   const deleteAccountLink = document.getElementById("deleteAccountLink");
+  const poweredBy = document.getElementById("poweredBy");
   const navBrand = document.getElementById("navBrand");
   const navCartBtn = document.getElementById("navCartBtn");
   const navOrdersBtn = document.getElementById("navOrdersBtn");
@@ -429,6 +433,7 @@ function applyLanguage() {
     privacyLink.href = window.FeatureAccess?.privacyPolicyHref?.() || "privacy-policy.html";
   }
   if (deleteAccountLink) deleteAccountLink.textContent = t("deleteAccount");
+  if (poweredBy) poweredBy.textContent = t("poweredBy");
   if (navBrand) navBrand.textContent = t("navBrand");
   if (navCartBtn) navCartBtn.innerHTML = `${escapeHtml(t("navCart"))} (<span id="cartCount">${escapeHtml(document.getElementById("cartCount")?.textContent || "0")}</span>)`;
   if (navOrdersBtn) navOrdersBtn.textContent = t("navOrders");

@@ -3,4 +3,5 @@
     <string name="admob_banner_ad_unit_id">ca-app-pub-1598347178644013/9628270088</string>
     <string name="privacy_policy_url">https://market-scraper-0k36.onrender.com/privacy-policy.html</string>
     <string name="privacy_policy">Privacy Policy</string>
+    <string name="powered_by">Powered by HAI Software Intelligence</string>
 </resources>

@@ -203,6 +203,46 @@
         padding: 18px 0 4px;
       }
 
+      .powered-by {
+        margin: 14px 0 0;
+        color: #94a3b8;
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        text-align: center;
+      }
+
+      .web-ad-banner {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 40;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 90px;
+        max-height: 90px;
+        overflow: hidden;
+        padding: 0;
+        background: #fff;
+        border-top: 1px solid #e2e8f0;
+      }
+
+      .web-ad-banner[hidden] {
+        display: none !important;
+      }
+
+      .web-ad-banner .adsbygoogle {
+        display: block;
+        width: 100%;
+        max-width: 728px;
+        max-height: 90px;
+      }
+
+      body.has-web-ad-banner {
+        padding-bottom: 90px;
+      }
+
       .contact-link {
         background: none;
         border: 0;
@@ -601,6 +641,7 @@
           <a href="delete-account.html" id="deleteAccountLink" class="locked-feature-link">Delete Account</a>
         </span>
       </p>
+      <p class="powered-by" id="poweredBy">Powered by HAI Software Intelligence</p>
       <div id="contactFormWrap" hidden>
         <form class="contact-form" action="https://formsubmit.co/pazarfiyati@gmail.com" method="POST">
           <input type="hidden" name="_subject" value="Pazar Fiyatı contact message" />
@@ -624,8 +665,10 @@
         </form>
       </div>
     </footer>
+    <div id="webAdBanner" class="web-ad-banner" hidden aria-label="Advertisement"></div>
     <script src="app-settings.js"></script>
     <script src="feature-access.js"></script>
     <script src="frontend.js"></script>
+    <script src="web-ads.js"></script>
   </body>
 </html>
