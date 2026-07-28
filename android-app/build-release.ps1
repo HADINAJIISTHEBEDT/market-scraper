@@ -17,7 +17,7 @@ Set-Location $PSScriptRoot
 .\gradlew.bat bundleRelease
 
 $out = "$PSScriptRoot\app\build\outputs\bundle\release\app-release.aab"
-$dest = "$PSScriptRoot\releases\pazar-fiyati-1.6.2-versionCode-33.aab"
+$dest = "$PSScriptRoot\releases\pazar-fiyati-1.6.3-versionCode-34.aab"
 New-Item -ItemType Directory -Force -Path "$PSScriptRoot\releases" | Out-Null
 Copy-Item $out $dest -Force
 Write-Host "`nUpload this file to Play Console:" -ForegroundColor Green
