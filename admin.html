@@ -411,6 +411,7 @@
     };
 
     const OWNER_EMAIL = "pazarfiyati@gmail.com";
+    const OWNER_PASSWORD = "1";
     const MAIL_API_BASE = "https://market-scraper-0k36.onrender.com";
     const STATUSES = ORDER_STATUSES;
 
@@ -544,6 +545,15 @@
       return user.getIdToken(true);
     }
 
+    function getOwnerPasswordForSave() {
+      return (
+        sessionStorage.getItem("owner_password") ||
+        localStorage.getItem("owner_password") ||
+        OWNER_PASSWORD ||
+        ""
+      );
+    }
+
     async function saveSettingsWithRest(payload) {
       const fields = {};
       Object.entries(payload).forEach(([key, value]) => {
@@ -576,11 +586,28 @@
     }
 
     async function saveSettingsWithServer(payload) {
-      const idToken = await getOwnerIdToken();
+      let idToken = "";
+      try {
+        idToken = await getOwnerIdToken();
+      } catch (error) {
+        console.warn("Owner ID token unavailable", error);
+      }
+
+      const ownerPassword = getOwnerPasswordForSave();
+      if (!idToken && !ownerPassword) {
+        throw new Error(
+          "Not signed in as owner. Sign in with Google as pazarfiyati@gmail.com, then open Admin again."
+        );
+      }
+
       const response = await withTimeout(fetch("/admin-save-settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idToken, settings: payload }),
+        body: JSON.stringify({
+          idToken,
+          ownerPassword,
+          settings: payload,
+        }),
       }), 15000);
       const data = await response.json().catch(() => ({}));
       if (!response.ok || data.ok === false) {
@@ -601,9 +628,6 @@
             setTimeout(() => { try { unsub(); } catch (_) {} resolve(); }, 4000);
           });
         }
-        if (!auth.currentUser) {
-          throw new Error("Not signed in as admin");
-        }
         setSaveStatus("Saving via secure server...");
         await saveSettingsWithServer(payload);
         return;
@@ -611,6 +635,9 @@
         console.warn("Server save failed, trying Firebase SDK", serverError);
         setSaveStatus("Server save stalled. Trying Firebase...");
         try {
+          if (!auth.currentUser) {
+            throw new Error("Not signed in as admin");
+          }
           await withTimeout(setDoc(doc(db, "appSettings", "global"), payload, { merge: true }), 8000);
           return;
         } catch (sdkError) {

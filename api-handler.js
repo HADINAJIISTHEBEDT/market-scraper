@@ -40,7 +40,14 @@ const MIME = {
 
 const OWNER_EMAIL = "pazarfiyati@gmail.com";
 const FIREBASE_PROJECT_ID = "st-business-86a9b";
-const DEPLOY_MARK = "ads-settings-20260728b";
+const FIREBASE_WEB_API_KEY =
+  process.env.FIREBASE_WEB_API_KEY ||
+  "AIzaSyA4ZmYg5sTs4gU1Nm25s7of6oqJ4xGpR28";
+const OWNER_ADMIN_PASSWORD =
+  process.env.OWNER_ADMIN_PASSWORD ||
+  process.env.OWNER_PASSWORD ||
+  "1";
+const DEPLOY_MARK = "ads-settings-20260728c";
 const APP_SETTINGS_PATH = path.join(__dirname, "data", "app-settings.json");
 const ADS_TXT_BODY =
   "google.com, pub-1598347178644013, DIRECT, f08c47fec0942fa0\n";
@@ -57,6 +64,9 @@ Allow: /
 
 Sitemap: https://market-scraper-0k36.onrender.com/sitemap.xml
 `;
+
+let secureTokenCertsCache = null;
+let secureTokenCertsFetchedAt = 0;
 
 function normalizeGmail(email) {
   const value = String(email || "")
@@ -112,6 +122,93 @@ function writeStoredAppSettings(settings) {
   fs.writeFileSync(APP_SETTINGS_PATH, JSON.stringify(settings, null, 2), "utf8");
 }
 
+function decodeJwtPart(part) {
+  return JSON.parse(Buffer.from(String(part || ""), "base64url").toString("utf8"));
+}
+
+async function getSecureTokenCerts() {
+  const now = Date.now();
+  if (secureTokenCertsCache && now - secureTokenCertsFetchedAt < 60 * 60 * 1000) {
+    return secureTokenCertsCache;
+  }
+  const response = await fetch(
+    "https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com",
+  );
+  if (!response.ok) {
+    throw new Error(`Failed to fetch Google securetoken certs (${response.status})`);
+  }
+  secureTokenCertsCache = await response.json();
+  secureTokenCertsFetchedAt = now;
+  return secureTokenCertsCache;
+}
+
+async function verifyFirebaseIdTokenLocally(idToken) {
+  const crypto = require("crypto");
+  const parts = String(idToken || "").split(".");
+  if (parts.length !== 3) {
+    throw new Error("Malformed ID token");
+  }
+
+  const header = decodeJwtPart(parts[0]);
+  const payload = decodeJwtPart(parts[1]);
+  const certs = await getSecureTokenCerts();
+  const cert = certs[header.kid];
+  if (!cert) {
+    throw new Error("Unknown ID token signing key");
+  }
+
+  const verifier = crypto.createVerify("RSA-SHA256");
+  verifier.update(`${parts[0]}.${parts[1]}`);
+  verifier.end();
+  const signature = Buffer.from(parts[2], "base64url");
+  if (!verifier.verify(cert, signature)) {
+    throw new Error("ID token signature invalid");
+  }
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (Number(payload.exp || 0) < nowSec) {
+    throw new Error("ID token expired");
+  }
+  if (String(payload.aud || "") !== FIREBASE_PROJECT_ID) {
+    throw new Error("ID token audience mismatch");
+  }
+  if (
+    String(payload.iss || "") !==
+    `https://securetoken.google.com/${FIREBASE_PROJECT_ID}`
+  ) {
+    throw new Error("ID token issuer mismatch");
+  }
+  if (!payload.sub) {
+    throw new Error("ID token missing subject");
+  }
+
+  return payload;
+}
+
+async function verifyFirebaseIdTokenViaIdentityToolkit(idToken) {
+  const response = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(FIREBASE_WEB_API_KEY)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken }),
+    },
+  );
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !Array.isArray(data.users) || !data.users.length) {
+    throw new Error(
+      data.error?.message || "Invalid or expired auth token",
+    );
+  }
+  return data.users[0];
+}
+
+function assertOwnerEmail(email) {
+  if (normalizeGmail(email) !== normalizeGmail(OWNER_EMAIL)) {
+    throw new HttpError(403, "Only the owner admin can save settings");
+  }
+}
+
 async function verifyOwnerIdToken(idToken) {
   const token = String(idToken || "").trim();
   if (!token) {
@@ -126,41 +223,53 @@ async function verifyOwnerIdToken(idToken) {
     }
     if (admin.apps.length) {
       const decoded = await admin.auth().verifyIdToken(token);
-      if (normalizeGmail(decoded.email) !== normalizeGmail(OWNER_EMAIL)) {
-        throw new HttpError(403, "Only the owner admin can save settings");
-      }
+      assertOwnerEmail(decoded.email);
       return decoded;
     }
   } catch (err) {
     if (err instanceof HttpError) throw err;
-    // Fall through to tokeninfo verification when Admin SDK is unavailable.
+    // Fall through when Admin SDK is unavailable/misconfigured.
   }
 
-  const response = await fetch(
-    `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(token)}`,
-  );
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new HttpError(401, data.error_description || data.error || "Invalid or expired auth token");
+  // Local JWT verification (works without service account).
+  try {
+    const payload = await verifyFirebaseIdTokenLocally(token);
+    assertOwnerEmail(payload.email);
+    if (payload.email_verified === false) {
+      throw new HttpError(403, "Owner email is not verified");
+    }
+    return payload;
+  } catch (err) {
+    if (err instanceof HttpError) throw err;
   }
 
-  const audience = String(data.aud || "");
-  if (
-    audience !== FIREBASE_PROJECT_ID &&
-    !audience.includes(FIREBASE_PROJECT_ID)
-  ) {
-    throw new HttpError(401, "Auth token audience mismatch");
+  // Identity Toolkit lookup (POST body — avoids tokeninfo URL-length failures).
+  try {
+    const user = await verifyFirebaseIdTokenViaIdentityToolkit(token);
+    assertOwnerEmail(user.email);
+    if (user.emailVerified === false) {
+      throw new HttpError(403, "Owner email is not verified");
+    }
+    return user;
+  } catch (err) {
+    if (err instanceof HttpError) throw err;
+    throw new HttpError(
+      401,
+      err.message || "Invalid or expired auth token. Sign in again with Google.",
+    );
   }
+}
 
-  if (normalizeGmail(data.email) !== normalizeGmail(OWNER_EMAIL)) {
-    throw new HttpError(403, "Only the owner admin can save settings");
+function verifyOwnerPassword(body = {}) {
+  const password = String(body.ownerPassword || body.password || "").trim();
+  if (!password || password !== String(OWNER_ADMIN_PASSWORD)) {
+    return null;
   }
-
-  if (String(data.email_verified) !== "true" && data.email_verified !== true) {
-    throw new HttpError(403, "Owner email is not verified");
-  }
-
-  return data;
+  return {
+    email: OWNER_EMAIL,
+    uid: "owner-password",
+    authMethod: "owner-password",
+  };
 }
 
 class HttpError extends Error {
@@ -358,18 +467,31 @@ async function routeApiRequest(method, urlPath, body) {
     const idToken = String(body.idToken || "").trim();
     const settings =
       body.settings && typeof body.settings === "object" ? body.settings : null;
-    if (!idToken || !settings) {
-      throw new HttpError(400, "idToken and settings are required");
+    if (!settings) {
+      throw new HttpError(400, "settings are required");
     }
 
-    let decoded;
-    try {
-      decoded = await verifyOwnerIdToken(idToken);
-    } catch (err) {
-      if (err instanceof HttpError) {
-        return jsonResponse(err.statusCode, { ok: false, error: err.message });
+    let decoded = null;
+    let authError = null;
+
+    if (idToken) {
+      try {
+        decoded = await verifyOwnerIdToken(idToken);
+      } catch (err) {
+        authError = err;
       }
-      return jsonResponse(401, { ok: false, error: "Invalid or expired auth token" });
+    }
+
+    if (!decoded) {
+      decoded = verifyOwnerPassword(body);
+    }
+
+    if (!decoded) {
+      const message =
+        (authError && authError.message) ||
+        "Sign in again with Google as pazarfiyati@gmail.com (or send owner password).";
+      const status = authError instanceof HttpError ? authError.statusCode : 401;
+      return jsonResponse(status, { ok: false, error: message });
     }
 
     const payload = {

@@ -913,6 +913,9 @@
       localStorage.setItem("owner_email", normalizeGmail(OWNER_EMAIL));
       localStorage.setItem("user_role", "admin");
       try {
+        sessionStorage.setItem("owner_password", passwordInput.value);
+      } catch (_) {}
+      try {
         await withTimeout(setDoc(doc(db, "users", uid), {
           role: "admin",
           ownerAccessAt: new Date().toISOString()
