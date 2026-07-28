@@ -30,7 +30,7 @@
         android:theme="@style/Theme.MarketScraperAndroid">
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-1598347178644013~5936437080" />
+            android:value="ca-app-pub-1598347178644013~7557570125" />
         <activity
             android:name=".MainActivity"
             android:exported="true"
