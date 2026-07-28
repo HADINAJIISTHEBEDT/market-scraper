@@ -24,7 +24,7 @@
   ];
 
   const DEFAULT_SETTINGS = {
-    featuresUnlocked: false,
+    featuresUnlocked: true,
     announcement: "",
     appPaused: false,
     commandMessage: "",
@@ -39,6 +39,7 @@
     resolveReady = resolve;
   });
   let hasReady = false;
+  let loadedFromServer = false;
 
   function normalizeSettings(data = {}) {
     const tiles = Array.isArray(data.homepageTiles) && data.homepageTiles.length
@@ -48,7 +49,9 @@
     return {
       ...DEFAULT_SETTINGS,
       ...data,
-      featuresUnlocked: Boolean(data.featuresUnlocked),
+      featuresUnlocked: data.featuresUnlocked !== undefined
+        ? Boolean(data.featuresUnlocked)
+        : DEFAULT_SETTINGS.featuresUnlocked,
       announcement: String(data.announcement || ""),
       appPaused: Boolean(data.appPaused),
       commandMessage: String(data.commandMessage || ""),
@@ -111,6 +114,7 @@
     if (!Object.keys(data.settings).length) {
       throw new Error("Server settings empty");
     }
+    loadedFromServer = true;
     publishSettings(data.settings);
   }
 
@@ -135,6 +139,11 @@
       console.warn("[AppSettings] Server settings unavailable:", serverError.message || serverError);
     }
 
+    // Poll server settings so admin pause/unlock changes apply without a full redeploy.
+    setInterval(() => {
+      loadSettingsFromServer().catch(() => {});
+    }, 20000);
+
     try {
       const [{ initializeApp, getApp, getApps }, { doc, initializeFirestore, getFirestore, onSnapshot }] = await Promise.all([
         import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"),
@@ -154,6 +163,9 @@
       onSnapshot(
         doc(db, "appSettings", "global"),
         (snapshot) => {
+          // Server settings are the source of truth when available. Do not let an
+          // older Firestore document re-lock/pause the app after an admin server save.
+          if (loadedFromServer) return;
           publishSettings(snapshot.exists() ? snapshot.data() : {});
         },
         (error) => {

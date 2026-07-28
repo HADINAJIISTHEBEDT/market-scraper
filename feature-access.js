@@ -138,13 +138,15 @@
   }
 
   function areFeaturesUnlockedForAll() {
+    if (window.AppSettings?.areFeaturesUnlocked?.() === true) return true;
+    if (window.AppSettings?.get?.()?.featuresUnlocked === true) return true;
     return localStorage.getItem("app_features_unlocked") === "true";
   }
 
   function canUseFeatures() {
+    // Guests and signed-in users can use login/cart/profile/orders when unlocked.
     if (isAdminUser()) return true;
     if (areFeaturesUnlockedForAll()) return true;
-    if (localStorage.getItem("user_uid") && localStorage.getItem("user_email")) return true;
     return false;
   }
 
