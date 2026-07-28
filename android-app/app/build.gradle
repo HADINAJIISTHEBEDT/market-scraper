@@ -33,14 +33,14 @@ def hasReleaseSigning = keystoreProperties["storePassword"] != null
 
 android {
     namespace = "com.marketfiyati.app"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.marketfiyati.app"
         minSdk = 24
-        targetSdk = 35
-        versionCode = 25
-        versionName = "1.5"
+        targetSdk = 36
+        versionCode = 32
+        versionName = "1.6.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
