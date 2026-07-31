@@ -24,7 +24,7 @@
   ];
 
   const DEFAULT_SETTINGS = {
-    featuresUnlocked: true,
+    featuresUnlocked: false,
     announcement: "",
     appPaused: false,
     commandMessage: "",

@@ -592,13 +592,17 @@ function renderItemCard(item) {
     unitPrice: item.unitPrice || "",
     category: item.category || item._searchTerm || String(document.getElementById("searchInput")?.value || "").trim() || "General",
   }));
+  const showAddToCart = window.FeatureAccess?.canUseFeatures?.() === true;
+  const cartButtonHtml = showAddToCart
+    ? `<button class="btn-primary" type="button" onclick="addToCart(JSON.parse(this.dataset.item))" data-item="${cartPayload}">${escapeHtml(t("addToCart"))}</button>`
+    : "";
   return `<article class="item-card">
     ${imageHtml}
     ${marketHtml}
     <div class="item-name">${escapeHtml(item.name)}</div>
     <div class="item-price">${formatPrice(item.price)}</div>
     ${item.unitPrice ? `<div class="item-unit">${escapeHtml(item.unitPrice)}</div>` : ""}
-    <button class="btn-primary" type="button" onclick="addToCart(JSON.parse(this.dataset.item))" data-item="${cartPayload}">${escapeHtml(t("addToCart"))}</button>
+    ${cartButtonHtml}
   </article>`;
 }
 
@@ -617,6 +621,10 @@ function updateCartCount() {
 }
 
 window.addToCart = function(item) {
+  if (window.FeatureAccess && !window.FeatureAccess.canUseFeatures()) {
+    window.FeatureAccess.showLockedModal?.();
+    return;
+  }
   const cart = getCart();
   const existing = cart.find(
     c => c.name === item.name && c.market === item.market
@@ -755,7 +763,11 @@ function updateNavbar() {
   if (!canUse) {
     window.FeatureAccess?.initComingSoonPanel?.();
     window.FeatureAccess?.initLockedFooterLinks?.();
-    if (navLoginBtn) navLoginBtn.hidden = false;
+    // Do not offer a free Login shortcut while features are locked.
+    if (navLoginBtn) {
+      navLoginBtn.hidden = true;
+      navLoginBtn.removeAttribute("href");
+    }
     showProfilePromptIfNeeded();
     return;
   }
@@ -1021,6 +1033,8 @@ window.addEventListener("DOMContentLoaded", () => {
   }
   window.addEventListener("app-settings-changed", (event) => {
     applyRemoteSettings(event.detail);
+    updateNavbar();
+    if (currentResultsData) renderResults(currentResultsData);
   });
   currentLang = localStorage.getItem("app_lang") || "tr";
   const langSelect = document.getElementById("langSelect");

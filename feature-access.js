@@ -138,15 +138,27 @@
   }
 
   function areFeaturesUnlockedForAll() {
-    if (window.AppSettings?.areFeaturesUnlocked?.() === true) return true;
-    if (window.AppSettings?.get?.()?.featuresUnlocked === true) return true;
+    if (window.AppSettings?.get) {
+      const settings = window.AppSettings.get();
+      if (settings && typeof settings.featuresUnlocked === "boolean") {
+        return settings.featuresUnlocked === true;
+      }
+    }
     return localStorage.getItem("app_features_unlocked") === "true";
   }
 
   function canUseFeatures() {
-    // Guests and signed-in users can use login/cart/profile/orders when unlocked.
+    // Only owner/admin bypasses the lock. Normal users need featuresUnlocked.
+    if (isAdminUser()) return true;
+    return areFeaturesUnlockedForAll();
+  }
+
+  function canUseLogin() {
+    // Owner may always open login to unlock admin. Everyone else needs unlock.
     if (isAdminUser()) return true;
     if (areFeaturesUnlockedForAll()) return true;
+    const email = normalizeGmail(localStorage.getItem("user_email") || "");
+    if (email && email === normalizeGmail(OWNER_EMAIL)) return true;
     return false;
   }
 
@@ -279,11 +291,8 @@
       if (label && key) label.textContent = t(key);
       if (badge) badge.textContent = t("lockedBadge");
       if (card.dataset.feature === "login") {
-        if (card.dataset.loginBound === "true") return;
-        card.dataset.loginBound = "true";
-        card.addEventListener("click", () => {
-          window.location.href = "login.html";
-        });
+        // Keep login card locked for normal users; owner can open login.html directly.
+        bindLockedTrigger(card);
         return;
       }
       bindLockedTrigger(card);
@@ -524,6 +533,7 @@
     getDeviceId,
     isAdminUser,
     canUseFeatures,
+    canUseLogin,
     areFeaturesUnlockedForAll,
     isAndroidApp,
     navigateToAppPage,

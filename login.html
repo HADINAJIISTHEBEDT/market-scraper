@@ -877,6 +877,20 @@
           showOwnerPassword();
           return;
         }
+
+        // When admin locked features, normal users cannot complete login.
+        const unlocked = window.FeatureAccess?.areFeaturesUnlockedForAll?.() === true;
+        if (!unlocked) {
+          await safeSignOut();
+          window.FeatureAccess?.clearLocalUser?.();
+          setRawStatus(
+            window.FeatureAccess?.t?.("modalBody") ||
+              "These features will be unlocked as soon as possible. Only the admin can use them for now.",
+            true
+          );
+          return;
+        }
+
         // Non-owner users should continue directly to the app after successful sign-in.
         setTimeout(goToHomePage, 120);
       } catch (error) {
@@ -953,6 +967,24 @@
     }
 
     async function continueWithGoogle() {
+      const unlocked = window.FeatureAccess?.areFeaturesUnlockedForAll?.() === true;
+      const isAdmin = window.FeatureAccess?.isAdminUser?.() === true;
+      // Allow owner/admin path even when locked; block everyone else before Google popup.
+      if (!unlocked && !isAdmin) {
+        // Owner may still sign in via Google, then enter password. Detect by not blocking here
+        // if they are already known owner email; otherwise allow Google and filter in routeSignedInUser.
+        const knownEmail = normalizeGmail(localStorage.getItem("user_email") || "");
+        if (knownEmail && knownEmail !== normalizeGmail(OWNER_EMAIL)) {
+          window.FeatureAccess?.showLockedModal?.();
+          setRawStatus(
+            window.FeatureAccess?.t?.("modalBody") ||
+              "These features will be unlocked as soon as possible. Only the admin can use them for now.",
+            true
+          );
+          return;
+        }
+      }
+
       setStatus("statusStarting");
       sessionStorage.removeItem("login_auth_handled");
       sessionStorage.removeItem("android_auto_signin_tried");
