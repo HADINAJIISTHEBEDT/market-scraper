@@ -50,6 +50,7 @@
 
   const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(window.FIREBASE_CONFIG);
   const db = firebase.firestore();
+  const auth = firebase.auth ? firebase.auth() : null;
   try { db.settings({ experimentalForceLongPolling: true, merge: true }); } catch (e) {}
 
   const I18N = {
@@ -737,6 +738,56 @@
     }
   }
 
+  function loadOrdersFromServer() {
+    var idTokenPromise = Promise.resolve("");
+    if (auth) {
+      idTokenPromise = Promise.resolve().then(function () {
+        if (auth.currentUser) return auth.currentUser.getIdToken(true);
+        return new Promise(function (resolve) {
+          var done = false;
+          var unsub = auth.onAuthStateChanged(function (user) {
+            if (done) return;
+            done = true;
+            try { unsub(); } catch (e) {}
+            if (!user) {
+              resolve("");
+              return;
+            }
+            user.getIdToken(true).then(resolve).catch(function () { resolve(""); });
+          });
+          setTimeout(function () {
+            if (done) return;
+            done = true;
+            try { unsub(); } catch (e) {}
+            resolve("");
+          }, 2500);
+        });
+      }).catch(function () { return ""; });
+    }
+    return idTokenPromise.then(function (idToken) {
+      var sessionToken = localStorage.getItem("server_session_token") || "";
+      if (!idToken && !sessionToken) {
+        throw new Error("Sign in again to load orders.");
+      }
+      return fetch("/my-orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          idToken: idToken || "",
+          uid: userUid || "",
+          sessionToken: sessionToken,
+        }),
+      }).then(function (response) {
+        return response.json().catch(function () { return {}; }).then(function (data) {
+          if (!response.ok || data.ok === false) {
+            throw new Error(data.error || ("Server orders failed (" + response.status + ")"));
+          }
+          return Array.isArray(data.orders) ? data.orders : [];
+        });
+      });
+    });
+  }
+
   function attachOrdersListener(field, value, onEmpty) {
     if (ordersUnsubscribe) {
       ordersUnsubscribe();
@@ -749,8 +800,24 @@
     ordersUnsubscribe = db.collection("orders").where(field, "==", value).onSnapshot(
       function (snapshot) {
         const orders = mapOrderDocs(snapshot.docs);
-        if (!orders.length && typeof onEmpty === "function") {
-          onEmpty();
+        if (!orders.length) {
+          loadOrdersFromServer().then(function (serverOrders) {
+            if (serverOrders.length) {
+              renderOrders(serverOrders);
+              return;
+            }
+            if (typeof onEmpty === "function") {
+              onEmpty();
+              return;
+            }
+            renderOrders([]);
+          }).catch(function () {
+            if (typeof onEmpty === "function") {
+              onEmpty();
+              return;
+            }
+            renderOrders([]);
+          });
           return;
         }
         renderOrders(orders);
@@ -759,14 +826,27 @@
         db.collection("orders").where(field, "==", value).get()
           .then(function (snapshot) {
             const orders = mapOrderDocs(snapshot.docs);
-            if (!orders.length && typeof onEmpty === "function") {
-              onEmpty();
-              return;
+            if (!orders.length) {
+              return loadOrdersFromServer().then(function (serverOrders) {
+                if (serverOrders.length) {
+                  renderOrders(serverOrders);
+                  return;
+                }
+                if (typeof onEmpty === "function") {
+                  onEmpty();
+                  return;
+                }
+                renderOrders([]);
+              });
             }
             renderOrders(orders);
           })
           .catch(function (fallbackError) {
-            showOrdersLoadError(fallbackError || error);
+            loadOrdersFromServer().then(function (serverOrders) {
+              renderOrders(serverOrders);
+            }).catch(function (serverError) {
+              showOrdersLoadError(serverError || fallbackError || error);
+            });
           });
       }
     );

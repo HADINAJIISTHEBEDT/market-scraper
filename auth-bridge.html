@@ -109,13 +109,16 @@
         ";S.browser_fallback_url=" + encodeURIComponent(pageUrl) + ";end";
     }
 
-    function buildAndroidReturnUrl(user) {
+    function buildAndroidReturnUrl(user, sessionToken) {
       const params = new URLSearchParams();
       params.set("auth_uid", user.uid);
       params.set("auth_email", user.email || "");
       params.set("auth_name", user.displayName || "");
       if (user.photoURL) {
         params.set("auth_photo", user.photoURL);
+      }
+      if (sessionToken) {
+        params.set("auth_session", sessionToken);
       }
       return APP_LOGIN + "?" + params.toString();
     }
@@ -197,16 +200,49 @@
       showOpenAppActions(pageAfterSuccess || APP_HOME, "Open Pazar Fiyati app");
     }
 
-    function finishSignedInUser(user) {
+    async function syncUserToServer(user) {
+      try {
+        const idToken = await user.getIdToken(true);
+        const response = await fetch("/sync-user", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            idToken,
+            profile: {
+              name: user.displayName || user.email || "User",
+              email: user.email || "",
+              photoURL: user.photoURL || "",
+              lastLoginAt: new Date().toISOString(),
+            },
+          }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (response.ok && data.sessionToken) {
+          localStorage.setItem("server_session_token", data.sessionToken);
+          localStorage.setItem("user_uid", user.uid);
+          localStorage.setItem("user_email", user.email || "");
+          localStorage.setItem("user_name", user.displayName || user.email || "User");
+          if (user.photoURL) localStorage.setItem("user_photo", user.photoURL);
+          return data.sessionToken;
+        }
+      } catch (error) {
+        console.warn("Auth bridge server sync failed", error);
+      }
+      return "";
+    }
+
+    async function finishSignedInUser(user) {
       if (!user?.email) {
         finish("No email returned from Google.", true);
         return;
       }
       clearRedirectStarted();
+      statusEl.textContent = "Saving account...";
+      const sessionToken = await syncUserToServer(user);
       const returnMode = new URLSearchParams(window.location.search).get("return");
       if (returnMode === "android" || isInAppAuthWebView() || isEmbeddedAndroidApp()) {
         statusEl.textContent = "Signed in. Returning to the app...";
-        returnToAndroidApp(buildAndroidReturnUrl(user));
+        returnToAndroidApp(buildAndroidReturnUrl(user, sessionToken));
         return;
       }
       if (window.opener && !window.opener.closed) {

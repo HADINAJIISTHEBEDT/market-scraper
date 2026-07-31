@@ -803,10 +803,59 @@
       return "privacy-policy.html?lang=" + encodeURIComponent(currentLang || "tr");
     }
 
+    async function syncUserToServer(user, profile) {
+      let idToken = "";
+      try {
+        if (auth.currentUser) {
+          idToken = await auth.currentUser.getIdToken(true);
+        }
+      } catch (error) {
+        console.warn("ID token unavailable for server sync", error);
+      }
+      const sessionToken = localStorage.getItem("server_session_token") || "";
+      if (!idToken && !sessionToken) {
+        throw new Error("Missing auth token for server sync");
+      }
+      const response = await withTimeout(fetch("/sync-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          idToken,
+          uid: user.uid,
+          sessionToken,
+          profile: {
+            name: profile.name || "",
+            email: profile.email || "",
+            photoURL: profile.photoURL || "",
+            phone: profile.phone || "",
+            address: profile.address || "",
+            role: profile.role || "user",
+            lastDeviceId: profile.lastDeviceId || "",
+            lastSessionId: profile.lastSessionId || "",
+            lastLoginAt: profile.lastLoginAt || new Date().toISOString(),
+            createdAt: profile.createdAt || new Date().toISOString(),
+          },
+        }),
+      }), 10000, "Server profile sync timed out.");
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.ok === false) {
+        throw new Error(data.error || `Server sync failed (${response.status})`);
+      }
+      if (data.sessionToken) {
+        localStorage.setItem("server_session_token", data.sessionToken);
+      }
+      return data.user || profile;
+    }
+
     async function syncUserRecord(user) {
       const userRef = doc(db, "users", user.uid);
-      const snap = await withTimeout(getDoc(userRef), 8000, "Profile load timed out.");
-      const existing = snap.exists() ? snap.data() : {};
+      let existing = {};
+      try {
+        const snap = await withTimeout(getDoc(userRef), 8000, "Profile load timed out.");
+        existing = snap.exists() ? snap.data() : {};
+      } catch (error) {
+        console.warn("Firestore profile load failed", error);
+      }
       const deviceId = window.FeatureAccess?.getDeviceId?.() || "";
       const sessionId = sessionStorage.getItem("app_session_id") || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       sessionStorage.setItem("app_session_id", sessionId);
@@ -823,9 +872,26 @@
         lastLoginAt: new Date().toISOString(),
         createdAt: existing.createdAt || new Date().toISOString()
       };
-      await withTimeout(setDoc(userRef, mergedProfile, { merge: true }), 8000, "Profile save timed out.");
-      if (deviceId) {
-        await withTimeout(setDoc(userRef, { deviceIds: arrayUnion(deviceId) }, { merge: true }), 8000, "Device save timed out.");
+
+      // Server sync first so Admin can see users even when Firestore rules block writes.
+      try {
+        const serverUser = await syncUserToServer(user, mergedProfile);
+        Object.assign(mergedProfile, serverUser || {});
+      } catch (error) {
+        console.warn("Server profile sync failed", error);
+      }
+
+      try {
+        await withTimeout(setDoc(userRef, mergedProfile, { merge: true }), 8000, "Profile save timed out.");
+        if (deviceId) {
+          await withTimeout(setDoc(userRef, { deviceIds: arrayUnion(deviceId) }, { merge: true }), 8000, "Device save timed out.");
+        }
+      } catch (error) {
+        console.warn("Firestore profile save failed", error);
+        // Keep going if server sync already succeeded.
+        if (!localStorage.getItem("server_session_token")) {
+          throw error;
+        }
       }
       try {
         await deleteDoc(doc(db, "deletedAccounts", user.uid));
@@ -949,6 +1015,10 @@
       const uid = params.get("auth_uid");
       const email = params.get("auth_email");
       if (!uid || !email) return false;
+      const sessionToken = params.get("auth_session") || "";
+      if (sessionToken) {
+        localStorage.setItem("server_session_token", sessionToken);
+      }
       history.replaceState({}, "", "login.html");
       sessionStorage.removeItem("force_account_picker");
       void routeSignedInUser({

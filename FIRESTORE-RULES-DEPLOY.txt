@@ -1,0 +1,22 @@
+Deploy Firestore rules (required for Place Order + Admin users)
+
+The live Firebase project (st-business-86a9b) must use the rules in firestore.rules.
+Until those rules are published, Place Order shows "Missing or insufficient permissions"
+and logged-in users may not appear in Admin.
+
+Option A — Firebase Console (fastest, no CLI):
+1. Open https://console.firebase.google.com/project/st-business-86a9b/firestore/rules
+2. Replace the rules with the full contents of firestore.rules from this repo
+3. Click Publish
+
+Option B — Firebase CLI on your computer:
+  firebase login
+  firebase deploy --only firestore:rules --project st-business-86a9b
+
+After publish, hard-refresh the app and try:
+- Google login (user should appear in Admin → Users)
+- Place Order from cart
+
+Server fallbacks (/sync-user, /place-order) also store users/orders on Render
+so Admin can still see them before rules are published. Render disk is ephemeral,
+so publishing Firestore rules is still required for lasting data.

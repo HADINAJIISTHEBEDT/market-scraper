@@ -13,15 +13,85 @@ service cloud.firestore {
       return normalizedEmail() == 'pazarfiyati@gmail.com';
     }
 
+    function isSelf(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
     match /appSettings/{docId} {
       allow read: if true;
       allow write: if isOwner();
     }
 
+    // Login writes users/{uid}. Admin lists signed-in users.
     match /users/{userId} {
       allow read: if signedIn();
-      allow create, update: if signedIn() && (request.auth.uid == userId || isOwner());
+      allow create, update: if isSelf(userId) || isOwner();
       allow delete: if isOwner();
+    }
+
+    // Place Order allocates counters/orders then creates orders/{id}.
+    match /counters/{docId} {
+      allow read: if true;
+      allow create, update: if signedIn();
+      allow delete: if isOwner();
+    }
+
+    match /orders/{orderId} {
+      allow read: if true;
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid;
+      // Market/driver HTML panels are currently unauthenticated.
+      allow update: if true;
+      allow delete: if isOwner()
+        || (signedIn() && resource.data.userId == request.auth.uid);
+    }
+
+    match /orderConversations/{orderId} {
+      allow read: if true;
+      allow create, update: if true;
+      allow delete: if isOwner();
+    }
+
+    match /orderChats/{orderId}/messages/{messageId} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if isOwner();
+    }
+
+    match /orderCallHistory/{docId} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if isOwner();
+    }
+
+    match /marketDrivers/{marketId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /deleteRequests/{userId} {
+      allow read: if isOwner() || isSelf(userId);
+      allow create, update: if isSelf(userId) || isOwner();
+      allow delete: if isOwner();
+    }
+
+    match /deletedAccounts/{userId} {
+      allow read: if isOwner() || isSelf(userId);
+      allow create, update: if isOwner();
+      allow delete: if isOwner() || isSelf(userId);
+    }
+
+    match /blockedDevices/{deviceId} {
+      allow read: if signedIn();
+      allow write: if isOwner();
+    }
+
+    match /adminInbox/{docId} {
+      allow read, write: if isOwner();
+    }
+
+    match /mail/{docId} {
+      allow read, write: if isOwner();
     }
 
     match /{document=**} {

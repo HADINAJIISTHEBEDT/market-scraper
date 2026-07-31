@@ -47,8 +47,10 @@ const OWNER_ADMIN_PASSWORD =
   process.env.OWNER_ADMIN_PASSWORD ||
   process.env.OWNER_PASSWORD ||
   "1";
-const DEPLOY_MARK = "ads-settings-20260728e";
+const DEPLOY_MARK = "orders-users-perms-20260731a";
 const APP_SETTINGS_PATH = path.join(__dirname, "data", "app-settings.json");
+const USERS_STORE_PATH = path.join(__dirname, "data", "users-store.json");
+const ORDERS_STORE_PATH = path.join(__dirname, "data", "orders-store.json");
 const ADS_TXT_BODY =
   "google.com, pub-1598347178644013, DIRECT, f08c47fec0942fa0\n";
 // Official AdMob crawler is "Google-adstxt" (see AdMob help: ensure app-ads.txt can be crawled).
@@ -124,6 +126,84 @@ function writeStoredAppSettings(settings) {
   const dir = path.dirname(APP_SETTINGS_PATH);
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(APP_SETTINGS_PATH, JSON.stringify(settings, null, 2), "utf8");
+}
+
+function readJsonStore(filePath, fallback) {
+  try {
+    if (!fs.existsSync(filePath)) return fallback;
+    const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    return parsed == null ? fallback : parsed;
+  } catch (_) {
+    return fallback;
+  }
+}
+
+function writeJsonStore(filePath, value) {
+  const dir = path.dirname(filePath);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(filePath, JSON.stringify(value, null, 2), "utf8");
+}
+
+function readStoredUsers() {
+  const raw = readJsonStore(USERS_STORE_PATH, {});
+  return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+}
+
+function writeStoredUsers(users) {
+  writeJsonStore(USERS_STORE_PATH, users || {});
+}
+
+function readStoredOrders() {
+  const raw = readJsonStore(ORDERS_STORE_PATH, []);
+  return Array.isArray(raw) ? raw : [];
+}
+
+function writeStoredOrders(orders) {
+  writeJsonStore(ORDERS_STORE_PATH, Array.isArray(orders) ? orders : []);
+}
+
+function nextServerOrderNumber(orders) {
+  let max = 1000;
+  for (const order of orders) {
+    const num = Number(order && order.orderNumber);
+    if (Number.isFinite(num) && num > max) max = num;
+  }
+  return max + 1;
+}
+
+function createServerSessionToken() {
+  return require("crypto").randomBytes(24).toString("hex");
+}
+
+function resolveUserFromSession(body = {}) {
+  const uid = String(body.uid || body.userId || "").trim();
+  const sessionToken = String(body.sessionToken || body.serverSessionToken || "").trim();
+  if (!uid || !sessionToken) return null;
+  const users = readStoredUsers();
+  const user = users[uid];
+  if (!user || String(user.sessionToken || "") !== sessionToken) return null;
+  const expiresAt = Date.parse(String(user.sessionExpiresAt || ""));
+  if (Number.isFinite(expiresAt) && expiresAt < Date.now()) return null;
+  return {
+    uid,
+    email: user.email || "",
+    name: user.name || "",
+    picture: user.photoURL || "",
+    authMethod: "server-session",
+  };
+}
+
+async function resolveSignedInUser(body = {}) {
+  const idToken = String(body.idToken || "").trim();
+  if (idToken) {
+    return verifyAnyFirebaseIdToken(idToken);
+  }
+  const sessionUser = resolveUserFromSession(body);
+  if (sessionUser) return sessionUser;
+  throw new HttpError(
+    401,
+    "Missing auth token. Sign in again with Google.",
+  );
 }
 
 function decodeJwtPart(part) {
@@ -274,6 +354,76 @@ function verifyOwnerPassword(body = {}) {
     uid: "owner-password",
     authMethod: "owner-password",
   };
+}
+
+async function verifyAnyFirebaseIdToken(idToken) {
+  const token = String(idToken || "").trim();
+  if (!token) {
+    throw new HttpError(401, "Missing auth token");
+  }
+
+  try {
+    const admin = require("firebase-admin");
+    if (!admin.apps.length) {
+      await initializePushService();
+    }
+    if (admin.apps.length) {
+      return await admin.auth().verifyIdToken(token);
+    }
+  } catch (err) {
+    if (err instanceof HttpError) throw err;
+  }
+
+  try {
+    return await verifyFirebaseIdTokenLocally(token);
+  } catch (err) {
+    if (err instanceof HttpError) throw err;
+  }
+
+  try {
+    const user = await verifyFirebaseIdTokenViaIdentityToolkit(token);
+    return {
+      uid: user.localId || user.uid,
+      email: user.email,
+      email_verified: user.emailVerified,
+      name: user.displayName,
+      picture: user.photoUrl,
+    };
+  } catch (err) {
+    if (err instanceof HttpError) throw err;
+    throw new HttpError(
+      401,
+      err.message || "Invalid or expired auth token. Sign in again with Google.",
+    );
+  }
+}
+
+async function resolveOwnerAccess(body = {}) {
+  const idToken = String(body.idToken || "").trim();
+  let decoded = null;
+  let authError = null;
+
+  if (idToken) {
+    try {
+      decoded = await verifyOwnerIdToken(idToken);
+    } catch (err) {
+      authError = err;
+    }
+  }
+
+  if (!decoded) {
+    decoded = verifyOwnerPassword(body);
+  }
+
+  if (!decoded) {
+    const message =
+      (authError && authError.message) ||
+      "Sign in again with Google as pazarfiyati@gmail.com (or send owner password).";
+    const status = authError instanceof HttpError ? authError.statusCode : 401;
+    throw new HttpError(status, message);
+  }
+
+  return decoded;
 }
 
 class HttpError extends Error {
@@ -468,35 +618,220 @@ async function routeApiRequest(method, urlPath, body) {
   }
 
 
+  if (urlPath === "/sync-user") {
+    const decoded = await resolveSignedInUser(body);
+    const uid = String(decoded.uid || decoded.sub || "").trim();
+    if (!uid) {
+      throw new HttpError(401, "Auth token missing user id");
+    }
+
+    const profile =
+      body.profile && typeof body.profile === "object" ? body.profile : {};
+    const users = readStoredUsers();
+    const existing =
+      users[uid] && typeof users[uid] === "object" ? users[uid] : {};
+    const now = new Date().toISOString();
+    const sessionToken = createServerSessionToken();
+    const sessionExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const email = String(
+      profile.email || decoded.email || existing.email || "",
+    ).trim();
+    const merged = {
+      ...existing,
+      ...profile,
+      id: uid,
+      uid,
+      email,
+      name:
+        String(profile.name || decoded.name || existing.name || email || "User").trim() ||
+        "User",
+      photoURL: String(
+        profile.photoURL || decoded.picture || existing.photoURL || "",
+      ),
+      role:
+        normalizeGmail(email) === normalizeGmail(OWNER_EMAIL)
+          ? "admin"
+          : String(profile.role || existing.role || "user"),
+      lastLoginAt: String(profile.lastLoginAt || now),
+      createdAt: String(existing.createdAt || profile.createdAt || now),
+      updatedAt: now,
+      sessionToken,
+      sessionExpiresAt,
+      source: "server-sync",
+    };
+    users[uid] = merged;
+    writeStoredUsers(users);
+
+    const publicUser = { ...merged };
+    delete publicUser.sessionToken;
+
+    return jsonResponse(200, {
+      ok: true,
+      user: publicUser,
+      sessionToken,
+      sessionExpiresAt,
+      savedTo: "server",
+      deploy: DEPLOY_MARK,
+    });
+  }
+
+  if (urlPath === "/place-order") {
+    const decoded = await resolveSignedInUser(body);
+    const uid = String(decoded.uid || decoded.sub || "").trim();
+    if (!uid) {
+      throw new HttpError(401, "Auth token missing user id");
+    }
+
+    const order =
+      body.order && typeof body.order === "object" ? body.order : null;
+    if (!order) {
+      throw new HttpError(400, "order is required");
+    }
+
+    const items = Array.isArray(order.items) ? order.items : [];
+    if (!items.length) {
+      throw new HttpError(400, "order items are required");
+    }
+
+    const orderUserId = String(order.userId || uid).trim();
+    if (orderUserId !== uid) {
+      throw new HttpError(403, "Order userId must match signed-in user");
+    }
+
+    const orders = readStoredOrders();
+    const orderNumber =
+      Number(order.orderNumber) > 0
+        ? Number(order.orderNumber)
+        : nextServerOrderNumber(orders);
+    const now = new Date().toISOString();
+    const id = `server-${Date.now().toString(36)}-${Math.random()
+      .toString(36)
+      .slice(2, 8)}`;
+    const saved = {
+      ...order,
+      id,
+      userId: uid,
+      userEmail: String(order.userEmail || decoded.email || ""),
+      userName: String(order.userName || decoded.name || "User"),
+      orderNumber,
+      items,
+      status: String(order.status || "waiting"),
+      paymentStatus: String(order.paymentStatus || "pending"),
+      createdAt: String(order.createdAt || now),
+      updatedAt: now,
+      source: "server-place-order",
+    };
+    orders.unshift(saved);
+    writeStoredOrders(orders.slice(0, 500));
+
+    // Keep a lightweight user row so Admin Users stays populated.
+    const users = readStoredUsers();
+    const existing =
+      users[uid] && typeof users[uid] === "object" ? users[uid] : {};
+    users[uid] = {
+      ...existing,
+      id: uid,
+      uid,
+      email: saved.userEmail || existing.email || "",
+      name: saved.userName || existing.name || "User",
+      phone: saved.userPhone || existing.phone || "",
+      address: saved.userAddress || existing.address || "",
+      photoURL: saved.userPhoto || existing.photoURL || "",
+      lastLoginAt: now,
+      createdAt: existing.createdAt || now,
+      updatedAt: now,
+      role:
+        normalizeGmail(saved.userEmail || existing.email) ===
+        normalizeGmail(OWNER_EMAIL)
+          ? "admin"
+          : existing.role || "user",
+      source: "server-place-order",
+    };
+    writeStoredUsers(users);
+
+    return jsonResponse(200, {
+      ok: true,
+      order: saved,
+      orderNumber,
+      savedTo: "server",
+      deploy: DEPLOY_MARK,
+    });
+  }
+
+  if (urlPath === "/my-orders") {
+    const decoded = await resolveSignedInUser(body);
+    const uid = String(decoded.uid || decoded.sub || "").trim();
+    const email = normalizeGmail(decoded.email || "");
+    const orders = readStoredOrders()
+      .filter((order) => {
+        if (!order) return false;
+        if (String(order.userId || "") === uid) return true;
+        if (email && normalizeGmail(order.userEmail) === email) return true;
+        return false;
+      })
+      .sort((a, b) =>
+        String(b.createdAt || "").localeCompare(String(a.createdAt || "")),
+      );
+
+    return jsonResponse(200, {
+      ok: true,
+      orders,
+      deploy: DEPLOY_MARK,
+    });
+  }
+
+  if (urlPath === "/admin-list-users") {
+    await resolveOwnerAccess(body);
+    const usersMap = readStoredUsers();
+    const users = Object.values(usersMap)
+      .map((user) => {
+        if (!user || typeof user !== "object") return user;
+        const copy = { ...user };
+        delete copy.sessionToken;
+        return copy;
+      })
+      .sort((a, b) =>
+        String((b && b.lastLoginAt) || "").localeCompare(
+          String((a && a.lastLoginAt) || ""),
+        ),
+      );
+    return jsonResponse(200, {
+      ok: true,
+      users,
+      count: users.length,
+      deploy: DEPLOY_MARK,
+    });
+  }
+
+  if (urlPath === "/admin-list-orders") {
+    await resolveOwnerAccess(body);
+    const orders = readStoredOrders().sort((a, b) =>
+      String(b.createdAt || "").localeCompare(String(a.createdAt || "")),
+    );
+    return jsonResponse(200, {
+      ok: true,
+      orders,
+      count: orders.length,
+      deploy: DEPLOY_MARK,
+    });
+  }
+
   if (urlPath === "/admin-save-settings") {
-    const idToken = String(body.idToken || "").trim();
     const settings =
       body.settings && typeof body.settings === "object" ? body.settings : null;
     if (!settings) {
       throw new HttpError(400, "settings are required");
     }
 
-    let decoded = null;
-    let authError = null;
-
-    if (idToken) {
-      try {
-        decoded = await verifyOwnerIdToken(idToken);
-      } catch (err) {
-        authError = err;
-      }
-    }
-
-    if (!decoded) {
-      decoded = verifyOwnerPassword(body);
-    }
-
-    if (!decoded) {
-      const message =
-        (authError && authError.message) ||
-        "Sign in again with Google as pazarfiyati@gmail.com (or send owner password).";
-      const status = authError instanceof HttpError ? authError.statusCode : 401;
-      return jsonResponse(status, { ok: false, error: message });
+    let decoded;
+    try {
+      decoded = await resolveOwnerAccess(body);
+    } catch (err) {
+      const status = err instanceof HttpError ? err.statusCode : 401;
+      return jsonResponse(status, {
+        ok: false,
+        error: err.message || "Unauthorized",
+      });
     }
 
     const payload = {

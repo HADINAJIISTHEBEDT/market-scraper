@@ -2186,6 +2186,88 @@ Pazar Fiyatı Admin`;
         console.warn("Server settings preload failed", error);
       });
 
+      let firestoreUsers = [];
+      let serverUsers = [];
+      let firestoreOrders = [];
+      let serverOrders = [];
+
+      function mergeById(primary, secondary) {
+        const map = new Map();
+        [...secondary, ...primary].forEach((entry) => {
+          if (!entry || !entry.id) return;
+          map.set(entry.id, { ...(map.get(entry.id) || {}), ...entry });
+        });
+        return Array.from(map.values());
+      }
+
+      function publishUsers() {
+        const merged = mergeById(firestoreUsers, serverUsers).sort((a, b) =>
+          String(b.lastLoginAt || b.createdAt || "").localeCompare(String(a.lastLoginAt || a.createdAt || ""))
+        );
+        renderUsers(merged);
+      }
+
+      function publishOrders() {
+        const merged = mergeById(firestoreOrders, serverOrders).sort((a, b) =>
+          String(b.createdAt || "").localeCompare(String(a.createdAt || ""))
+        );
+        renderOrders(merged);
+      }
+
+      async function ownerListRequest(path) {
+        let idToken = "";
+        try {
+          idToken = await getOwnerIdToken();
+        } catch (error) {
+          console.warn("Owner ID token unavailable for", path, error);
+        }
+        const ownerPassword = getOwnerPasswordForSave();
+        if (!idToken && !ownerPassword) {
+          throw new Error("Owner auth missing for server list");
+        }
+        const response = await withTimeout(fetch(path, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ idToken, ownerPassword }),
+        }), 15000);
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || data.ok === false) {
+          throw new Error(data.error || `Server list failed (${response.status})`);
+        }
+        return data;
+      }
+
+      async function loadUsersFromServer() {
+        const data = await ownerListRequest("/admin-list-users");
+        serverUsers = (Array.isArray(data.users) ? data.users : []).map((user) => ({
+          id: user.id || user.uid,
+          ...user,
+        }));
+        publishUsers();
+        return serverUsers.length;
+      }
+
+      async function loadOrdersFromServer() {
+        const data = await ownerListRequest("/admin-list-orders");
+        serverOrders = (Array.isArray(data.orders) ? data.orders : []).map((order) => ({
+          id: order.id,
+          ...order,
+        }));
+        publishOrders();
+        return serverOrders.length;
+      }
+
+      loadUsersFromServer().catch((error) => {
+        console.warn("Server users preload failed", error);
+      });
+      loadOrdersFromServer().catch((error) => {
+        console.warn("Server orders preload failed", error);
+      });
+      setInterval(() => {
+        loadUsersFromServer().catch(() => {});
+        loadOrdersFromServer().catch(() => {});
+      }, 20000);
+
       onSnapshot(doc(db, "appSettings", "global"), (snapshot) => {
         const data = snapshot.exists() ? snapshot.data() : {};
         fillSettingsForm({
@@ -2204,17 +2286,37 @@ Pazar Fiyatı Admin`;
         });
       });
 
-      onSnapshot(query(collection(db, "orders"), orderBy("createdAt", "desc")), (snapshot) => {
-        renderOrders(snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() })));
+      // Avoid orderBy so users without lastLoginAt still appear; sort client-side.
+      onSnapshot(collection(db, "orders"), (snapshot) => {
+        firestoreOrders = snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() }));
+        publishOrders();
+      }, (error) => {
+        console.warn("Firestore orders listener failed", error);
+        loadOrdersFromServer().catch((serverError) => {
+          console.warn("Server orders fallback failed", serverError);
+        });
       });
 
       onSnapshot(query(collection(db, "orderCallHistory"), orderBy("createdAt", "desc")), (snapshot) => {
         adminCallHistoryEntries = snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() }));
         renderAdminCallHistory();
+      }, (error) => {
+        console.warn("Firestore call history listener failed", error);
       });
 
-      onSnapshot(query(collection(db, "users"), orderBy("lastLoginAt", "desc")), (snapshot) => {
-        renderUsers(snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() })));
+      onSnapshot(collection(db, "users"), (snapshot) => {
+        firestoreUsers = snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() }));
+        publishUsers();
+      }, (error) => {
+        console.warn("Firestore users listener failed", error);
+        loadUsersFromServer().catch((serverError) => {
+          console.warn("Server users fallback failed", serverError);
+          document.getElementById("usersLoading").style.display = "none";
+          if (!currentUsers.length) {
+            document.getElementById("usersList").innerHTML =
+              `<p class="empty-msg">${escapeHtml(t("noUsers"))}</p>`;
+          }
+        });
       });
 
       onSnapshot(query(collection(db, "deleteRequests"), orderBy("requestedAt", "desc")), (snapshot) => {
@@ -2227,11 +2329,15 @@ Pazar Fiyatı Admin`;
             console.error("Legacy inbox archive failed", error);
           });
         });
+      }, (error) => {
+        console.warn("Firestore deleteRequests listener failed", error);
       });
 
       onSnapshot(query(collection(db, "adminInbox"), orderBy("requestedAt", "desc")), (snapshot) => {
         currentInboxMessages = snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() }));
         renderInbox(currentInboxMessages);
+      }, (error) => {
+        console.warn("Firestore adminInbox listener failed", error);
       });
     }
   </script>

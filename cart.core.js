@@ -12,6 +12,7 @@
 
   const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(window.FIREBASE_CONFIG);
   const db = firebase.firestore();
+  const auth = firebase.auth();
   try { db.settings({ experimentalForceLongPolling: true, merge: true }); } catch (e) {}
 
   const resolveOrderMarketId = window.MarketsConfig.resolveOrderMarketId;
@@ -172,6 +173,102 @@
     renderCart();
   };
 
+  function buildOrderPayload(orderNumber, paymentMethod, orderItems, total, marketId, marketName) {
+    var mapLink = localStorage.getItem("user_map_link") || "";
+    var coords = window.OrderLifecycle.parseMapCoordinates
+      ? window.OrderLifecycle.parseMapCoordinates(mapLink)
+      : null;
+    return {
+      userId: userUid,
+      userName: userName || t("unknown"),
+      userEmail: localStorage.getItem("user_email") || "",
+      userPhone: localStorage.getItem("user_phone") || "",
+      userAddress: localStorage.getItem("user_address") || "",
+      userMapLink: mapLink,
+      userPhoto: localStorage.getItem("user_photo") || "",
+      userLat: coords ? coords.lat : null,
+      userLng: coords ? coords.lng : null,
+      marketId: marketId,
+      marketName: marketName,
+      orderNumber: orderNumber,
+      items: orderItems,
+      totalPrice: total,
+      status: "waiting",
+      paymentStatus: "pending",
+      preferredPaymentMethod: paymentMethod,
+      paymentSummary: paymentMethod === "card" ? {
+        type: "card",
+        cardholderName: document.getElementById("cartCardName")?.value.trim() || "",
+        last4: document.getElementById("cartCardLast4")?.value.trim() || "",
+        expiry: document.getElementById("cartCardExpiry")?.value.trim() || "",
+      } : { type: "cash" },
+      createdAt: new Date().toISOString()
+    };
+  }
+
+  function resolveOrderAuth() {
+    return Promise.resolve().then(function () {
+      if (auth.currentUser) return auth.currentUser.getIdToken(true);
+      return new Promise(function (resolve) {
+        var done = false;
+        var unsub = auth.onAuthStateChanged(function (user) {
+          if (done) return;
+          done = true;
+          try { unsub(); } catch (e) {}
+          if (!user) {
+            resolve("");
+            return;
+          }
+          user.getIdToken(true).then(resolve).catch(function () { resolve(""); });
+        });
+        setTimeout(function () {
+          if (done) return;
+          done = true;
+          try { unsub(); } catch (e) {}
+          resolve("");
+        }, 2500);
+      });
+    }).then(function (idToken) {
+      return {
+        idToken: idToken || "",
+        uid: userUid,
+        sessionToken: localStorage.getItem("server_session_token") || "",
+      };
+    });
+  }
+
+  function placeOrderOnServer(order) {
+    return resolveOrderAuth().then(function (authInfo) {
+      if (!authInfo.idToken && !authInfo.sessionToken) {
+        throw new Error("Sign in again, then place the order.");
+      }
+      return fetch("/place-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          idToken: authInfo.idToken,
+          uid: authInfo.uid,
+          sessionToken: authInfo.sessionToken,
+          order: order,
+        }),
+      }).then(function (response) {
+        return response.json().catch(function () { return {}; }).then(function (data) {
+          if (!response.ok || data.ok === false) {
+            throw new Error(data.error || ("Server order failed (" + response.status + ")"));
+          }
+          return data.orderNumber || order.orderNumber;
+        });
+      });
+    });
+  }
+
+  function allocateOrderNumberSafe() {
+    return allocateOrderNumber(db).catch(function (error) {
+      console.warn("Order counter unavailable, using local number", error);
+      return 1000 + (Date.now() % 900000);
+    });
+  }
+
   window.placeOrder = function () {
     if (!userUid) {
       window.location.href = "login.html";
@@ -194,38 +291,13 @@
       return Object.assign({}, item, { available: item.available !== false });
     });
 
-    allocateOrderNumber(db).then(function (orderNumber) {
-      var mapLink = localStorage.getItem("user_map_link") || "";
-      var coords = window.OrderLifecycle.parseMapCoordinates
-        ? window.OrderLifecycle.parseMapCoordinates(mapLink)
-        : null;
-      return db.collection("orders").add({
-        userId: userUid,
-        userName: userName || t("unknown"),
-        userEmail: localStorage.getItem("user_email") || "",
-        userPhone: localStorage.getItem("user_phone") || "",
-        userAddress: localStorage.getItem("user_address") || "",
-        userMapLink: mapLink,
-        userPhoto: localStorage.getItem("user_photo") || "",
-        userLat: coords ? coords.lat : null,
-        userLng: coords ? coords.lng : null,
-        marketId: marketId,
-        marketName: marketName,
-        orderNumber: orderNumber,
-        items: orderItems,
-        totalPrice: total,
-        status: "waiting",
-        paymentStatus: "pending",
-        preferredPaymentMethod: paymentMethod,
-        paymentSummary: paymentMethod === "card" ? {
-          type: "card",
-          cardholderName: document.getElementById("cartCardName")?.value.trim() || "",
-          last4: document.getElementById("cartCardLast4")?.value.trim() || "",
-          expiry: document.getElementById("cartCardExpiry")?.value.trim() || "",
-        } : { type: "cash" },
-        createdAt: new Date().toISOString()
-      }).then(function () {
+    allocateOrderNumberSafe().then(function (orderNumber) {
+      const order = buildOrderPayload(orderNumber, paymentMethod, orderItems, total, marketId, marketName);
+      return db.collection("orders").add(order).then(function () {
         return orderNumber;
+      }).catch(function (firestoreError) {
+        console.warn("Firestore place order failed, trying server", firestoreError);
+        return placeOrderOnServer(order);
       });
     }).then(function (orderNumber) {
       localStorage.removeItem("cart");
