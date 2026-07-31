@@ -1,4 +1,6 @@
 data/app-settings.json
+data/users-store.json
+data/orders-store.json
 node_modules/
 .cache/
 .idea/
